@@ -1,6 +1,7 @@
 #include "VulkanEngine.h"
 
 #include <iostream>
+#include <functional>
 
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vk_enum_string_helper.h>
@@ -32,12 +33,18 @@ const bool kEnableValidationLayers = false;
 const bool kEnableValidationLayers = true;
 #endif
 
-VulkanEngine::VulkanEngine() : is_initialized_(false), frame_number_(0) {}
+VulkanEngine::VulkanEngine()
+    : is_initialized_(false),
+      frame_number_(0),
+      delta_time_(0),
+      last_time_(0),
+      cursor_enabled_(false) {}
 
 VulkanEngine::~VulkanEngine() {}
 
 void VulkanEngine::Init() {
-  window_.Init(1600, 900, "Vulkan Engine");
+  window_.Init(1600, 900, "Vulkan Engine", this);
+  glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   VK_CHECK(
       instance_.Init(kEnableValidationLayers, {"VK_LAYER_KHRONOS_validation"}));
   VK_CHECK(surface_.Init(&instance_, &window_));
@@ -229,7 +236,7 @@ void VulkanEngine::LoadTextures() {
 void VulkanEngine::InitScene() {
   Renderer::RenderObject room;
   room.Create(GetMesh("room"), GetMaterial("textured"));
-  room.ModelMatrix() = glm::translate(glm::vec3(0, 0, 7));
+  room.ModelMatrix() = glm::translate(glm::vec3(0, 0, -5));
   room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-45.f),
                                    glm::vec3(1.f, 0.f, 0.f));
   room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-135.f),
@@ -322,6 +329,54 @@ size_t VulkanEngine::PadUniformBuffer(size_t size) {
         (aligned_size + min_ubo_alignment - 1) & ~(min_ubo_alignment - 1);
   }
   return aligned_size;
+}
+
+void VulkanEngine::MouseCallback(GLFWwindow* window, double x, double y) {
+  static bool first_mouse = true;
+  if (cursor_enabled_) return;
+
+  if (first_mouse) {
+    last_mouse_x_ = x;
+    last_mouse_y_ = y;
+    first_mouse = false;
+  }
+
+  float delta_x = x - last_mouse_x_;
+  float delta_y = last_mouse_y_ - y;
+  last_mouse_x_ = x;
+  last_mouse_y_ = y;
+
+  camera_.ProcessMouse(delta_x, delta_y);
+}
+
+void VulkanEngine::ProcessInput() {
+  if (!cursor_enabled_ &&
+      glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
+    cursor_enabled_ = true;
+    glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    int width, height;
+    window_.GetFramebufferSize(&width, &height);
+    glfwSetCursorPos(window_.GetWindow(), width / 2, height / 2);
+  } else if (cursor_enabled_ &&
+             glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_ALT) ==
+                 GLFW_RELEASE) {
+    cursor_enabled_ = false;
+    glfwSetCursorPos(window_.GetWindow(), last_mouse_x_, last_mouse_y_);
+    glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  }
+
+  if (glfwGetKey(window_.GetWindow(), GLFW_KEY_W) == GLFW_PRESS)
+    camera_.ProcessKeyboard(Renderer::Camera::Direction::kForward, delta_time_);
+  if (glfwGetKey(window_.GetWindow(), GLFW_KEY_S) == GLFW_PRESS)
+    camera_.ProcessKeyboard(Renderer::Camera::Direction::kBackward, delta_time_);
+  if (glfwGetKey(window_.GetWindow(), GLFW_KEY_D) == GLFW_PRESS)
+    camera_.ProcessKeyboard(Renderer::Camera::Direction::kRight, delta_time_);
+  if (glfwGetKey(window_.GetWindow(), GLFW_KEY_A) == GLFW_PRESS)
+    camera_.ProcessKeyboard(Renderer::Camera::Direction::kLeft, delta_time_);
+  if (glfwGetKey(window_.GetWindow(), GLFW_KEY_SPACE) == GLFW_PRESS)
+    camera_.ProcessKeyboard(Renderer::Camera::Direction::kUp, delta_time_);
+  if (glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+    camera_.ProcessKeyboard(Renderer::Camera::Direction::kDown, delta_time_);
 }
 
 void VulkanEngine::Cleanup() {
@@ -443,13 +498,11 @@ void VulkanEngine::Draw() {
 
 void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
                                Renderer::RenderObject* first, size_t count) {
-  glm::vec3 cam_pos{0.f, 0.f, -10.f};
-  glm::mat4 view = glm::translate(glm::mat4{1.f}, cam_pos);
   glm::mat4 projection =
-      glm::perspective(glm::radians(70.f), 1600.f / 900.f, 0.1f, 100.f);
+      glm::perspective(glm::radians(90.f), 1600.f / 900.f, 0.1f, 100.f);
   projection[1][1] *= -1;
 
-  scene_data_.camera_data.view = view;
+  scene_data_.camera_data.view = camera_.GetViewMat();
   scene_data_.camera_data.projection = projection;
 
   float framed = frame_number_ / 120.f;
@@ -506,6 +559,12 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
 void VulkanEngine::Run() {
   while (!window_.ShouldClose()) {
     window_.PollEvents();
+
+    float current_time = glfwGetTime();
+    delta_time_ = current_time - last_time_;
+    last_time_ = current_time;
+
+    ProcessInput();
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();

@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 
+#include "Camera.h"
 #include "CommandPool.h"
 #include "Descriptors.h"
 #include "DescriptorPool.h"
@@ -74,6 +75,8 @@ class VulkanEngine {
 
   void Run();
 
+  void MouseCallback(GLFWwindow* window, double x, double y);
+
  private:
   void InitSyncStructures();
   void InitDescriptors();
@@ -89,10 +92,17 @@ class VulkanEngine {
   Renderer::Mesh* GetMesh(const std::string& name); 
   size_t PadUniformBuffer(size_t size);
 
+  void ProcessInput();
+
   bool is_initialized_;
   uint32_t frame_number_;
+  float delta_time_;
+  float last_time_;
+  int last_mouse_x_, last_mouse_y_;
+  bool cursor_enabled_;
 
   Renderer::Window window_;
+  Renderer::Camera camera_;
 
   Renderer::VulkanInstance instance_;
   Renderer::Surface surface_;
