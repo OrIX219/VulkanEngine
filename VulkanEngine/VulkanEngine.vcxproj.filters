@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Libraries">
+      <UniqueIdentifier>{0259E1F6-6EC3-956D-B701-471323AB73C2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\include">
+      <UniqueIdentifier>{7562B06E-E178-AE04-2AF0-392696457F8C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\include\imgui">
+      <UniqueIdentifier>{9FB39B21-0BEB-E3B8-14F5-47DC80AB0AB2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{EFAC8DF2-5B8C-0C8E-64A4-9764D00273EF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{2DAB880B-99B4-887C-2230-9F7C8E38947C}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\Buffer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CommandBuffer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CommandPool.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DescriptorPool.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Descriptors.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Image.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\IndexBuffer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Log.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\LogicalDevice.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Material.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Mesh.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PhysicalDevice.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Pipeline.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Queue.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RenderObject.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\RenderPass.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Surface.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Swapchain.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SwapchainFramebuffers.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Texture.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TextureSampler.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Vertex.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\VertexBuffer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\VulkanEngine.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\VulkanInstance.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Window.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Libraries\include\imgui\imgui.cpp">
+      <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\imgui_demo.cpp">
+      <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\imgui_draw.cpp">
+      <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\imgui_impl_glfw.cpp">
+      <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\imgui_impl_vulkan.cpp">
+      <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\imgui_tables.cpp">
+      <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\imgui_widgets.cpp">
+      <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CommandBuffer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CommandPool.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DescriptorPool.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Descriptors.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Image.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\IndexBuffer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Log.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\LogicalDevice.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Mesh.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PhysicalDevice.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Pipeline.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Queue.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\RenderPass.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Surface.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Swapchain.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SwapchainFramebuffers.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Texture.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\TextureSampler.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\VertexBuffer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\VulkanEngine.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Window.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\colored_triangle.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\colored_triangle.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\default_lit.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\textured_lit.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\tri_mesh.vert">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>
