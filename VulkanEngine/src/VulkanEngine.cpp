@@ -13,11 +13,9 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/gtx/transform.hpp>
 
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_glfw.h"
-#include "imgui/imgui_impl_vulkan.h"
-
-#include "TextureAsset.h"
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/imgui_impl_vulkan.h>
 
 #define VK_CHECK(x)                                                       \
   do {                                                                    \
