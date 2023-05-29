@@ -15,7 +15,8 @@ TextureSampler::TextureSampler(LogicalDevice* device)
 
 TextureSampler::~TextureSampler() {}
 
-void TextureSampler::Create(LogicalDevice* device) {
+void TextureSampler::Create(LogicalDevice* device, float min_lod,
+                            float max_lod) {
   device_ = device;
 
   VkSamplerCreateInfo sampler_info{};
@@ -36,8 +37,8 @@ void TextureSampler::Create(LogicalDevice* device) {
   sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
   sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
   sampler_info.mipLodBias = 0.f;
-  sampler_info.minLod = 0.f;
-  sampler_info.maxLod = 0.f;
+  sampler_info.minLod = min_lod;
+  sampler_info.maxLod = max_lod;
 
   if (vkCreateSampler(device_->GetDevice(), &sampler_info, nullptr,
                       &sampler_) != VK_SUCCESS)
@@ -82,7 +83,7 @@ TextureSampler& TextureSampler::SetAnisotropyEnable(bool enable) {
 
 TextureSampler& TextureSampler::SetDefaults() {
   SetMagFilter(VK_FILTER_NEAREST)
-      .SetMinFilter(VK_FILTER_NEAREST)
+      .SetMinFilter(VK_FILTER_LINEAR)
       .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_REPEAT,
                        VK_SAMPLER_ADDRESS_MODE_REPEAT,
                        VK_SAMPLER_ADDRESS_MODE_REPEAT})

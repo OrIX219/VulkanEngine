@@ -24,6 +24,9 @@ class Texture {
   VkImageView GetView();
 
  private:
+  uint32_t CalculateMipLevels(uint32_t width, uint32_t height);
+  void GenerateMipmaps(CommandBuffer command_buffer);
+
   Buffer<true> staging_buffer_;
   Image image_;
 };

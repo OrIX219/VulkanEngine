@@ -18,7 +18,8 @@ class TextureSampler {
   TextureSampler(LogicalDevice* device);
   ~TextureSampler();
 
-  void Create(LogicalDevice* device);
+  void Create(LogicalDevice* device, float min_lod = 0.f,
+              float max_lod = VK_LOD_CLAMP_NONE);
   void Destroy();
 
   VkSampler GetSampler();

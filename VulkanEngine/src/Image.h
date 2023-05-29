@@ -12,12 +12,14 @@ class Image {
  public:
   Image();
   Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
-        VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
+        VkImageUsageFlags usage, uint32_t mip_levels = 1,
+        VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
         VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
         VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
 
   VkResult Create(VmaAllocator allocator, LogicalDevice* device,
                   VkExtent3D extent, VkImageUsageFlags usage,
+                  uint32_t mip_levels = 1,
                   VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
                   VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
                   VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
@@ -28,6 +30,7 @@ class Image {
 
   VkExtent3D GetExtent() const;
   VkFormat GetFormat() const;
+  uint32_t GetMipLevels() const;
 
   void TransitionLayout(CommandBuffer command_buffer, VkFormat format,
                         VkImageLayout old_layout, VkImageLayout new_layout);
@@ -59,6 +62,7 @@ class Image {
 
   VkExtent3D image_extent_;
   VkFormat image_format_;
+  uint32_t mip_levels_;
 
   VmaAllocator allocator_;
   LogicalDevice* device_;

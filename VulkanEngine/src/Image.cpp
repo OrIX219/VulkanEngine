@@ -5,25 +5,27 @@ namespace Renderer {
 Image::Image() : image_(VK_NULL_HANDLE) {}
 
 Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
-             VkImageUsageFlags usage, VkFormat format, VkImageTiling tiling,
-             VkImageAspectFlags aspect_flags) {
-  Create(allocator, device, extent, usage, format, tiling, aspect_flags);
+             VkImageUsageFlags usage, uint32_t mip_levels, VkFormat format,
+             VkImageTiling tiling, VkImageAspectFlags aspect_flags) {
+  Create(allocator, device, extent, usage, mip_levels, format, tiling,
+         aspect_flags);
 }
 
 VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
                        VkExtent3D extent, VkImageUsageFlags usage,
-                       VkFormat format, VkImageTiling tiling,
-                       VkImageAspectFlags aspect_flags) {
+                       uint32_t mip_levels, VkFormat format,
+                       VkImageTiling tiling, VkImageAspectFlags aspect_flags) {
   allocator_ = allocator;
   device_ = device;
   image_extent_ = extent;
+  mip_levels_ = mip_levels;
   image_format_ = format;
 
   VkImageCreateInfo image_info{};
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image_info.imageType = VK_IMAGE_TYPE_2D;
   image_info.extent = image_extent_;
-  image_info.mipLevels = 1;
+  image_info.mipLevels = mip_levels_;
   image_info.arrayLayers = 1;
   image_info.format = format;
   image_info.tiling = tiling;
@@ -56,6 +58,8 @@ VkExtent3D Image::GetExtent() const { return image_extent_; }
 
 VkFormat Image::GetFormat() const { return image_format_; }
 
+uint32_t Image::GetMipLevels() const { return mip_levels_; }
+
 void Image::TransitionLayout(CommandBuffer command_buffer, VkFormat format,
                              VkImageLayout old_layout, VkImageLayout new_layout) {
   VkImageMemoryBarrier barrier{};
@@ -67,7 +71,7 @@ void Image::TransitionLayout(CommandBuffer command_buffer, VkFormat format,
   barrier.image = image_;
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.baseMipLevel = 0;
-  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.levelCount = mip_levels_;
   barrier.subresourceRange.baseArrayLayer = 0;
   barrier.subresourceRange.layerCount = 1;
 
@@ -105,7 +109,7 @@ VkResult Image::CreateImageView(VkImageAspectFlags aspect_flags) {
   create_info.format = image_format_;
   create_info.subresourceRange.aspectMask = aspect_flags;
   create_info.subresourceRange.baseMipLevel = 0;
-  create_info.subresourceRange.levelCount = 1;
+  create_info.subresourceRange.levelCount = mip_levels_;
   create_info.subresourceRange.baseArrayLayer = 0;
   create_info.subresourceRange.layerCount = 1;
 

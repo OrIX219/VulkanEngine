@@ -60,7 +60,7 @@ void VulkanEngine::Init() {
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT,
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1, VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT));
 
   VK_CHECK(render_pass_.CreateDefault(&device_, swapchain_.GetImageFormat()));
@@ -196,15 +196,16 @@ void VulkanEngine::LoadMeshes() {
   Renderer::CommandBuffer command_buffer = frames_[0].command_pool_.GetBuffer();
   command_buffer.Begin(true);
 
-  Renderer::Mesh lost_empire;
-  lost_empire.LoadFromAsset(allocator_, command_buffer, "Assets/lost_empire.mesh");
+  Renderer::Mesh viking_room;
+  viking_room.LoadFromAsset(allocator_, command_buffer,
+                            "Assets/viking_room.mesh");
 
   command_buffer.End();
   command_buffer.Submit();
 
   device_.GetGraphicsQueue().SubmitBatches();
 
-  meshes_["empire"] = lost_empire;
+  meshes_["room"] = viking_room;
 }
 
 void VulkanEngine::LoadTextures() {
@@ -213,35 +214,38 @@ void VulkanEngine::LoadTextures() {
   Renderer::CommandBuffer command_buffer = frames_[0].command_pool_.GetBuffer();
   command_buffer.Begin(true);
 
-  Renderer::Texture texture;
-  texture.LoadFromAsset(allocator_, &device_, command_buffer,
-                        "Assets/lost_empire-RGBA.tx");
+  Renderer::Texture viking_texture;
+  viking_texture.LoadFromAsset(allocator_, &device_, command_buffer,
+                               "Assets/viking_room.tx");
 
   command_buffer.End();
   command_buffer.Submit();
 
   device_.GetGraphicsQueue().SubmitBatches();
 
-  textures_["empire_diffuse"] = texture;
+  textures_["viking"] = viking_texture;
 }
 
 void VulkanEngine::InitScene() {
-  Renderer::RenderObject map;
-  map.Create(GetMesh("empire"), GetMaterial("textured"));
-  map.ModelMatrix() = glm::translate(glm::vec3(5, -15, 0));
-  renderables_.push_back(map);
+  Renderer::RenderObject room;
+  room.Create(GetMesh("room"), GetMaterial("textured"));
+  room.ModelMatrix() = glm::translate(glm::vec3(0, 0, 7));
+  room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-45.f),
+                                   glm::vec3(1.f, 0.f, 0.f));
+  room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-135.f),
+                                   glm::vec3(0.f, 0.f, 1.f));
+  renderables_.push_back(room);
 
-  Renderer::Material* textured_mat = GetMaterial("textured");
-
-  VkDescriptorImageInfo image_info{};
-  image_info.sampler = texture_sampler_.GetSampler();
-  image_info.imageView = textures_["empire_diffuse"].GetView();
-  image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  Renderer::Material* viking_mat = GetMaterial("textured");
+  VkDescriptorImageInfo viking_info{};
+  viking_info.sampler = texture_sampler_.GetSampler();
+  viking_info.imageView = textures_["viking"].GetView();
+  viking_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
   Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
-      .BindImage(0, &image_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .BindImage(0, &viking_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                  VK_SHADER_STAGE_FRAGMENT_BIT)
-      .Build(textured_mat->texture_set);
+      .Build(viking_mat->texture_set);
 }
 
 void VulkanEngine::InitImgui() {
