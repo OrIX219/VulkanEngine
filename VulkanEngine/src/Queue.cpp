@@ -8,12 +8,13 @@ void Queue::SetQueue(const VkQueue& queue) { queue_ = queue; }
 
 VkQueue Queue::GetQueue() { return queue_; }
 
-void Queue::StartBatch() {
+void Queue::BeginBatch() {
+  if (current_batch_ < batches_.size()) EndBatch();
   batches_.push_back(std::vector<VkCommandBuffer>());
 }
 
 void Queue::AddToBatch(VkCommandBuffer command_buffer) {
-  if (current_batch_ >= batches_.size()) StartBatch();
+  if (current_batch_ >= batches_.size()) BeginBatch();
   batches_[current_batch_].push_back(command_buffer);
 }
 

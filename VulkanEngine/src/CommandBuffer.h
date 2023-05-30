@@ -20,7 +20,7 @@ class CommandBuffer {
 
   VkResult Reset();
 
-  VkResult Begin(bool one_time = false);
+  VkResult Begin(bool one_time = true);
   VkResult End();
   void AddToBatch();
   void Submit();

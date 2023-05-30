@@ -84,10 +84,9 @@ void VulkanEngine::Init() {
   InitDescriptors();
   InitPipelines();
 
-  Renderer::Queue& init_queue =
-      init_pool_.GetLogicalDevice()->GetQueue(init_pool_.GetQueueFamily());
+  Renderer::Queue& init_queue = device_.GetQueue(init_pool_.GetQueueFamily());
 
-  init_queue.StartBatch();
+  init_queue.BeginBatch();
   LoadMeshes();
   LoadTextures();
   init_queue.EndBatch();
@@ -213,7 +212,7 @@ void VulkanEngine::InitPipelines() {
 
 void VulkanEngine::LoadMeshes() {
   Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
-  command_buffer.Begin(true);
+  command_buffer.Begin();
 
   Renderer::Mesh viking_room;
   viking_room.LoadFromAsset(allocator_, command_buffer,
@@ -229,7 +228,7 @@ void VulkanEngine::LoadTextures() {
   texture_sampler_.SetDefaults().Create(&device_);
 
   Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
-  command_buffer.Begin(true);
+  command_buffer.Begin();
 
   Renderer::Texture viking_texture;
   viking_texture.LoadFromAsset(allocator_, &device_, command_buffer,
@@ -484,11 +483,10 @@ void VulkanEngine::Draw() {
 
   Renderer::CommandBuffer command_buffer =
       frames_[frame_index].command_pool_.GetBuffer();
-  VK_CHECK(command_buffer.Begin(true));
+  VK_CHECK(command_buffer.Begin());
 
   VkClearValue clear_value{};
-  float flash = abs(sin(frame_number_ / 120.f));
-  clear_value.color = {{0.f, 0.f, flash, 1.f}};
+  clear_value.color = {{0.f, 0.f, 0.f, 1.f}};
   VkClearValue depth_clear{};
   depth_clear.depthStencil.depth = 1.f;
 
