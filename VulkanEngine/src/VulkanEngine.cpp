@@ -62,6 +62,8 @@ void VulkanEngine::Init() {
   allocator_info.vulkanApiVersion = VK_API_VERSION_1_2;
 
   VK_CHECK(vmaCreateAllocator(&allocator_info, &allocator_));
+  VK_CHECK(init_pool_.Create(
+      &device_, device_.GetQueueFamilies().graphics_family.value()));
 
   VK_CHECK(swapchain_.Create(&device_, &surface_));
 
@@ -82,8 +84,15 @@ void VulkanEngine::Init() {
   InitDescriptors();
   InitPipelines();
 
+  Renderer::Queue& init_queue =
+      init_pool_.GetLogicalDevice()->GetQueue(init_pool_.GetQueueFamily());
+
+  init_queue.StartBatch();
   LoadMeshes();
   LoadTextures();
+  init_queue.EndBatch();
+
+  init_queue.SubmitBatches();
 
   InitScene();
 
@@ -91,6 +100,8 @@ void VulkanEngine::Init() {
 
   device_.WaitIdle();
   is_initialized_ = true;
+
+  init_pool_.Destroy();
 }
 
 void VulkanEngine::InitSyncStructures() {
@@ -201,7 +212,7 @@ void VulkanEngine::InitPipelines() {
 }
 
 void VulkanEngine::LoadMeshes() {
-  Renderer::CommandBuffer command_buffer = frames_[0].command_pool_.GetBuffer();
+  Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin(true);
 
   Renderer::Mesh viking_room;
@@ -209,9 +220,7 @@ void VulkanEngine::LoadMeshes() {
                             "Assets/viking_room.mesh");
 
   command_buffer.End();
-  command_buffer.Submit();
-
-  device_.GetGraphicsQueue().SubmitBatches();
+  command_buffer.AddToBatch();
 
   meshes_["room"] = viking_room;
 }
@@ -219,7 +228,7 @@ void VulkanEngine::LoadMeshes() {
 void VulkanEngine::LoadTextures() {
   texture_sampler_.SetDefaults().Create(&device_);
 
-  Renderer::CommandBuffer command_buffer = frames_[0].command_pool_.GetBuffer();
+  Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin(true);
 
   Renderer::Texture viking_texture;
@@ -227,9 +236,7 @@ void VulkanEngine::LoadTextures() {
                                "Assets/viking_room.tx");
 
   command_buffer.End();
-  command_buffer.Submit();
-
-  device_.GetGraphicsQueue().SubmitBatches();
+  command_buffer.AddToBatch();
 
   textures_["viking"] = viking_texture;
 }
@@ -291,7 +298,7 @@ void VulkanEngine::InitImgui() {
 
   ImGui_ImplVulkan_Init(&init_info, render_pass_.GetRenderPass());
 
-  Renderer::CommandBuffer command_buffer = frames_[0].command_pool_.GetBuffer();
+  Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
   ImGui_ImplVulkan_CreateFontsTexture(command_buffer.GetBuffer());
   command_buffer.End();
@@ -597,6 +604,10 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
 
 void VulkanEngine::DrawMenu() {
   ImGui::SetNextWindowSize(ImVec2{100.f, 0.f});
+  VkExtent2D window_extent = window_.GetFramebufferSize();
+  ImGui::SetNextWindowPos(ImVec2{static_cast<float>(window_extent.width) / 2,
+                                 static_cast<float>(window_extent.height) / 2},
+                          ImGuiCond_Always, ImVec2{0.5f, 0.5f});
   ImGui::Begin("Menu", &menu_opened_,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
   ImVec2 region = ImGui::GetContentRegionAvail();
@@ -619,8 +630,8 @@ void VulkanEngine::Run() {
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
-
     ImGui::NewFrame();
+
     if (menu_opened_) DrawMenu();
 
     Draw();

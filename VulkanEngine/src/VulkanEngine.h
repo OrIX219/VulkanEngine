@@ -115,7 +115,8 @@ class VulkanEngine {
   Renderer::LogicalDevice device_;
 
   VmaAllocator allocator_;
- 
+  Renderer::CommandPool init_pool_;
+
   Renderer::Swapchain swapchain_;
   Renderer::Image depth_image_;
   Renderer::RenderPass render_pass_;

@@ -22,8 +22,9 @@ class CommandBuffer {
 
   VkResult Begin(bool one_time = false);
   VkResult End();
+  void AddToBatch();
   void Submit();
-  void Submit(VkSubmitInfo submit_info);
+  void Submit(VkSubmitInfo sync_info);
 
   VkResult Create(VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
   void Destroy();

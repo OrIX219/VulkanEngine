@@ -33,6 +33,11 @@ VkResult CommandBuffer::End() {
   return vkEndCommandBuffer(command_buffer_);
 }
 
+void CommandBuffer::AddToBatch() {
+  Queue& queue = pool_->GetLogicalDevice()->GetQueue(pool_->GetQueueFamily());
+  queue.AddToBatch(command_buffer_);
+}
+
 void CommandBuffer::Submit() {
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -44,11 +49,11 @@ void CommandBuffer::Submit() {
   queue.Submit(submit_info);
 }
 
-void CommandBuffer::Submit(VkSubmitInfo submit_info) {
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &command_buffer_;
+void CommandBuffer::Submit(VkSubmitInfo sync_info) {
+  sync_info.commandBufferCount = 1;
+  sync_info.pCommandBuffers = &command_buffer_;
   Queue& queue = pool_->GetLogicalDevice()->GetQueue(pool_->GetQueueFamily());
-  queue.Submit(std::move(submit_info));
+  queue.Submit(std::move(sync_info));
 }
 
 VkResult CommandBuffer::Create(VkCommandBufferLevel level) {
