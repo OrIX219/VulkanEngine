@@ -88,7 +88,7 @@ VkDescriptorPool DescriptorAllocator::CreatePool(
   pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   pool_info.poolSizeCount = static_cast<uint32_t>(sizes.size());
   pool_info.pPoolSizes = sizes.data();
-  pool_info.maxSets = count;
+  pool_info.maxSets = static_cast<uint32_t>(count);
   pool_info.flags = flags;
 
   VkDescriptorPool descriptor_pool;

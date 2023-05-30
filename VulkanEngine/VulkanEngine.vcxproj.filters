@@ -189,12 +189,6 @@
     <ClCompile Include="src\Camera.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\colored_triangle.frag">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Shaders\colored_triangle.vert">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="Shaders\default_lit.frag">
       <Filter>Shaders</Filter>
     </None>

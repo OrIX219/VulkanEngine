@@ -29,6 +29,7 @@ class SwapchainFramebuffers {
 
   Swapchain* swapchain_;
   RenderPass* render_pass_;
+  Image* depth_image_;
 };
 
 }

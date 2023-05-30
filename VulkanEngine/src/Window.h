@@ -12,7 +12,8 @@ class Window {
   Window();
   ~Window();
 
-  void Init(uint32_t width, uint32_t height, const char* title, VulkanEngine* engine);
+  void Init(uint32_t width, uint32_t height, const char* title,
+            VulkanEngine* engine);
   void Destroy();
 
   GLFWwindow* GetWindow();
@@ -26,15 +27,16 @@ class Window {
   void SetResized(bool resized);
 
   void GetFramebufferSize(int* width, int* height) const;
+  VkExtent2D GetFramebufferSize() const;
+
+  static void FramebufferResizeCallback(GLFWwindow* window, int width,
+                                        int height);
+
+  static void CursorPosCallback(GLFWwindow* window, double x, double y);
 
  private:
-  static void FramebufferResizeCallback(GLFWwindow* window, int width,
-                                        int height) {
-    auto wnd = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-    wnd->resized_ = true;
-  }
-
   bool resized_;
+  VulkanEngine* engine_;
 
   GLFWwindow* window_;
 };

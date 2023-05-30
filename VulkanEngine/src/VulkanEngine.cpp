@@ -301,6 +301,25 @@ void VulkanEngine::InitImgui() {
   ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
+void VulkanEngine::RecreateSwapchain() {
+  VkExtent2D extent = window_.GetFramebufferSize();
+  if (extent.width == 0 || extent.height == 0) {
+    extent = window_.GetFramebufferSize();
+    window_.WaitEvents();
+  }
+
+  device_.WaitIdle();
+
+  swapchain_.Recreate();
+  depth_image_.Destroy();
+  extent = swapchain_.GetImageExtent();
+  depth_image_.Create(allocator_, &device_, {extent.width, extent.height, 1},
+                      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1,
+                      VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+                      VK_IMAGE_ASPECT_DEPTH_BIT);
+  swapchain_framebuffers_.Recreate();
+}
+
 Renderer::Material* VulkanEngine::CreateMaterial(Renderer::Pipeline pipeline,
                                                  const std::string& name) {
   Renderer::Material mat{VK_NULL_HANDLE, pipeline};
@@ -331,7 +350,7 @@ size_t VulkanEngine::PadUniformBuffer(size_t size) {
   return aligned_size;
 }
 
-void VulkanEngine::MouseCallback(GLFWwindow* window, double x, double y) {
+void VulkanEngine::MousePosCallback(double x, double y) {
   static bool first_mouse = true;
   if (cursor_enabled_) return;
 
@@ -354,9 +373,8 @@ void VulkanEngine::ProcessInput() {
       glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
     cursor_enabled_ = true;
     glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    int width, height;
-    window_.GetFramebufferSize(&width, &height);
-    glfwSetCursorPos(window_.GetWindow(), width / 2, height / 2);
+    VkExtent2D extent = window_.GetFramebufferSize();
+    glfwSetCursorPos(window_.GetWindow(), extent.width / 2, extent.height / 2);
   } else if (cursor_enabled_ &&
              glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_ALT) ==
                  GLFW_RELEASE) {
@@ -425,25 +443,32 @@ void VulkanEngine::Cleanup() {
 }
 
 void VulkanEngine::Draw() {
-  VK_CHECK(vkWaitForFences(
-      device_.GetDevice(), 1,
-      &frames_[frame_number_ % kMaxFramesInFlight].render_fence_, VK_TRUE,
-      UINT64_MAX));
-  VK_CHECK(vkResetFences(
-      device_.GetDevice(), 1,
-      &frames_[frame_number_ % kMaxFramesInFlight].render_fence_));
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+
+  VK_CHECK(vkWaitForFences(device_.GetDevice(), 1,
+                           &frames_[frame_index].render_fence_, VK_TRUE,
+                           UINT64_MAX));
 
   uint32_t image_index;
-  VK_CHECK(swapchain_.AcquireNextImage(
-      &image_index,
-      frames_[frame_number_ % kMaxFramesInFlight].present_semaphore_));
+  VkResult res = swapchain_.AcquireNextImage(
+      &image_index, frames_[frame_index].present_semaphore_);
 
-  VK_CHECK(frames_[frame_number_ % kMaxFramesInFlight].command_pool_.Reset());
+  if (res == VK_ERROR_OUT_OF_DATE_KHR) {
+    RecreateSwapchain();
+    return;
+  } else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
+    VK_CHECK(res);
+  }
+
+  VK_CHECK(vkResetFences(device_.GetDevice(), 1,
+                         &frames_[frame_index].render_fence_));
+
+  VK_CHECK(frames_[frame_index].command_pool_.Reset());
 
   ImGui::Render();
 
   Renderer::CommandBuffer command_buffer =
-      frames_[frame_number_ % kMaxFramesInFlight].command_pool_.GetBuffer();
+      frames_[frame_index].command_pool_.GetBuffer();
   VK_CHECK(command_buffer.Begin(true));
 
   VkClearValue clear_value{};
@@ -471,15 +496,13 @@ void VulkanEngine::Draw() {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   submit_info.pWaitDstStageMask = &wait_stage;
   submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores =
-      &frames_[frame_number_ % kMaxFramesInFlight].present_semaphore_;
+  submit_info.pWaitSemaphores = &frames_[frame_index].present_semaphore_;
   submit_info.signalSemaphoreCount = 1;
-  submit_info.pSignalSemaphores =
-      &frames_[frame_number_ % kMaxFramesInFlight].render_semaphore_;
+  submit_info.pSignalSemaphores = &frames_[frame_index].render_semaphore_;
   command_buffer.Submit(std::move(submit_info));
 
   VK_CHECK(device_.GetGraphicsQueue().SubmitBatches(
-      frames_[frame_number_ % kMaxFramesInFlight].render_fence_));
+      frames_[frame_index].render_fence_));
 
   VkPresentInfoKHR present_info{};
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -487,17 +510,26 @@ void VulkanEngine::Draw() {
   present_info.swapchainCount = 1;
   present_info.pSwapchains = swapchains;
   present_info.waitSemaphoreCount = 1;
-  present_info.pWaitSemaphores =
-      &frames_[frame_number_ % kMaxFramesInFlight].render_semaphore_;
+  present_info.pWaitSemaphores = &frames_[frame_index].render_semaphore_;
   present_info.pImageIndices = &image_index;
 
-  VK_CHECK(device_.GetPresentQueue().Present(&present_info));
+  res = device_.GetPresentQueue().Present(&present_info);
+
+  if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR ||
+      window_.GetResized()) {
+    window_.SetResized(false);
+    RecreateSwapchain();
+  } else if (res != VK_SUCCESS) {
+    VK_CHECK(res);
+  }
 
   frame_number_++;
 }
 
 void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
                                Renderer::RenderObject* first, size_t count) {
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+
   glm::mat4 projection =
       glm::perspective(glm::radians(90.f), 1600.f / 900.f, 0.1f, 100.f);
   projection[1][1] *= -1;
@@ -508,13 +540,11 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
   float framed = frame_number_ / 120.f;
   scene_data_.ambient_color = {sin(framed), 0, cos(framed), 1};
 
-  uint32_t uniform_offset = PadUniformBuffer(sizeof(SceneData)) *
-                            (frame_number_ % kMaxFramesInFlight);
+  uint32_t uniform_offset = PadUniformBuffer(sizeof(SceneData)) * frame_index;
   scene_buffer_.SetData(&scene_data_, sizeof(SceneData), uniform_offset);
 
-  ObjectData* object_SSBO =
-      static_cast<ObjectData*>(frames_[frame_number_ % kMaxFramesInFlight]
-                                   .object_buffer_.GetMappedMemory());
+  ObjectData* object_SSBO = static_cast<ObjectData*>(
+      frames_[frame_index].object_buffer_.GetMappedMemory());
   for (size_t i = 0; i < count; ++i) {
     Renderer::RenderObject& object = first[i];
     object_SSBO[i].model_matrix = object.ModelMatrix();
@@ -531,12 +561,12 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
       vkCmdBindDescriptorSets(
           command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
           object.GetMaterial()->pipeline.GetLayout(), 0, 1,
-          &frames_[frame_number_ % kMaxFramesInFlight].global_descriptor_, 1,
+          &frames_[frame_index].global_descriptor_, 1,
           &uniform_offset);
       vkCmdBindDescriptorSets(
           command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
           object.GetMaterial()->pipeline.GetLayout(), 1, 1,
-          &frames_[frame_number_ % kMaxFramesInFlight].object_descriptor_, 0,
+          &frames_[frame_index].object_descriptor_, 0,
           nullptr);
       if (object.GetMaterial()->texture_set != VK_NULL_HANDLE) {
         vkCmdBindDescriptorSets(

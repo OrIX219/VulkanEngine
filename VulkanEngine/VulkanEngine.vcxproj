@@ -161,8 +161,6 @@
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\colored_triangle.frag" />
-    <None Include="Shaders\colored_triangle.vert" />
     <None Include="Shaders\default_lit.frag" />
     <None Include="Shaders\textured_lit.frag" />
     <None Include="Shaders\tri_mesh.vert" />

@@ -75,7 +75,7 @@ class VulkanEngine {
 
   void Run();
 
-  void MouseCallback(GLFWwindow* window, double x, double y);
+  void MousePosCallback(double x, double y);
 
  private:
   void InitSyncStructures();
@@ -85,6 +85,8 @@ class VulkanEngine {
   void LoadTextures();
   void InitScene();
   void InitImgui();
+
+  void RecreateSwapchain();
 
   Renderer::Material* CreateMaterial(Renderer::Pipeline pipeline,
                                      const std::string& name);
