@@ -73,9 +73,11 @@ class VulkanEngine {
   void DrawObjects(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderObject* first, size_t count);
 
+  void DrawMenu();
   void Run();
 
   void MousePosCallback(double x, double y);
+  void KeyCallback(int key, int action, int mods);
 
  private:
   void InitSyncStructures();
@@ -102,6 +104,7 @@ class VulkanEngine {
   float last_time_;
   int last_mouse_x_, last_mouse_y_;
   bool cursor_enabled_;
+  bool menu_opened_;
 
   Renderer::Window window_;
   Renderer::Camera camera_;

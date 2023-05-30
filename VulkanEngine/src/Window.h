@@ -19,6 +19,7 @@ class Window {
   GLFWwindow* GetWindow();
 
   bool ShouldClose() const;
+  void Close();
 
   void PollEvents() const;
   void WaitEvents() const;
@@ -33,6 +34,9 @@ class Window {
                                         int height);
 
   static void CursorPosCallback(GLFWwindow* window, double x, double y);
+
+  static void KeyCallback(GLFWwindow* window, int key, int scancode, int action,
+                          int mods);
 
  private:
   bool resized_;

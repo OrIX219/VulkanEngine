@@ -20,6 +20,7 @@ void Window::Init(uint32_t width, uint32_t height, const char* title,
   glfwSetWindowUserPointer(window_, this);
   glfwSetWindowSizeCallback(window_, FramebufferResizeCallback);
   glfwSetCursorPosCallback(window_, CursorPosCallback);
+  glfwSetKeyCallback(window_, KeyCallback);
 }
 
 void Window::Destroy() {
@@ -30,6 +31,8 @@ void Window::Destroy() {
 GLFWwindow* Window::GetWindow() { return window_; }
 
 bool Window::ShouldClose() const { return glfwWindowShouldClose(window_); }
+
+void Window::Close() { glfwSetWindowShouldClose(window_, true); }
 
 void Window::PollEvents() const { glfwPollEvents(); }
 
@@ -58,6 +61,12 @@ void Window::FramebufferResizeCallback(GLFWwindow* window, int width,
 void Window::CursorPosCallback(GLFWwindow* window, double x, double y) {
   Window* wnd = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
   wnd->engine_->MousePosCallback(x, y);
+}
+
+void Window::KeyCallback(GLFWwindow* window, int key, int scancode, int action,
+                         int mods) {
+  Window* wnd = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
+  wnd->engine_->KeyCallback(key, action, mods);
 }
 
 }  // namespace Renderer

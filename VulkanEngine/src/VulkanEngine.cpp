@@ -38,7 +38,8 @@ VulkanEngine::VulkanEngine()
       frame_number_(0),
       delta_time_(0),
       last_time_(0),
-      cursor_enabled_(false) {}
+      cursor_enabled_(false),
+      menu_opened_(false) {}
 
 VulkanEngine::~VulkanEngine() {}
 
@@ -355,17 +356,24 @@ void VulkanEngine::MousePosCallback(double x, double y) {
   if (cursor_enabled_) return;
 
   if (first_mouse) {
-    last_mouse_x_ = x;
-    last_mouse_y_ = y;
+    last_mouse_x_ = static_cast<int>(x);
+    last_mouse_y_ = static_cast<int>(y);
     first_mouse = false;
   }
 
-  float delta_x = x - last_mouse_x_;
-  float delta_y = last_mouse_y_ - y;
-  last_mouse_x_ = x;
-  last_mouse_y_ = y;
+  float delta_x = static_cast<float>(x - last_mouse_x_);
+  float delta_y = static_cast<float>(last_mouse_y_ - y);
+  last_mouse_x_ = static_cast<int>(x);
+  last_mouse_y_ = static_cast<int>(y);
 
   camera_.ProcessMouse(delta_x, delta_y);
+}
+
+void VulkanEngine::KeyCallback(int key, int action, int mods) {
+  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+    menu_opened_ = !menu_opened_;
+    return;
+  }
 }
 
 void VulkanEngine::ProcessInput() {
@@ -540,7 +548,8 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
   float framed = frame_number_ / 120.f;
   scene_data_.ambient_color = {sin(framed), 0, cos(framed), 1};
 
-  uint32_t uniform_offset = PadUniformBuffer(sizeof(SceneData)) * frame_index;
+  uint32_t uniform_offset =
+      static_cast<uint32_t>(PadUniformBuffer(sizeof(SceneData))) * frame_index;
   scene_buffer_.SetData(&scene_data_, sizeof(SceneData), uniform_offset);
 
   ObjectData* object_SSBO = static_cast<ObjectData*>(
@@ -582,15 +591,27 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
     }
 
     vkCmdDraw(command_buffer.GetBuffer(), object.GetMesh()->GetVerticesCount(),
-              1, 0, i);
+              1, 0, static_cast<uint32_t>(i));
   }
+}
+
+void VulkanEngine::DrawMenu() {
+  ImGui::SetNextWindowSize(ImVec2{100.f, 0.f});
+  ImGui::Begin("Menu", &menu_opened_,
+               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+  ImVec2 region = ImGui::GetContentRegionAvail();
+  if (ImGui::Button("Exit", ImVec2{region.x, 0.f})) {
+    window_.Close();
+  }
+
+  ImGui::End();
 }
 
 void VulkanEngine::Run() {
   while (!window_.ShouldClose()) {
     window_.PollEvents();
 
-    float current_time = glfwGetTime();
+    float current_time = static_cast<float>(glfwGetTime());
     delta_time_ = current_time - last_time_;
     last_time_ = current_time;
 
@@ -600,8 +621,7 @@ void VulkanEngine::Run() {
     ImGui_ImplGlfw_NewFrame();
 
     ImGui::NewFrame();
-
-    ImGui::ShowDemoWindow();
+    if (menu_opened_) DrawMenu();
 
     Draw();
   }
