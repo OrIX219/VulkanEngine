@@ -16,6 +16,12 @@ class Swapchain {
 
   VkResult Create(LogicalDevice* device, Surface* surface);
   void Destroy();
+
+  /*
+  Destroy and create swapchain for same surface
+  - Used for handling window resize
+  - Fetches current window size automatically
+  */
   VkResult Recreate();
 
   VkResult AcquireNextImage(

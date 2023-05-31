@@ -53,9 +53,14 @@ struct RenderPassAttachment {
 
 struct RenderPassSubpass {
   std::vector<VkAttachmentReference> color_attachments;
+  std::vector<VkAttachmentReference> resolve_attachments;
   std::optional<VkAttachmentReference> depth_stencil_attachment;
 
   RenderPassSubpass& AddColorAttachmentRef(uint32_t attachment_index,
+      VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+  RenderPassSubpass& AddResolveAttachmentRef(
+      uint32_t attachment_index,
       VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
   RenderPassSubpass& SetDepthStencilAttachmentRef(uint32_t attachment_index,

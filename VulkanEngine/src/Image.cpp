@@ -5,16 +5,18 @@ namespace Renderer {
 Image::Image() : image_(VK_NULL_HANDLE) {}
 
 Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
-             VkImageUsageFlags usage, uint32_t mip_levels, VkFormat format,
+             VkImageUsageFlags usage, uint32_t mip_levels,
+             VkSampleCountFlagBits samples, VkFormat format,
              VkImageTiling tiling, VkImageAspectFlags aspect_flags) {
-  Create(allocator, device, extent, usage, mip_levels, format, tiling,
+  Create(allocator, device, extent, usage, mip_levels, samples, format, tiling,
          aspect_flags);
 }
 
 VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
                        VkExtent3D extent, VkImageUsageFlags usage,
-                       uint32_t mip_levels, VkFormat format,
-                       VkImageTiling tiling, VkImageAspectFlags aspect_flags) {
+                       uint32_t mip_levels, VkSampleCountFlagBits samples,
+                       VkFormat format, VkImageTiling tiling,
+                       VkImageAspectFlags aspect_flags) {
   allocator_ = allocator;
   device_ = device;
   image_extent_ = extent;
@@ -32,7 +34,7 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   image_info.usage = usage;
   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  image_info.samples = samples;
 
   VmaAllocationCreateInfo alloc_info{};
   alloc_info.usage = VMA_MEMORY_USAGE_AUTO;

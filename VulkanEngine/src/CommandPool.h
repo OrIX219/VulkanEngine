@@ -24,8 +24,16 @@ class CommandPool {
 
   size_t GetBuffersCount() const;
 
+  /*
+  Get command buffer from free pool
+
+  - Allocates new command buffer if none is available
+  */
   CommandBuffer GetBuffer();
 
+  /*
+  Allocate new command buffer and add to free pool
+  */
   void CreateBuffer(
       VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 

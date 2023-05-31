@@ -280,8 +280,8 @@ PipelineBuilder& PipelineBuilder::SetColorBlendAttachment(
 }
 
 PipelineBuilder& PipelineBuilder::SetMultisampling(
-    VkBool32 sample_shading_enable,
-    VkSampleCountFlagBits rasterization_samples) {
+    VkSampleCountFlagBits rasterization_samples, VkBool32 sample_shading_enable,
+    float min_sample_shading) {
   multisampling_.sampleShadingEnable = sample_shading_enable;
   multisampling_.rasterizationSamples = rasterization_samples;
 

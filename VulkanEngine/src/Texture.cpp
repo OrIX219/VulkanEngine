@@ -48,10 +48,6 @@ bool Texture::LoadFromFile(VmaAllocator allocator, LogicalDevice* device,
 
   GenerateMipmaps(command_buffer);
 
-  /*image_.TransitionLayout(command_buffer, image_.GetFormat(),
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);*/
-
   return true;
 }
 

@@ -21,6 +21,8 @@ class Queue {
   void BeginBatch();
   /*
   Add command buffer to current command buffer batch
+
+  - Begins new batch if there is none
   */
   void AddToBatch(VkCommandBuffer command_buffer);
   /*

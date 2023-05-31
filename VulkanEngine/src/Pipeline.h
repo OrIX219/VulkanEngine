@@ -97,8 +97,9 @@ class PipelineBuilder {
   PipelineBuilder& SetColorBlendAttachment(
       VkPipelineColorBlendAttachmentState* color_blend_attachment);
   PipelineBuilder& SetMultisampling(
+      VkSampleCountFlagBits rasterization_samples = VK_SAMPLE_COUNT_1_BIT,
       VkBool32 sample_shading_enable = VK_FALSE,
-      VkSampleCountFlagBits rasterization_samples = VK_SAMPLE_COUNT_1_BIT);
+      float min_sample_shading = 0.2f);
   PipelineBuilder& SetMultisampling(
       VkPipelineMultisampleStateCreateInfo* multisampling);
   PipelineBuilder& SetDepthStencil(

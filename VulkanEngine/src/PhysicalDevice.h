@@ -41,6 +41,7 @@ class PhysicalDevice {
 
   VkPhysicalDevice GetDevice();
   VkPhysicalDeviceProperties GetProperties() const;
+  VkSampleCountFlagBits GetMaxSamples() const;
 
   const std::vector<const char*>& GetExtensions() const;
   const VulkanInstance* GetInstance() const;
@@ -59,6 +60,7 @@ class PhysicalDevice {
 
   VkPhysicalDevice device_ = VK_NULL_HANDLE;
   VkPhysicalDeviceProperties properties_;
+  VkSampleCountFlagBits max_samples_;
 
   VulkanInstance* instance_;
   Surface* surface_;

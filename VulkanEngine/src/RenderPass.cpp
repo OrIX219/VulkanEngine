@@ -152,6 +152,16 @@ RenderPassSubpass& RenderPassSubpass::AddColorAttachmentRef(
   return *this;
 }
 
+RenderPassSubpass& RenderPassSubpass::AddResolveAttachmentRef(
+    uint32_t attachment_index, VkImageLayout layout) {
+  VkAttachmentReference attachment{};
+  attachment.attachment = attachment_index;
+  attachment.layout = layout;
+  resolve_attachments.push_back(attachment);
+
+  return *this;
+}
+
 RenderPassSubpass& RenderPassSubpass::SetDepthStencilAttachmentRef(
     uint32_t attachment_index, VkImageLayout layout) {
   depth_stencil_attachment = {attachment_index, layout};
@@ -191,6 +201,8 @@ RenderPassBuilder& RenderPassBuilder::AddSubpass(
   subpass_info.colorAttachmentCount =
       static_cast<uint32_t>(subpass->color_attachments.size());
   subpass_info.pColorAttachments = subpass->color_attachments.data();
+  if (subpass->resolve_attachments.size())
+    subpass_info.pResolveAttachments = subpass->resolve_attachments.data();
   if (subpass->depth_stencil_attachment.has_value())
     subpass_info.pDepthStencilAttachment = &subpass->depth_stencil_attachment.value();
   subpasses_.push_back(subpass_info);

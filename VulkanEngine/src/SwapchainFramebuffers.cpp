@@ -17,14 +17,16 @@ VkFramebuffer SwapchainFramebuffers::GetFramebuffer(size_t index) const {
 
 VkResult SwapchainFramebuffers::Recreate() {
   Destroy();
-  return Create(swapchain_, render_pass_, depth_image_);
+  return Create(swapchain_, render_pass_, color_image_, depth_image_);
 }
 
 VkResult SwapchainFramebuffers::Create(Swapchain* swapchain,
                                        RenderPass* render_pass,
+                                       Image* color_image,
                                        Image* depth_image) {
   swapchain_ = swapchain;
   render_pass_ = render_pass;
+  color_image_ = color_image;
   depth_image_ = depth_image;
 
   const auto& image_views = swapchain_->GetImageViews();
@@ -32,8 +34,10 @@ VkResult SwapchainFramebuffers::Create(Swapchain* swapchain,
 
   VkExtent2D swap_chain_extent = swapchain_->GetImageExtent();
   for (size_t i = 0; i < image_views.size(); ++i) {
-    std::vector<VkImageView> attachments = {image_views[i]};
+    std::vector<VkImageView> attachments;
+    if (color_image_) attachments.push_back(color_image_->GetView());
     if (depth_image_) attachments.push_back(depth_image_->GetView());
+    attachments.push_back(image_views[i]);
 
     VkFramebufferCreateInfo framebuffer_info{};
     framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

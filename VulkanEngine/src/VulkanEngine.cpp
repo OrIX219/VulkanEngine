@@ -68,13 +68,21 @@ void VulkanEngine::Init() {
   VK_CHECK(swapchain_.Create(&device_, &surface_));
 
   VkExtent2D extent = swapchain_.GetImageExtent();
+  VK_CHECK(color_image_.Create(allocator_, &device_,
+                               {extent.width, extent.height, 1},
+                               VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                               1, physical_device_.GetMaxSamples()));
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1, VK_FORMAT_D32_SFLOAT,
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1,
+      physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT));
 
-  VK_CHECK(render_pass_.CreateDefault(&device_, swapchain_.GetImageFormat()));
-  VK_CHECK(swapchain_framebuffers_.Create(&swapchain_, &render_pass_, &depth_image_));
+  InitRenderPasses();
+
+  VK_CHECK(swapchain_framebuffers_.Create(&swapchain_, &render_pass_,
+                                          &color_image_, &depth_image_));
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i)
     VK_CHECK(frames_[i].command_pool_.Create(
@@ -101,6 +109,49 @@ void VulkanEngine::Init() {
   is_initialized_ = true;
 
   init_pool_.Destroy();
+}
+
+void VulkanEngine::InitRenderPasses() {
+  Renderer::RenderPassBuilder render_pass_builder(&device_);
+
+  Renderer::RenderPassAttachment color_attachment, depth_attachment,
+      color_attachment_resolve;
+  color_attachment.SetOperations()
+      .SetSamples(physical_device_.GetMaxSamples())
+      .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+      .SetFormat(swapchain_.GetImageFormat());
+  depth_attachment.SetOperations()
+      .SetSamples(physical_device_.GetMaxSamples())
+      .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                  VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+      .SetFormat(VK_FORMAT_D32_SFLOAT);
+  color_attachment_resolve.SetDefaults().SetFormat(swapchain_.GetImageFormat());
+
+  render_pass_builder.AddAttachment(&color_attachment)
+      .AddAttachment(&depth_attachment)
+      .AddAttachment(&color_attachment_resolve);
+
+  Renderer::RenderPassSubpass subpass;
+  subpass.AddColorAttachmentRef(0)
+      .SetDepthStencilAttachmentRef(1)
+      .AddResolveAttachmentRef(2);
+
+  render_pass_builder.AddSubpass(&subpass);
+  render_pass_builder
+      .AddDependency(VK_SUBPASS_EXTERNAL, 0,
+                     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+                     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                     VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+      .AddDependency(VK_SUBPASS_EXTERNAL, 0,
+                     VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                     0,
+                     VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+
+  render_pass_ = render_pass_builder.Build();
 }
 
 void VulkanEngine::InitSyncStructures() {
@@ -190,6 +241,7 @@ void VulkanEngine::InitPipelines() {
           .SetLayout(set_layouts, push_constants)
           .SetViewport(viewport)
           .SetScissors(scissors)
+          .SetMultisampling(physical_device_.GetMaxSamples(), VK_TRUE)
           .Build(&render_pass_);
 
   set_layouts.push_back(single_texture_set_layout_);
@@ -204,6 +256,7 @@ void VulkanEngine::InitPipelines() {
           .SetLayout(set_layouts, push_constants)
           .SetViewport(viewport)
           .SetScissors(scissors)
+          .SetMultisampling(physical_device_.GetMaxSamples(), VK_TRUE)
           .Build(&render_pass_);
 
   CreateMaterial(mesh_pipeline, "default");
@@ -293,7 +346,7 @@ void VulkanEngine::InitImgui() {
   init_info.DescriptorPool = imgui_pool_.GetPool();
   init_info.MinImageCount = 3;
   init_info.ImageCount = 3;
-  init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+  init_info.MSAASamples = physical_device_.GetMaxSamples();
 
   ImGui_ImplVulkan_Init(&init_info, render_pass_.GetRenderPass());
 
@@ -320,10 +373,15 @@ void VulkanEngine::RecreateSwapchain() {
   swapchain_.Recreate();
   depth_image_.Destroy();
   extent = swapchain_.GetImageExtent();
+  VK_CHECK(color_image_.Create(allocator_, &device_,
+                               {extent.width, extent.height, 1}, 1,
+                               VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                               physical_device_.GetMaxSamples()));
   depth_image_.Create(allocator_, &device_, {extent.width, extent.height, 1},
                       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1,
-                      VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-                      VK_IMAGE_ASPECT_DEPTH_BIT);
+                      physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
+                      VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
   swapchain_framebuffers_.Recreate();
 }
 
@@ -443,6 +501,7 @@ void VulkanEngine::Cleanup() {
     render_pass_.Destroy();
 
     depth_image_.Destroy();
+    color_image_.Destroy();
 
     swapchain_.Destroy();
 
@@ -492,7 +551,8 @@ void VulkanEngine::Draw() {
 
   render_pass_.Begin(command_buffer,
                      swapchain_framebuffers_.GetFramebuffer(image_index),
-                     {{0, 0}, swapchain_.GetImageExtent()}, {clear_value, depth_clear});
+                     {{0, 0}, swapchain_.GetImageExtent()},
+                     {clear_value, depth_clear, clear_value});
 
   DrawObjects(command_buffer, renderables_.data(), renderables_.size());
 
@@ -616,6 +676,58 @@ void VulkanEngine::DrawMenu() {
   ImGui::End();
 }
 
+void VulkanEngine::DrawToolbar() {
+  const ImVec2 button_size{50.f, 50.f};
+  ImGui::SetNextWindowSize(ImVec2{0.f, 0.f});
+  ImGui::SetNextWindowPos(ImVec2{0.f, 0.f});
+  ImGui::Begin("Toolbar", nullptr,
+               ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoCollapse |
+                   ImGuiWindowFlags_NoMove);
+
+  static bool device_props = false;
+  if (ImGui::Button("Device\nProps", button_size))
+    device_props = !device_props;
+
+  if (device_props) {
+    const VkPhysicalDeviceProperties& props = physical_device_.GetProperties();
+    ImGui::SetNextWindowSize(ImVec2{400.f, 0.f});
+    ImGui::SetNextWindowPos(ImVec2{ImGui::GetWindowWidth(), ImGui::GetWindowPos().y});
+    ImGui::Begin("DeviceProps", &device_props,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoCollapse |
+                     ImGuiWindowFlags_NoMove);
+    ImGui::PushTextWrapPos();
+    ImGui::Text("Device Type: %s\n", string_VkPhysicalDeviceType(props.deviceType));
+    ImGui::Text("Device Name: %s\n", props.deviceName);
+    ImGui::SeparatorText("Limits");
+    ImGui::Text("Max Push Constant Size: %d\n", props.limits.maxPushConstantsSize);
+    ImGui::Text("Max Memory Allocation Count: %d\n",
+                props.limits.maxMemoryAllocationCount);
+    ImGui::Text("Max Bound Descriptor Sets: %d\n",
+                props.limits.maxBoundDescriptorSets);
+    ImGui::Text("Max Descriptor Set Samplers: %d\n",
+                props.limits.maxDescriptorSetSamplers);
+    ImGui::Text("Max Descriptor Set Uniform Buffers: %d\n",
+                props.limits.maxDescriptorSetUniformBuffers);
+    ImGui::Text("Max Descriptor Set Dynamic Uniform Buffers: %d\n",
+                props.limits.maxDescriptorSetUniformBuffersDynamic);
+    ImGui::Text("Max Descriptor Set Storage Buffers: %d\n",
+                props.limits.maxDescriptorSetStorageBuffers);
+    ImGui::Text("Max Descriptor Set Dynamic Storage Buffers: %d\n",
+                props.limits.maxDescriptorSetStorageBuffersDynamic);
+    ImGui::Text("Max Descriptor Set Sampled Images: %d\n",
+                props.limits.maxDescriptorSetSampledImages);
+    ImGui::Text("Max Descriptor Set Storage Images: %d\n",
+                props.limits.maxDescriptorSetStorageImages);
+    ImGui::Text("Max Descriptor Set Input Attachments: %d\n",
+                props.limits.maxDescriptorSetInputAttachments);
+    ImGui::Text("Max Sample Count: %d\n", physical_device_.GetMaxSamples());
+    ImGui::PopTextWrapPos();
+    ImGui::End();
+  }
+
+  ImGui::End();
+}
+
 void VulkanEngine::Run() {
   while (!window_.ShouldClose()) {
     window_.PollEvents();
@@ -631,6 +743,7 @@ void VulkanEngine::Run() {
     ImGui::NewFrame();
 
     if (menu_opened_) DrawMenu();
+    DrawToolbar();
 
     Draw();
   }

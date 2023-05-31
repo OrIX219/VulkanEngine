@@ -16,13 +16,24 @@ class CommandBuffer {
   ~CommandBuffer();
 
   VkCommandBuffer GetBuffer();
-  VkCommandBuffer* GetBufferPtr();
 
   VkResult Reset();
 
   VkResult Begin(bool one_time = true);
   VkResult End();
+
+  /*
+  Add command buffer to current batch in queue
+
+  - Begins new batch if there is none
+  */
   void AddToBatch();
+
+  /*
+  Push command buffer to queue buffer as individual batch for later submission
+
+  - Ends current batch if there is any
+  */
   void Submit();
   void Submit(VkSubmitInfo sync_info);
 

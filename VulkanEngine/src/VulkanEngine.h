@@ -74,12 +74,14 @@ class VulkanEngine {
                    Renderer::RenderObject* first, size_t count);
 
   void DrawMenu();
+  void DrawToolbar();
   void Run();
 
   void MousePosCallback(double x, double y);
   void KeyCallback(int key, int action, int mods);
 
  private:
+  void InitRenderPasses();
   void InitSyncStructures();
   void InitDescriptors();
   void InitPipelines();
@@ -118,6 +120,7 @@ class VulkanEngine {
   Renderer::CommandPool init_pool_;
 
   Renderer::Swapchain swapchain_;
+  Renderer::Image color_image_;
   Renderer::Image depth_image_;
   Renderer::RenderPass render_pass_;
   Renderer::SwapchainFramebuffers swapchain_framebuffers_;

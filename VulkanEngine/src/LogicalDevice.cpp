@@ -30,6 +30,7 @@ VkResult LogicalDevice::Init(PhysicalDevice* physical_device) {
 
   VkPhysicalDeviceFeatures features{};
   features.samplerAnisotropy = VK_TRUE;
+  features.sampleRateShading = VK_TRUE;
   VkPhysicalDeviceFeatures2 device_features{};
   device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   device_features.features = features;

@@ -14,8 +14,6 @@ CommandBuffer::~CommandBuffer() {}
 
 VkCommandBuffer CommandBuffer::GetBuffer() { return command_buffer_; }
 
-VkCommandBuffer* CommandBuffer::GetBufferPtr() { return &command_buffer_; }
-
 VkResult CommandBuffer::Reset() {
   return vkResetCommandBuffer(command_buffer_, 0);
 }

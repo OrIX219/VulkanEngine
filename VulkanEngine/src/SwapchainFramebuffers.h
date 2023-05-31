@@ -20,8 +20,14 @@ class SwapchainFramebuffers {
   VkFramebuffer GetFramebuffer(size_t index) const;
 
   VkResult Create(Swapchain* swapchain, RenderPass* render_pass,
+                  Image* color_image = nullptr,
                   Image* depth_image = nullptr);
   void Destroy();
+
+  /*
+  Destroy and create framebuffers for same swapchain
+  - Used for handling window resize (must recreate swapchain first)
+  */
   VkResult Recreate();
 
  private:
@@ -29,6 +35,7 @@ class SwapchainFramebuffers {
 
   Swapchain* swapchain_;
   RenderPass* render_pass_;
+  Image* color_image_;
   Image* depth_image_;
 };
 

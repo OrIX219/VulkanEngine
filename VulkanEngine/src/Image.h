@@ -13,6 +13,7 @@ class Image {
   Image();
   Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
         VkImageUsageFlags usage, uint32_t mip_levels = 1,
+        VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
         VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
         VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
         VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
@@ -20,6 +21,7 @@ class Image {
   VkResult Create(VmaAllocator allocator, LogicalDevice* device,
                   VkExtent3D extent, VkImageUsageFlags usage,
                   uint32_t mip_levels = 1,
+                  VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
                   VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
                   VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
                   VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
@@ -36,7 +38,7 @@ class Image {
                         VkImageLayout old_layout, VkImageLayout new_layout);
 
   static VkFormat FindSupportedFormat(PhysicalDevice* physical_device,
-                                      const std::vector<VkFormat> candidates,
+                                      const std::vector<VkFormat>& candidates,
                                       VkImageTiling tiling,
                                       VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {

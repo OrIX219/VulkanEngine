@@ -33,6 +33,16 @@ VkResult PhysicalDevice::Init(VulkanInstance* instance, Surface* surface,
 
   vkGetPhysicalDeviceProperties(device_, &properties_);
 
+  VkSampleCountFlags counts = properties_.limits.framebufferColorSampleCounts &
+                              properties_.limits.framebufferDepthSampleCounts;
+  if (counts & VK_SAMPLE_COUNT_64_BIT) max_samples_ = VK_SAMPLE_COUNT_64_BIT;
+  else if (counts & VK_SAMPLE_COUNT_32_BIT) max_samples_ = VK_SAMPLE_COUNT_32_BIT;
+  else if (counts & VK_SAMPLE_COUNT_16_BIT) max_samples_ = VK_SAMPLE_COUNT_16_BIT;
+  else if (counts & VK_SAMPLE_COUNT_8_BIT) max_samples_ = VK_SAMPLE_COUNT_8_BIT;
+  else if (counts & VK_SAMPLE_COUNT_4_BIT) max_samples_ = VK_SAMPLE_COUNT_4_BIT;
+  else if (counts & VK_SAMPLE_COUNT_2_BIT) max_samples_ = VK_SAMPLE_COUNT_2_BIT;
+  else if (counts & VK_SAMPLE_COUNT_1_BIT) max_samples_ = VK_SAMPLE_COUNT_1_BIT;
+
   return VK_SUCCESS;
 }
 
@@ -40,6 +50,10 @@ VkPhysicalDevice PhysicalDevice::GetDevice() { return device_; }
 
 VkPhysicalDeviceProperties PhysicalDevice::GetProperties() const {
   return properties_;
+}
+
+VkSampleCountFlagBits PhysicalDevice::GetMaxSamples() const {
+  return max_samples_;
 }
 
 const std::vector<const char*>& PhysicalDevice::GetExtensions() const {
