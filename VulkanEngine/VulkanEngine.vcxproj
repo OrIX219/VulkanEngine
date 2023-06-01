@@ -104,6 +104,7 @@
     <ClInclude Include="src\Camera.h" />
     <ClInclude Include="src\CommandBuffer.h" />
     <ClInclude Include="src\CommandPool.h" />
+    <ClInclude Include="src\CVAR.h" />
     <ClInclude Include="src\DescriptorPool.h" />
     <ClInclude Include="src\Descriptors.h" />
     <ClInclude Include="src\Image.h" />
@@ -117,6 +118,7 @@
     <ClInclude Include="src\Queue.h" />
     <ClInclude Include="src\RenderObject.h" />
     <ClInclude Include="src\RenderPass.h" />
+    <ClInclude Include="src\StringHash.h" />
     <ClInclude Include="src\Surface.h" />
     <ClInclude Include="src\Swapchain.h" />
     <ClInclude Include="src\SwapchainFramebuffers.h" />
@@ -134,11 +136,13 @@
     <ClCompile Include="..\Libraries\include\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="..\Libraries\include\imgui\imgui_stdlib.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui_widgets.cpp" />
     <ClCompile Include="src\Camera.cpp" />
     <ClCompile Include="src\CommandBuffer.cpp" />
     <ClCompile Include="src\CommandPool.cpp" />
+    <ClCompile Include="src\CVAR.cpp" />
     <ClCompile Include="src\DescriptorPool.cpp" />
     <ClCompile Include="src\Descriptors.cpp" />
     <ClCompile Include="src\Image.cpp" />

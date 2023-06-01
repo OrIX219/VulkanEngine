@@ -18,6 +18,8 @@
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_vulkan.h>
 
+#include "CVAR.h"
+
 #define VK_CHECK(x)                                                       \
   do {                                                                    \
     VkResult err = x;                                                     \
@@ -39,7 +41,8 @@ VulkanEngine::VulkanEngine()
       delta_time_(0),
       last_time_(0),
       cursor_enabled_(false),
-      menu_opened_(false) {}
+      menu_opened_(false),
+      console_opened_(false) {}
 
 VulkanEngine::~VulkanEngine() {}
 
@@ -54,6 +57,8 @@ void VulkanEngine::Init() {
                             {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                              VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME}));
   VK_CHECK(device_.Init(&physical_device_));
+
+  InitCVars();
 
   VmaAllocatorCreateInfo allocator_info{};
   allocator_info.instance = instance_.GetInstance();
@@ -109,6 +114,70 @@ void VulkanEngine::Init() {
   is_initialized_ = true;
 
   init_pool_.Destroy();
+}
+
+void VulkanEngine::InitCVars() {
+  AutoCVar_Float CVAR_clear_r("clear_color.r",
+                              "Framebuffer clear color's red component", 0.f,
+                              CVarFlags::kEditFloatDrag);
+  AutoCVar_Float CVAR_clear_g("clear_color.g",
+                              "Framebuffer clear color's green component", 0.f,
+                              CVarFlags::kEditFloatDrag);
+  AutoCVar_Float CVAR_clear_b("clear_color.b",
+                              "Framebuffer clear color's blue component", 0.f,
+                              CVarFlags::kEditFloatDrag);
+
+  const VkPhysicalDeviceProperties& props = physical_device_.GetProperties();
+  AutoCVar_String CVar_device_type(
+      "device_type", "Device type",
+      string_VkPhysicalDeviceType(props.deviceType), CVarFlags::kEditReadOnly);
+  AutoCVar_String CVar_device_name("device_name", "Device name",
+                                   props.deviceName, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_push_constant_size(
+      "limits.max_push_constant_size", "Max Push Constant Size",
+      props.limits.maxPushConstantsSize, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_memory_allocation_count(
+      "limits.max_memory_allocation_count", "Max Memory Allocation Count",
+      props.limits.maxMemoryAllocationCount, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_bound_descriptor_sets(
+      "limits.max_bound_descriptor_sets", "Max Bound Descriptor Sets",
+      props.limits.maxBoundDescriptorSets, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_descriptor_set_samplers(
+      "limits.max_descriptor_set_samplers", "Max Descriptor Set Samplers",
+      props.limits.maxDescriptorSetSamplers, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_descriptor_set_uniform_buffers(
+      "limits.max_descriptor_set_uniform_buffers",
+      "Max Descriptor Set Uniform Buffers",
+      props.limits.maxDescriptorSetUniformBuffers, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_descriptor_set_dynamic_uniform_buffers(
+      "limits.max_descriptor_set_dynamic_uniform_buffers",
+      "Max Descriptor Set Dynamic Uniform Buffers",
+      props.limits.maxDescriptorSetUniformBuffersDynamic,
+      CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_descriptor_set_storage_buffers(
+      "limits.max_descriptor_set_storage_buffers",
+      "Max Descriptor Set Storage Buffers",
+      props.limits.maxDescriptorSetStorageBuffers, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_descriptor_set_dynamic_storage_buffers(
+      "limits.max_descriptor_set_dynamic_storage_buffers",
+      "Max Descriptor Set Dynamic Storage Buffers",
+      props.limits.maxDescriptorSetStorageBuffersDynamic,
+      CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_descriptor_set_sampled_images(
+      "limits.max_descriptor_set_sampled_images",
+      "Max Descriptor Set Sampled Images",
+      props.limits.maxDescriptorSetSampledImages, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_descriptor_set_storage_images(
+      "limits.max_descriptor_set_storage_images",
+      "Max Descriptor Set Storage Images",
+      props.limits.maxDescriptorSetStorageImages, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_descriptor_set_input_attachments(
+      "limits.max_descriptor_set_input_attachments",
+      "Max Descriptor Set Input Attachments",
+      props.limits.maxDescriptorSetInputAttachments, CVarFlags::kEditReadOnly);
+  AutoCVar_Int CVar_max_sample_count(
+      "limits.max_sample_count", "Max Sample Count",
+      physical_device_.GetMaxSamples(), CVarFlags::kEditReadOnly);
 }
 
 void VulkanEngine::InitRenderPasses() {
@@ -438,25 +507,43 @@ void VulkanEngine::MousePosCallback(double x, double y) {
 }
 
 void VulkanEngine::KeyCallback(int key, int action, int mods) {
-  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-    menu_opened_ = !menu_opened_;
-    return;
+  if (action == GLFW_PRESS) {
+    switch (key) {
+      case GLFW_KEY_ESCAPE:
+        menu_opened_ = !menu_opened_;
+        if (menu_opened_) EnableCursor(true);
+        break;
+      case GLFW_KEY_F1:
+        console_opened_ = !console_opened_;
+        if (console_opened_) EnableCursor(true);
+        break;
+    }
   }
 }
 
-void VulkanEngine::ProcessInput() {
-  if (!cursor_enabled_ &&
-      glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
+void VulkanEngine::EnableCursor(bool enable) {
+  if (enable == cursor_enabled_) return;
+  if (enable) {
     cursor_enabled_ = true;
     glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     VkExtent2D extent = window_.GetFramebufferSize();
     glfwSetCursorPos(window_.GetWindow(), extent.width / 2, extent.height / 2);
-  } else if (cursor_enabled_ &&
-             glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_ALT) ==
-                 GLFW_RELEASE) {
+  } else {
     cursor_enabled_ = false;
     glfwSetCursorPos(window_.GetWindow(), last_mouse_x_, last_mouse_y_);
     glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  }
+}
+
+void VulkanEngine::ProcessInput() {
+  if (menu_opened_ || console_opened_) return;
+
+  if (!cursor_enabled_ &&
+      glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
+    EnableCursor(true);
+  } else if (cursor_enabled_ && glfwGetKey(window_.GetWindow(),
+                                           GLFW_KEY_LEFT_ALT) == GLFW_RELEASE) {
+    EnableCursor(false);
   }
 
   if (glfwGetKey(window_.GetWindow(), GLFW_KEY_W) == GLFW_PRESS)
@@ -549,7 +636,11 @@ void VulkanEngine::Draw() {
   VK_CHECK(command_buffer.Begin());
 
   VkClearValue clear_value{};
-  clear_value.color = {{0.f, 0.f, 0.f, 1.f}};
+  clear_value.color = {
+      {static_cast<float>(*CVarSystem::Get()->GetFloatCVar("clear_color.r")),
+       static_cast<float>(*CVarSystem::Get()->GetFloatCVar("clear_color.g")),
+       static_cast<float>(*CVarSystem::Get()->GetFloatCVar("clear_color.b")),
+       1.f}};
   VkClearValue depth_clear{};
   depth_clear.depthStencil.depth = 1.f;
 
@@ -688,46 +779,8 @@ void VulkanEngine::DrawToolbar() {
                ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoCollapse |
                    ImGuiWindowFlags_NoMove);
 
-  static bool device_props = false;
-  if (ImGui::Button("Device\nProps", button_size))
-    device_props = !device_props;
-
-  if (device_props) {
-    const VkPhysicalDeviceProperties& props = physical_device_.GetProperties();
-    ImGui::SetNextWindowSize(ImVec2{400.f, 0.f});
-    ImGui::SetNextWindowPos(ImVec2{ImGui::GetWindowWidth(), ImGui::GetWindowPos().y});
-    ImGui::Begin("DeviceProps", &device_props,
-                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoCollapse |
-                     ImGuiWindowFlags_NoMove);
-    ImGui::PushTextWrapPos();
-    ImGui::Text("Device Type: %s\n", string_VkPhysicalDeviceType(props.deviceType));
-    ImGui::Text("Device Name: %s\n", props.deviceName);
-    ImGui::SeparatorText("Limits");
-    ImGui::Text("Max Push Constant Size: %d\n", props.limits.maxPushConstantsSize);
-    ImGui::Text("Max Memory Allocation Count: %d\n",
-                props.limits.maxMemoryAllocationCount);
-    ImGui::Text("Max Bound Descriptor Sets: %d\n",
-                props.limits.maxBoundDescriptorSets);
-    ImGui::Text("Max Descriptor Set Samplers: %d\n",
-                props.limits.maxDescriptorSetSamplers);
-    ImGui::Text("Max Descriptor Set Uniform Buffers: %d\n",
-                props.limits.maxDescriptorSetUniformBuffers);
-    ImGui::Text("Max Descriptor Set Dynamic Uniform Buffers: %d\n",
-                props.limits.maxDescriptorSetUniformBuffersDynamic);
-    ImGui::Text("Max Descriptor Set Storage Buffers: %d\n",
-                props.limits.maxDescriptorSetStorageBuffers);
-    ImGui::Text("Max Descriptor Set Dynamic Storage Buffers: %d\n",
-                props.limits.maxDescriptorSetStorageBuffersDynamic);
-    ImGui::Text("Max Descriptor Set Sampled Images: %d\n",
-                props.limits.maxDescriptorSetSampledImages);
-    ImGui::Text("Max Descriptor Set Storage Images: %d\n",
-                props.limits.maxDescriptorSetStorageImages);
-    ImGui::Text("Max Descriptor Set Input Attachments: %d\n",
-                props.limits.maxDescriptorSetInputAttachments);
-    ImGui::Text("Max Sample Count: %d\n", physical_device_.GetMaxSamples());
-    ImGui::PopTextWrapPos();
-    ImGui::End();
-  }
+  if (ImGui::Button("Debug\n(F1)", button_size))
+    console_opened_ = !console_opened_;
 
   ImGui::End();
 }
@@ -748,6 +801,8 @@ void VulkanEngine::Run() {
 
     if (menu_opened_) DrawMenu();
     DrawToolbar();
+    if (console_opened_)
+      CVarSystem::Get()->DrawImguiEditor();
 
     Draw();
   }

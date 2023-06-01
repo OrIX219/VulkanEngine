@@ -97,6 +97,8 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\Camera.h" />
+    <ClInclude Include="src\CVAR.h" />
+    <ClInclude Include="src\StringHash.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\imgui\imgui.cpp">
@@ -187,6 +189,8 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\Camera.cpp" />
+    <ClCompile Include="src\CVAR.cpp" />
+    <ClCompile Include="..\Libraries\include\imgui\imgui_stdlib.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">

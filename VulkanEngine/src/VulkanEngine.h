@@ -81,6 +81,7 @@ class VulkanEngine {
   void KeyCallback(int key, int action, int mods);
 
  private:
+  void InitCVars();
   void InitRenderPasses();
   void InitSyncStructures();
   void InitDescriptors();
@@ -98,6 +99,7 @@ class VulkanEngine {
   Renderer::Mesh* GetMesh(const std::string& name); 
   size_t PadUniformBuffer(size_t size);
 
+  void EnableCursor(bool enable);
   void ProcessInput();
 
   bool is_initialized_;
@@ -106,7 +108,7 @@ class VulkanEngine {
   float last_time_;
   int last_mouse_x_, last_mouse_y_;
   bool cursor_enabled_;
-  bool menu_opened_;
+  bool menu_opened_, console_opened_;
 
   Renderer::Window window_;
   Renderer::Camera camera_;
