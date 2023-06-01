@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VertexBuffer.h"
+#include "IndexBuffer.h"
 
 namespace Renderer {
 
@@ -11,13 +12,15 @@ class Mesh {
        const std::vector<Vertex>& vertices);
   ~Mesh();
   void Create(VmaAllocator allocator, CommandBuffer command_buffer,
-                     const std::vector<Vertex>& vertices);
+              const std::vector<Vertex>& vertices);
+  void Create(VmaAllocator allocator, CommandBuffer command_buffer,
+              const std::vector<Vertex>& vertices,
+              const std::vector<uint32_t>& indices);
   void Destroy();
 
   uint32_t GetVerticesCount() const;
+  uint32_t GetIndicesCount() const;
 
-  bool LoadFromObj(VmaAllocator allocator, CommandBuffer command_buffer,
-                   const char* path);
   bool LoadFromAsset(VmaAllocator allocator, CommandBuffer command_buffer,
                      const char* path);
 
@@ -25,6 +28,7 @@ class Mesh {
 
  private:
   VertexBuffer vertex_buffer_;
+  IndexBuffer index_buffer_;
 };
 
 }

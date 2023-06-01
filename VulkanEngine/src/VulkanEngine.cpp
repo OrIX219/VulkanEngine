@@ -116,12 +116,16 @@ void VulkanEngine::InitRenderPasses() {
 
   Renderer::RenderPassAttachment color_attachment, depth_attachment,
       color_attachment_resolve;
-  color_attachment.SetOperations()
+  color_attachment
+      .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
+                     VK_ATTACHMENT_STORE_OP_DONT_CARE)
       .SetSamples(physical_device_.GetMaxSamples())
       .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
       .SetFormat(swapchain_.GetImageFormat());
-  depth_attachment.SetOperations()
+  depth_attachment
+      .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
+                     VK_ATTACHMENT_STORE_OP_DONT_CARE)
       .SetSamples(physical_device_.GetMaxSamples())
       .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                   VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
@@ -655,8 +659,8 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
       last_mesh = object.GetMesh();
     }
 
-    vkCmdDraw(command_buffer.GetBuffer(), object.GetMesh()->GetVerticesCount(),
-              1, 0, static_cast<uint32_t>(i));
+    vkCmdDrawIndexed(command_buffer.GetBuffer(),
+                     object.GetMesh()->GetIndicesCount(), 1, 0, 0, 0);
   }
 }
 

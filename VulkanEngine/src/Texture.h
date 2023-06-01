@@ -14,8 +14,6 @@ class Texture {
   Texture(VmaAllocator allocator, LogicalDevice* device,
           CommandBuffer& command_buffer, const char* path);
 
-  bool LoadFromFile(VmaAllocator allocator, LogicalDevice* device,
-                    CommandBuffer command_buffer, const char* path);
   bool LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
                      CommandBuffer command_buffer, const char* path);
   void Destroy();

@@ -1,10 +1,6 @@
 #include "Texture.h"
 
 #include "Buffer.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb\stb_image.h>
-
 #include "TextureAsset.h"
 
 namespace Renderer {
@@ -13,42 +9,7 @@ Texture::Texture() {}
 
 Texture::Texture(VmaAllocator allocator, LogicalDevice* device,
                  CommandBuffer& command_buffer, const char* path) {
-  LoadFromFile(allocator, device, command_buffer, path);
-}
-
-bool Texture::LoadFromFile(VmaAllocator allocator, LogicalDevice* device,
-                           CommandBuffer command_buffer, const char* path) {
-  int tex_width, tex_height, tex_channels;
-  stbi_uc* pixels =
-      stbi_load(path, &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
-  VkDeviceSize image_size = tex_width * tex_height * 4;
-
-  if (!pixels) return false;
-
-  staging_buffer_.Destroy();
-  staging_buffer_.Create(
-      allocator, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-  staging_buffer_.SetData(pixels, image_size);
-
-  stbi_image_free(pixels);
-
-  VkExtent3D extent{static_cast<uint32_t>(tex_width),
-                    static_cast<uint32_t>(tex_height), 1};
-  uint32_t mip_levels = CalculateMipLevels(extent.width, extent.height);
-  image_.Create(allocator, device, extent,
-                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                mip_levels);
-
-  image_.TransitionLayout(command_buffer, image_.GetFormat(),
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-  staging_buffer_.CopyToImage(command_buffer, &image_);
-
-  GenerateMipmaps(command_buffer);
-
-  return true;
+  LoadFromAsset(allocator, device, command_buffer, path);
 }
 
 bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
@@ -98,10 +59,6 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
   staging_buffer_.CopyToImage(command_buffer, &image_);
 
   GenerateMipmaps(command_buffer);
-
-  /*image_.TransitionLayout(command_buffer, image_.GetFormat(),
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);*/
 
   return true;
 }
