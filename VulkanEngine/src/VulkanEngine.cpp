@@ -30,10 +30,12 @@
   } while (0);
 
 #ifdef NDEBUG
-const bool kEnableValidationLayers = false;
+constexpr bool kEnableValidationLayers = false;
 #else
-const bool kEnableValidationLayers = true;
+constexpr bool kEnableValidationLayers = true;
 #endif
+
+namespace Engine {
 
 VulkanEngine::VulkanEngine()
     : is_initialized_(false),
@@ -549,7 +551,8 @@ void VulkanEngine::ProcessInput() {
   if (glfwGetKey(window_.GetWindow(), GLFW_KEY_W) == GLFW_PRESS)
     camera_.ProcessKeyboard(Renderer::Camera::Direction::kForward, delta_time_);
   if (glfwGetKey(window_.GetWindow(), GLFW_KEY_S) == GLFW_PRESS)
-    camera_.ProcessKeyboard(Renderer::Camera::Direction::kBackward, delta_time_);
+    camera_.ProcessKeyboard(Renderer::Camera::Direction::kBackward,
+                            delta_time_);
   if (glfwGetKey(window_.GetWindow(), GLFW_KEY_D) == GLFW_PRESS)
     camera_.ProcessKeyboard(Renderer::Camera::Direction::kRight, delta_time_);
   if (glfwGetKey(window_.GetWindow(), GLFW_KEY_A) == GLFW_PRESS)
@@ -636,11 +639,10 @@ void VulkanEngine::Draw() {
   VK_CHECK(command_buffer.Begin());
 
   VkClearValue clear_value{};
-  clear_value.color = {
-      {static_cast<float>(*CVarSystem::Get()->GetFloatCVar("clear_color.r")),
-       static_cast<float>(*CVarSystem::Get()->GetFloatCVar("clear_color.g")),
-       static_cast<float>(*CVarSystem::Get()->GetFloatCVar("clear_color.b")),
-       1.f}};
+  clear_value.color = {{*CVarSystem::Get()->GetFloatCVar("clear_color.r"),
+                        *CVarSystem::Get()->GetFloatCVar("clear_color.g"),
+                        *CVarSystem::Get()->GetFloatCVar("clear_color.b"),
+                        1.f}};
   VkClearValue depth_clear{};
   depth_clear.depthStencil.depth = 1.f;
 
@@ -730,13 +732,11 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
       vkCmdBindDescriptorSets(
           command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
           object.GetMaterial()->pipeline.GetLayout(), 0, 1,
-          &frames_[frame_index].global_descriptor_, 1,
-          &uniform_offset);
+          &frames_[frame_index].global_descriptor_, 1, &uniform_offset);
       vkCmdBindDescriptorSets(
           command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
           object.GetMaterial()->pipeline.GetLayout(), 1, 1,
-          &frames_[frame_index].object_descriptor_, 0,
-          nullptr);
+          &frames_[frame_index].object_descriptor_, 0, nullptr);
       if (object.GetMaterial()->texture_set != VK_NULL_HANDLE) {
         vkCmdBindDescriptorSets(
             command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -801,11 +801,12 @@ void VulkanEngine::Run() {
 
     if (menu_opened_) DrawMenu();
     DrawToolbar();
-    if (console_opened_)
-      CVarSystem::Get()->DrawImguiEditor();
+    if (console_opened_) CVarSystem::Get()->DrawImguiEditor();
 
     Draw();
   }
 
   device_.WaitIdle();
 }
+
+}  // namespace Engine

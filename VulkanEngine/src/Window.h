@@ -3,7 +3,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <glfw/glfw3.h>
 
+namespace Engine {
 class VulkanEngine;
+}
 
 namespace Renderer {
 
@@ -13,7 +15,7 @@ class Window {
   ~Window();
 
   void Init(uint32_t width, uint32_t height, const char* title,
-            VulkanEngine* engine);
+            Engine::VulkanEngine* engine);
   void Destroy();
 
   GLFWwindow* GetWindow();
@@ -40,7 +42,7 @@ class Window {
 
  private:
   bool resized_;
-  VulkanEngine* engine_;
+  Engine::VulkanEngine* engine_;
 
   GLFWwindow* window_;
 };

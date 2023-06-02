@@ -1,7 +1,7 @@
 #include "VulkanEngine.h"
 
 int main(int argc, char* argv[]) {
-  VulkanEngine engine;
+  Engine::VulkanEngine engine;
   engine.Init();
   engine.Run();
   engine.Cleanup();

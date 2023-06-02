@@ -28,6 +28,8 @@
 
 #include <glm\glm.hpp>
 
+namespace Engine {
+
 constexpr uint32_t kMaxFramesInFlight = 2;
 
 struct CameraData {
@@ -96,7 +98,7 @@ class VulkanEngine {
   Renderer::Material* CreateMaterial(Renderer::Pipeline pipeline,
                                      const std::string& name);
   Renderer::Material* GetMaterial(const std::string& name);
-  Renderer::Mesh* GetMesh(const std::string& name); 
+  Renderer::Mesh* GetMesh(const std::string& name);
   size_t PadUniformBuffer(size_t size);
 
   void EnableCursor(bool enable);
@@ -146,3 +148,5 @@ class VulkanEngine {
   std::unordered_map<std::string, Renderer::Texture> textures_;
   Renderer::TextureSampler texture_sampler_;
 };
+
+}  // namespace Engine

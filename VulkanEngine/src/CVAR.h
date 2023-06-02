@@ -3,6 +3,8 @@
 #include "StringHash.h"
 #include <unordered_map>
 
+namespace Engine {
+
 enum class CVarFlags : uint32_t {
   kNone = 0,
   kNoEdit = 1 << 1,
@@ -45,7 +47,7 @@ class CVarSystem {
   static CVarSystem* Get();
 };
 
-template<typename T>
+template <typename T>
 struct AutoCVar {
  protected:
   uint32_t index;
@@ -53,8 +55,8 @@ struct AutoCVar {
 };
 
 struct AutoCVar_Int : AutoCVar<int32_t> {
-  AutoCVar_Int(const char* name, const char* description,
-                 int32_t default_value, CVarFlags flags = CVarFlags::kNone);
+  AutoCVar_Int(const char* name, const char* description, int32_t default_value,
+               CVarFlags flags = CVarFlags::kNone);
 
   int32_t Get();
   int32_t* GetPtr();
@@ -62,8 +64,8 @@ struct AutoCVar_Int : AutoCVar<int32_t> {
 };
 
 struct AutoCVar_Float : AutoCVar<float> {
-  AutoCVar_Float(const char* name, const char* description,
-                 float default_value, CVarFlags flags = CVarFlags::kNone);
+  AutoCVar_Float(const char* name, const char* description, float default_value,
+                 CVarFlags flags = CVarFlags::kNone);
 
   float Get();
   float* GetPtr();
@@ -72,8 +74,11 @@ struct AutoCVar_Float : AutoCVar<float> {
 
 struct AutoCVar_String : AutoCVar<std::string> {
   AutoCVar_String(const char* name, const char* description,
-                 const char* default_value, CVarFlags flags = CVarFlags::kNone);
+                  const char* default_value,
+                  CVarFlags flags = CVarFlags::kNone);
 
   const char* Get();
   void Set(std::string&& value);
 };
+
+}  // namespace Engine
