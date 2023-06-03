@@ -1,6 +1,7 @@
 #include "Pipeline.h"
 
 #include <fstream>
+#include "Logger.h"
 
 namespace Renderer {
 
@@ -140,7 +141,7 @@ Pipeline PipelineBuilder::Build(RenderPass* render_pass) {
   Pipeline pipeline;
 
   if (pipeline.Create(device_, &pipeline_info, foreign_layout_) != VK_SUCCESS) {
-    std::cerr << "Failed to create pipeline!" << std::endl;
+    LOG_ERROR("Failed to create pipeline!")
     return Pipeline();
   } else {
     return pipeline;
@@ -359,7 +360,7 @@ VkShaderModule PipelineBuilder::CreateShaderModule(
   VkShaderModule shader_module;
   if (vkCreateShaderModule(device_->GetDevice(), &create_info, nullptr,
                            &shader_module) != VK_SUCCESS) {
-    std::cerr << "Failed to create shader module!" << std::endl;
+    LOG_ERROR("Failed to create shader module!")
     return VK_NULL_HANDLE;
   }
 

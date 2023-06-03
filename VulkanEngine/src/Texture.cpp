@@ -2,6 +2,7 @@
 
 #include "Buffer.h"
 #include "TextureAsset.h"
+#include "Logger.h"
 
 namespace Renderer {
 
@@ -18,7 +19,7 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
   bool loaded = Assets::LoadBinaryFile(path, file);
 
   if (!loaded) {
-    std::cerr << "Error when loading texture\n";
+    LOG_ERROR("Error when loading texture")
     return false;
   }
 

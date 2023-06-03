@@ -19,6 +19,7 @@
 #include <imgui/imgui_impl_vulkan.h>
 
 #include "CVAR.h"
+#include "Logger.h"
 
 #define VK_CHECK(x)                                                       \
   do {                                                                    \
@@ -49,6 +50,8 @@ VulkanEngine::VulkanEngine()
 VulkanEngine::~VulkanEngine() {}
 
 void VulkanEngine::Init() {
+  Logger::Get().SetTime();
+
   window_.Init(1600, 900, "Vulkan Engine", this);
   glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   VK_CHECK(
@@ -60,6 +63,7 @@ void VulkanEngine::Init() {
                              VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME}));
   VK_CHECK(device_.Init(&physical_device_));
 
+  Logger::Init(&instance_);
   InitCVars();
 
   VmaAllocatorCreateInfo allocator_info{};
@@ -600,6 +604,8 @@ void VulkanEngine::Cleanup() {
     swapchain_.Destroy();
 
     vmaDestroyAllocator(allocator_);
+
+    Logger::Cleanup();
 
     device_.Destroy();
     surface_.Destroy();

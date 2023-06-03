@@ -54,8 +54,6 @@ class Queue {
  private:
   VkQueue queue_;
 
-  VkFence last_fence_;
-
   uint32_t current_batch_;
   std::vector<std::vector<VkCommandBuffer>> batches_;
   std::vector<VkSubmitInfo> submit_batches_;

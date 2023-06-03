@@ -1,6 +1,7 @@
 #include "Mesh.h"
 
 #include "MeshAsset.h"
+#include "Logger.h"
 
 namespace Renderer {
 
@@ -47,7 +48,7 @@ bool Mesh::LoadFromAsset(VmaAllocator allocator, CommandBuffer command_buffer,
   bool loaded = Assets::LoadBinaryFile(path, file);
 
   if (!loaded) {
-    std::cerr << "Error when loading mesh\n";
+    LOG_ERROR("Error when loading mesh")
     return false;
   }
 

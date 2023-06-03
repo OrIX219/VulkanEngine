@@ -7,6 +7,9 @@
     <Filter Include="Libraries\include">
       <UniqueIdentifier>{7562B06E-E178-AE04-2AF0-392696457F8C}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Libraries\include\fmt">
+      <UniqueIdentifier>{2B1B723C-9787-2D37-607B-C594CCA64F9F}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Libraries\include\imgui">
       <UniqueIdentifier>{9FB39B21-0BEB-E3B8-14F5-47DC80AB0AB2}</UniqueIdentifier>
     </Filter>
@@ -19,6 +22,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Buffer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CVAR.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Camera.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\CommandBuffer.h">
@@ -39,7 +48,7 @@
     <ClInclude Include="src\IndexBuffer.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Log.h">
+    <ClInclude Include="src\Logger.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\LogicalDevice.h">
@@ -64,6 +73,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\RenderPass.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\StringHash.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\Surface.h">
@@ -96,11 +108,14 @@
     <ClInclude Include="src\Window.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Camera.h" />
-    <ClInclude Include="src\CVAR.h" />
-    <ClInclude Include="src\StringHash.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Libraries\include\fmt\format.cc">
+      <Filter>Libraries\include\fmt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\fmt\os.cc">
+      <Filter>Libraries\include\fmt</Filter>
+    </ClCompile>
     <ClCompile Include="..\Libraries\include\imgui\imgui.cpp">
       <Filter>Libraries\include\imgui</Filter>
     </ClCompile>
@@ -116,11 +131,20 @@
     <ClCompile Include="..\Libraries\include\imgui\imgui_impl_vulkan.cpp">
       <Filter>Libraries\include\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\imgui_stdlib.cpp">
+      <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
     <ClCompile Include="..\Libraries\include\imgui\imgui_tables.cpp">
       <Filter>Libraries\include\imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\Libraries\include\imgui\imgui_widgets.cpp">
       <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CVAR.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Camera.cpp">
+      <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\CommandBuffer.cpp">
       <Filter>src</Filter>
@@ -138,9 +162,6 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\IndexBuffer.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Log.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\LogicalDevice.cpp">
@@ -182,15 +203,15 @@
     <ClCompile Include="src\VulkanEngine.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\VulkanInstance.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="src\Window.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Camera.cpp" />
-    <ClCompile Include="src\CVAR.cpp" />
-    <ClCompile Include="..\Libraries\include\imgui\imgui_stdlib.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">
