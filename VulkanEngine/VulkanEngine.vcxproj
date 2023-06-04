@@ -115,6 +115,7 @@
     <ClInclude Include="src\Mesh.h" />
     <ClInclude Include="src\PhysicalDevice.h" />
     <ClInclude Include="src\Pipeline.h" />
+    <ClInclude Include="src\VulkanProfiler.h" />
     <ClInclude Include="src\Queue.h" />
     <ClInclude Include="src\RenderObject.h" />
     <ClInclude Include="src\RenderPass.h" />
@@ -163,6 +164,7 @@
     <ClCompile Include="src\VertexBuffer.cpp" />
     <ClCompile Include="src\VulkanEngine.cpp" />
     <ClCompile Include="src\VulkanInstance.cpp" />
+    <ClCompile Include="src\VulkanProfiler.cpp" />
     <ClCompile Include="src\Window.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>

@@ -5,7 +5,9 @@
 
 namespace Engine {
 
-enum class CVarFlags : uint32_t {
+// Hate this workaround to use scoped enums as bitmask
+namespace CVarFlagBits {
+enum : uint32_t {
   kNone = 0,
   kNoEdit = 1 << 1,
   kEditReadOnly = 1 << 2,
@@ -14,6 +16,8 @@ enum class CVarFlags : uint32_t {
   kEditCheckbox = 1 << 8,
   kEditFloatDrag = 1 << 9
 };
+}
+using CVarFlags = uint32_t;
 
 class CVarParameter;
 
@@ -56,7 +60,7 @@ struct AutoCVar {
 
 struct AutoCVar_Int : AutoCVar<int32_t> {
   AutoCVar_Int(const char* name, const char* description, int32_t default_value,
-               CVarFlags flags = CVarFlags::kNone);
+               CVarFlags flags = CVarFlagBits::kNone);
 
   int32_t Get();
   int32_t* GetPtr();
@@ -65,7 +69,7 @@ struct AutoCVar_Int : AutoCVar<int32_t> {
 
 struct AutoCVar_Float : AutoCVar<float> {
   AutoCVar_Float(const char* name, const char* description, float default_value,
-                 CVarFlags flags = CVarFlags::kNone);
+                 CVarFlags flags = CVarFlagBits::kNone);
 
   float Get();
   float* GetPtr();
@@ -75,7 +79,7 @@ struct AutoCVar_Float : AutoCVar<float> {
 struct AutoCVar_String : AutoCVar<std::string> {
   AutoCVar_String(const char* name, const char* description,
                   const char* default_value,
-                  CVarFlags flags = CVarFlags::kNone);
+                  CVarFlags flags = CVarFlagBits::kNone);
 
   const char* Get();
   void Set(std::string&& value);

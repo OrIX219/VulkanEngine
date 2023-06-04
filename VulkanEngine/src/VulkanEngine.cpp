@@ -25,8 +25,7 @@
   do {                                                                    \
     VkResult err = x;                                                     \
     if (err) {                                                            \
-      std::cerr << "Vulkan error: " << string_VkResult(err) << std::endl; \
-      abort();                                                            \
+      LOG_FATAL(std::string_view{string_VkResult(err)})                   \
     }                                                                     \
   } while (0);
 
@@ -51,20 +50,33 @@ VulkanEngine::~VulkanEngine() {}
 
 void VulkanEngine::Init() {
   Logger::Get().SetTime();
+  LOG_INFO("Engine init")
 
   window_.Init(1600, 900, "Vulkan Engine", this);
   glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  LOG_SUCCESS("Window created")
   VK_CHECK(
       instance_.Init(kEnableValidationLayers, {"VK_LAYER_KHRONOS_validation"}));
+  LOG_SUCCESS("Vulkan instance initialized")
+
+  Logger::Init(&instance_);
+  LOG_SUCCESS("Logger initialized")
+
   VK_CHECK(surface_.Init(&instance_, &window_));
+  LOG_SUCCESS("GLFW surface initialized")
   VK_CHECK(
       physical_device_.Init(&instance_, &surface_,
                             {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                              VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME}));
+  LOG_SUCCESS("GPU found")
   VK_CHECK(device_.Init(&physical_device_));
+  LOG_SUCCESS("Logical device initialized")
 
-  Logger::Init(&instance_);
+  profiler_.Init(&device_,
+                 physical_device_.GetProperties().limits.timestampPeriod);
+  LOG_SUCCESS("Profiler initialized")
   InitCVars();
+  LOG_SUCCESS("CVars system initialized")
 
   VmaAllocatorCreateInfo allocator_info{};
   allocator_info.instance = instance_.GetInstance();
@@ -77,6 +89,7 @@ void VulkanEngine::Init() {
       &device_, device_.GetQueueFamilies().graphics_family.value()));
 
   VK_CHECK(swapchain_.Create(&device_, &surface_));
+  LOG_SUCCESS("Swapchain created")
 
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(allocator_, &device_,
@@ -84,16 +97,20 @@ void VulkanEngine::Init() {
                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                                1, physical_device_.GetMaxSamples()));
+  LOG_SUCCESS("Color image created")
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1,
       physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT));
+  LOG_SUCCESS("Depth image created")
 
   InitRenderPasses();
+  LOG_SUCCESS("Render passes initialized")
 
   VK_CHECK(swapchain_framebuffers_.Create(&swapchain_, &render_pass_,
                                           &color_image_, &depth_image_));
+  LOG_SUCCESS("Swapchain framebuffers created")
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i)
     VK_CHECK(frames_[i].command_pool_.Create(
@@ -101,7 +118,9 @@ void VulkanEngine::Init() {
 
   InitSyncStructures();
   InitDescriptors();
+  LOG_SUCCESS("Descriptors initialized")
   InitPipelines();
+  LOG_SUCCESS("Pipelines initialized")
 
   Renderer::Queue& init_queue = device_.GetQueue(init_pool_.GetQueueFamily());
 
@@ -125,65 +144,77 @@ void VulkanEngine::Init() {
 void VulkanEngine::InitCVars() {
   AutoCVar_Float CVAR_clear_r("clear_color.r",
                               "Framebuffer clear color's red component", 0.f,
-                              CVarFlags::kEditFloatDrag);
+                              CVarFlagBits::kEditFloatDrag);
   AutoCVar_Float CVAR_clear_g("clear_color.g",
                               "Framebuffer clear color's green component", 0.f,
-                              CVarFlags::kEditFloatDrag);
+                              CVarFlagBits::kEditFloatDrag);
   AutoCVar_Float CVAR_clear_b("clear_color.b",
                               "Framebuffer clear color's blue component", 0.f,
-                              CVarFlags::kEditFloatDrag);
+                              CVarFlagBits::kEditFloatDrag);
 
   const VkPhysicalDeviceProperties& props = physical_device_.GetProperties();
   AutoCVar_String CVar_device_type(
       "device_type", "Device type",
-      string_VkPhysicalDeviceType(props.deviceType), CVarFlags::kEditReadOnly);
+      string_VkPhysicalDeviceType(props.deviceType),
+      CVarFlagBits::kEditReadOnly);
   AutoCVar_String CVar_device_name("device_name", "Device name",
-                                   props.deviceName, CVarFlags::kEditReadOnly);
+                                   props.deviceName,
+                                   CVarFlagBits::kEditReadOnly);
   AutoCVar_Int CVar_max_push_constant_size(
       "limits.max_push_constant_size", "Max Push Constant Size",
-      props.limits.maxPushConstantsSize, CVarFlags::kEditReadOnly);
+      props.limits.maxPushConstantsSize,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_memory_allocation_count(
       "limits.max_memory_allocation_count", "Max Memory Allocation Count",
-      props.limits.maxMemoryAllocationCount, CVarFlags::kEditReadOnly);
+      props.limits.maxMemoryAllocationCount,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_bound_descriptor_sets(
       "limits.max_bound_descriptor_sets", "Max Bound Descriptor Sets",
-      props.limits.maxBoundDescriptorSets, CVarFlags::kEditReadOnly);
+      props.limits.maxBoundDescriptorSets,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_descriptor_set_samplers(
       "limits.max_descriptor_set_samplers", "Max Descriptor Set Samplers",
-      props.limits.maxDescriptorSetSamplers, CVarFlags::kEditReadOnly);
+      props.limits.maxDescriptorSetSamplers,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_descriptor_set_uniform_buffers(
       "limits.max_descriptor_set_uniform_buffers",
       "Max Descriptor Set Uniform Buffers",
-      props.limits.maxDescriptorSetUniformBuffers, CVarFlags::kEditReadOnly);
+      props.limits.maxDescriptorSetUniformBuffers,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_descriptor_set_dynamic_uniform_buffers(
       "limits.max_descriptor_set_dynamic_uniform_buffers",
       "Max Descriptor Set Dynamic Uniform Buffers",
       props.limits.maxDescriptorSetUniformBuffersDynamic,
-      CVarFlags::kEditReadOnly);
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_descriptor_set_storage_buffers(
       "limits.max_descriptor_set_storage_buffers",
       "Max Descriptor Set Storage Buffers",
-      props.limits.maxDescriptorSetStorageBuffers, CVarFlags::kEditReadOnly);
+      props.limits.maxDescriptorSetStorageBuffers,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_descriptor_set_dynamic_storage_buffers(
       "limits.max_descriptor_set_dynamic_storage_buffers",
       "Max Descriptor Set Dynamic Storage Buffers",
       props.limits.maxDescriptorSetStorageBuffersDynamic,
-      CVarFlags::kEditReadOnly);
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_descriptor_set_sampled_images(
       "limits.max_descriptor_set_sampled_images",
       "Max Descriptor Set Sampled Images",
-      props.limits.maxDescriptorSetSampledImages, CVarFlags::kEditReadOnly);
+      props.limits.maxDescriptorSetSampledImages,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_descriptor_set_storage_images(
       "limits.max_descriptor_set_storage_images",
       "Max Descriptor Set Storage Images",
-      props.limits.maxDescriptorSetStorageImages, CVarFlags::kEditReadOnly);
+      props.limits.maxDescriptorSetStorageImages,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_descriptor_set_input_attachments(
       "limits.max_descriptor_set_input_attachments",
       "Max Descriptor Set Input Attachments",
-      props.limits.maxDescriptorSetInputAttachments, CVarFlags::kEditReadOnly);
+      props.limits.maxDescriptorSetInputAttachments,
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
   AutoCVar_Int CVar_max_sample_count(
       "limits.max_sample_count", "Max Sample Count",
-      physical_device_.GetMaxSamples(), CVarFlags::kEditReadOnly);
+      physical_device_.GetMaxSamples(),
+      CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
 }
 
 void VulkanEngine::InitRenderPasses() {
@@ -523,6 +554,9 @@ void VulkanEngine::KeyCallback(int key, int action, int mods) {
         console_opened_ = !console_opened_;
         if (console_opened_) EnableCursor(true);
         break;
+      case GLFW_KEY_LEFT_ALT:
+        EnableCursor(!cursor_enabled_);
+        break;
     }
   }
 }
@@ -542,15 +576,7 @@ void VulkanEngine::EnableCursor(bool enable) {
 }
 
 void VulkanEngine::ProcessInput() {
-  if (menu_opened_ || console_opened_) return;
-
-  if (!cursor_enabled_ &&
-      glfwGetKey(window_.GetWindow(), GLFW_KEY_LEFT_ALT) == GLFW_PRESS) {
-    EnableCursor(true);
-  } else if (cursor_enabled_ && glfwGetKey(window_.GetWindow(),
-                                           GLFW_KEY_LEFT_ALT) == GLFW_RELEASE) {
-    EnableCursor(false);
-  }
+  if (cursor_enabled_) return;
 
   if (glfwGetKey(window_.GetWindow(), GLFW_KEY_W) == GLFW_PRESS)
     camera_.ProcessKeyboard(Renderer::Camera::Direction::kForward, delta_time_);
@@ -605,10 +631,12 @@ void VulkanEngine::Cleanup() {
 
     vmaDestroyAllocator(allocator_);
 
-    Logger::Cleanup();
+    profiler_.Cleanup();
 
     device_.Destroy();
     surface_.Destroy();
+
+    Logger::Cleanup();
     instance_.Destroy();
 
     window_.Destroy();
@@ -652,17 +680,24 @@ void VulkanEngine::Draw() {
   VkClearValue depth_clear{};
   depth_clear.depthStencil.depth = 1.f;
 
-  render_pass_.Begin(command_buffer,
-                     swapchain_framebuffers_.GetFramebuffer(image_index),
-                     {{0, 0}, swapchain_.GetImageExtent()},
-                     {clear_value, depth_clear, clear_value});
+  profiler_.GrabQueries(command_buffer);
+  {
+    Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Full Frame");
+    Renderer::VulkanPipelineStatRecorder stats(command_buffer, &profiler_,
+                                               "Total Primitives");
 
-  DrawObjects(command_buffer, renderables_.data(), renderables_.size());
+    render_pass_.Begin(command_buffer,
+                       swapchain_framebuffers_.GetFramebuffer(image_index),
+                       {{0, 0}, swapchain_.GetImageExtent()},
+                       {clear_value, depth_clear, clear_value});
 
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-                                  command_buffer.GetBuffer());
+    DrawObjects(command_buffer, renderables_.data(), renderables_.size());
 
-  render_pass_.End(command_buffer);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+                                    command_buffer.GetBuffer());
+
+    render_pass_.End(command_buffer);
+  }
 
   VK_CHECK(command_buffer.End());
 
@@ -778,17 +813,28 @@ void VulkanEngine::DrawMenu() {
 }
 
 void VulkanEngine::DrawToolbar() {
-  const ImVec2 button_size{50.f, 50.f};
-  ImGui::SetNextWindowSize(ImVec2{0.f, 0.f});
-  ImGui::SetNextWindowPos(ImVec2{0.f, 0.f});
-  ImGui::Begin("Toolbar", nullptr,
-               ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoCollapse |
-                   ImGuiWindowFlags_NoMove);
-
-  if (ImGui::Button("Debug\n(F1)", button_size))
-    console_opened_ = !console_opened_;
-
-  ImGui::End();
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Debug")) {
+      if (ImGui::BeginMenu("CVAR")) {
+        CVarSystem::Get()->DrawImguiEditor();
+        ImGui::EndMenu();
+      } 
+      if (ImGui::BeginMenu("Timings")) {
+        for (auto& [k, v] : profiler_.timings) {
+          ImGui::Text("%s %f ms", k.c_str(), v);
+        }
+        ImGui::EndMenu();
+      } 
+      if (ImGui::BeginMenu("Stats")) {
+        for (auto& [k, v] : profiler_.stats) {
+          ImGui::Text("%s %d", k.c_str(), v);
+        }
+        ImGui::EndMenu();
+      }
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
 }
 
 void VulkanEngine::Run() {
@@ -807,7 +853,6 @@ void VulkanEngine::Run() {
 
     if (menu_opened_) DrawMenu();
     DrawToolbar();
-    if (console_opened_) CVarSystem::Get()->DrawImguiEditor();
 
     Draw();
   }

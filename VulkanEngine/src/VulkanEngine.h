@@ -21,6 +21,7 @@
 #include "Texture.h"
 #include "TextureSampler.h"
 #include "VulkanInstance.h"
+#include "VulkanProfiler.h"
 #include "Window.h"
 
 #define VMA_VULKAN_VERSION 1002000
@@ -119,6 +120,8 @@ class VulkanEngine {
   Renderer::Surface surface_;
   Renderer::PhysicalDevice physical_device_;
   Renderer::LogicalDevice device_;
+
+  Renderer::VulkanProfiler profiler_;
 
   VmaAllocator allocator_;
   Renderer::CommandPool init_pool_;

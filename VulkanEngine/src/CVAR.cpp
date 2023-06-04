@@ -320,7 +320,7 @@ void AutoCVar_String::Set(std::string&& value) {
 }
 
 void CVarSystemImpl::AddToEditor(CVarParameter* param) {
-  bool is_hidden = ((uint32_t)param->flags & (uint32_t)CVarFlags::kNoEdit);
+  bool is_hidden = (param->flags & CVarFlagBits::kNoEdit);
   if (!is_hidden)
     cached_edit_parameters_.push_back(param);
 }
@@ -339,7 +339,7 @@ void CVarSystemImpl::DrawImguiEditor() {
   // Insert all the edit parameters into the hashmap by category
   size_t categorized_counter = 0;
   for (auto p : cached_edit_parameters_) {
-    bool is_advanced = ((uint32_t)p->flags & (uint32_t)CVarFlags::kAdvanced);
+    bool is_advanced = (p->flags & CVarFlagBits::kAdvanced);
     if ((!show_advanced && is_advanced) ||
         p->name.find(search_text) == std::string::npos)
       continue;
@@ -403,12 +403,9 @@ void Label(const char* label, float text_width) {
 }
 void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
   static const ImVec4 kYellow = {1.f, 1.f, 0.f, 1.f};
-  const bool readonly_flag =
-      ((uint32_t)p->flags & (uint32_t)CVarFlags::kEditReadOnly);
-  const bool checkbox_flag =
-      ((uint32_t)p->flags & (uint32_t)CVarFlags::kEditCheckbox);
-  const bool drag_flag =
-      ((uint32_t)p->flags & (uint32_t)CVarFlags::kEditFloatDrag);
+  const bool readonly_flag = (p->flags & CVarFlagBits::kEditReadOnly);
+  const bool checkbox_flag = (p->flags & CVarFlagBits::kEditCheckbox);
+  const bool drag_flag = (p->flags & CVarFlagBits::kEditFloatDrag);
 
   switch (p->type) {
     case CVarType::kInt:
