@@ -13,6 +13,7 @@
 #include "Mesh.h"
 #include "PhysicalDevice.h"
 #include "Pipeline.h"
+#include "PushBuffer.h"
 #include "RenderObject.h"
 #include "RenderPass.h"
 #include "Surface.h"
@@ -57,6 +58,7 @@ struct FrameData {
   VkSemaphore render_semaphore_, present_semaphore_;
   VkFence render_fence_;
 
+  Renderer::PushBuffer dynamic_data_;
   Renderer::Buffer<true> object_buffer_;
 
   VkDescriptorSet global_descriptor_;
@@ -100,7 +102,6 @@ class VulkanEngine {
                                      const std::string& name);
   Renderer::Material* GetMaterial(const std::string& name);
   Renderer::Mesh* GetMesh(const std::string& name);
-  size_t PadUniformBuffer(size_t size);
 
   void EnableCursor(bool enable);
   void ProcessInput();
@@ -111,7 +112,7 @@ class VulkanEngine {
   float last_time_;
   int last_mouse_x_, last_mouse_y_;
   bool cursor_enabled_;
-  bool menu_opened_, console_opened_;
+  bool menu_opened_;
 
   Renderer::Window window_;
   Renderer::Camera camera_;
@@ -142,7 +143,6 @@ class VulkanEngine {
 
   std::array<FrameData, kMaxFramesInFlight> frames_;
   SceneData scene_data_;
-  Renderer::Buffer<true> scene_buffer_;
 
   std::vector<Renderer::RenderObject> renderables_;
 

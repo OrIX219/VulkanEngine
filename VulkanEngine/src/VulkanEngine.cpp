@@ -43,8 +43,7 @@ VulkanEngine::VulkanEngine()
       delta_time_(0),
       last_time_(0),
       cursor_enabled_(false),
-      menu_opened_(false),
-      console_opened_(false) {}
+      menu_opened_(false) {}
 
 VulkanEngine::~VulkanEngine() {}
 
@@ -294,12 +293,6 @@ void VulkanEngine::InitDescriptors() {
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
   }
 
-  const size_t scene_data_size =
-      kMaxFramesInFlight * PadUniformBuffer(sizeof(SceneData));
-  scene_buffer_.Create(allocator_, scene_data_size,
-                       VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-
   Renderer::DescriptorSetLayout single_texture_layout;
   single_texture_layout.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                    VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -307,8 +300,13 @@ void VulkanEngine::InitDescriptors() {
   single_texture_set_layout_ = single_texture_layout.layout;
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
+    frames_[i].dynamic_data_.Create(
+        allocator_, 8192,
+        static_cast<uint32_t>(physical_device_.GetProperties()
+                                  .limits.minUniformBufferOffsetAlignment));
+
     VkDescriptorBufferInfo scene_info{};
-    scene_info.buffer = scene_buffer_.GetBuffer();
+    scene_info.buffer = frames_[i].dynamic_data_.GetBuffer();
     scene_info.offset = 0;
     scene_info.range = sizeof(SceneData);
 
@@ -514,17 +512,6 @@ Renderer::Mesh* VulkanEngine::GetMesh(const std::string& name) {
   return &(*iter).second;
 }
 
-size_t VulkanEngine::PadUniformBuffer(size_t size) {
-  size_t min_ubo_alignment =
-      physical_device_.GetProperties().limits.minUniformBufferOffsetAlignment;
-  size_t aligned_size = size;
-  if (min_ubo_alignment > 0) {
-    aligned_size =
-        (aligned_size + min_ubo_alignment - 1) & ~(min_ubo_alignment - 1);
-  }
-  return aligned_size;
-}
-
 void VulkanEngine::MousePosCallback(double x, double y) {
   static bool first_mouse = true;
   if (cursor_enabled_) return;
@@ -548,11 +535,7 @@ void VulkanEngine::KeyCallback(int key, int action, int mods) {
     switch (key) {
       case GLFW_KEY_ESCAPE:
         menu_opened_ = !menu_opened_;
-        if (menu_opened_) EnableCursor(true);
-        break;
-      case GLFW_KEY_F1:
-        console_opened_ = !console_opened_;
-        if (console_opened_) EnableCursor(true);
+        EnableCursor(menu_opened_);
         break;
       case GLFW_KEY_LEFT_ALT:
         EnableCursor(!cursor_enabled_);
@@ -603,7 +586,6 @@ void VulkanEngine::Cleanup() {
     for (auto& material : materials_) material.second.Destroy();
     texture_sampler_.Destroy();
 
-    scene_buffer_.Destroy();
     for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
       vkDestroySemaphore(device_.GetDevice(), frames_[i].render_semaphore_,
                          nullptr);
@@ -613,6 +595,7 @@ void VulkanEngine::Cleanup() {
 
       frames_[i].command_pool_.Destroy();
       frames_[i].object_buffer_.Destroy();
+      frames_[i].dynamic_data_.Destroy();
     }
 
     vkDestroyDescriptorSetLayout(device_.GetDevice(),
@@ -645,14 +628,14 @@ void VulkanEngine::Cleanup() {
 
 void VulkanEngine::Draw() {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
 
-  VK_CHECK(vkWaitForFences(device_.GetDevice(), 1,
-                           &frames_[frame_index].render_fence_, VK_TRUE,
-                           UINT64_MAX));
+  VK_CHECK(vkWaitForFences(device_.GetDevice(), 1, &frame.render_fence_,
+                           VK_TRUE, UINT64_MAX));
 
   uint32_t image_index;
-  VkResult res = swapchain_.AcquireNextImage(
-      &image_index, frames_[frame_index].present_semaphore_);
+  VkResult res =
+      swapchain_.AcquireNextImage(&image_index, frame.present_semaphore_);
 
   if (res == VK_ERROR_OUT_OF_DATE_KHR) {
     RecreateSwapchain();
@@ -661,15 +644,14 @@ void VulkanEngine::Draw() {
     VK_CHECK(res);
   }
 
-  VK_CHECK(vkResetFences(device_.GetDevice(), 1,
-                         &frames_[frame_index].render_fence_));
+  VK_CHECK(vkResetFences(device_.GetDevice(), 1, &frame.render_fence_));
 
-  VK_CHECK(frames_[frame_index].command_pool_.Reset());
+  VK_CHECK(frame.command_pool_.Reset());
+  frame.dynamic_data_.Reset();
 
   ImGui::Render();
 
-  Renderer::CommandBuffer command_buffer =
-      frames_[frame_index].command_pool_.GetBuffer();
+  Renderer::CommandBuffer command_buffer = frame.command_pool_.GetBuffer();
   VK_CHECK(command_buffer.Begin());
 
   VkClearValue clear_value{};
@@ -707,13 +689,12 @@ void VulkanEngine::Draw() {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   submit_info.pWaitDstStageMask = &wait_stage;
   submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores = &frames_[frame_index].present_semaphore_;
+  submit_info.pWaitSemaphores = &frame.present_semaphore_;
   submit_info.signalSemaphoreCount = 1;
-  submit_info.pSignalSemaphores = &frames_[frame_index].render_semaphore_;
+  submit_info.pSignalSemaphores = &frame.render_semaphore_;
   command_buffer.Submit(std::move(submit_info));
 
-  VK_CHECK(device_.GetGraphicsQueue().SubmitBatches(
-      frames_[frame_index].render_fence_));
+  VK_CHECK(device_.GetGraphicsQueue().SubmitBatches(frame.render_fence_));
 
   VkPresentInfoKHR present_info{};
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -721,7 +702,7 @@ void VulkanEngine::Draw() {
   present_info.swapchainCount = 1;
   present_info.pSwapchains = swapchains;
   present_info.waitSemaphoreCount = 1;
-  present_info.pWaitSemaphores = &frames_[frame_index].render_semaphore_;
+  present_info.pWaitSemaphores = &frame.render_semaphore_;
   present_info.pImageIndices = &image_index;
 
   res = device_.GetPresentQueue().Present(&present_info);
@@ -740,6 +721,7 @@ void VulkanEngine::Draw() {
 void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
                                Renderer::RenderObject* first, size_t count) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
 
   glm::mat4 projection =
       glm::perspective(glm::radians(90.f), 1600.f / 900.f, 0.1f, 100.f);
@@ -751,12 +733,10 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
   float framed = frame_number_ / 120.f;
   scene_data_.ambient_color = {sin(framed), 0, cos(framed), 1};
 
-  uint32_t uniform_offset =
-      static_cast<uint32_t>(PadUniformBuffer(sizeof(SceneData))) * frame_index;
-  scene_buffer_.SetData(&scene_data_, sizeof(SceneData), uniform_offset);
+  uint32_t uniform_offset = frame.dynamic_data_.Push(scene_data_);
 
-  ObjectData* object_SSBO = static_cast<ObjectData*>(
-      frames_[frame_index].object_buffer_.GetMappedMemory());
+  ObjectData* object_SSBO =
+      static_cast<ObjectData*>(frame.object_buffer_.GetMappedMemory());
   for (size_t i = 0; i < count; ++i) {
     Renderer::RenderObject& object = first[i];
     object_SSBO[i].model_matrix = object.ModelMatrix();
@@ -770,14 +750,14 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
     if (object.GetMaterial() != last_material) {
       object.GetMaterial()->pipeline.Bind(command_buffer);
       last_material = object.GetMaterial();
-      vkCmdBindDescriptorSets(
-          command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-          object.GetMaterial()->pipeline.GetLayout(), 0, 1,
-          &frames_[frame_index].global_descriptor_, 1, &uniform_offset);
-      vkCmdBindDescriptorSets(
-          command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-          object.GetMaterial()->pipeline.GetLayout(), 1, 1,
-          &frames_[frame_index].object_descriptor_, 0, nullptr);
+      vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                              VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              object.GetMaterial()->pipeline.GetLayout(), 0, 1,
+                              &frame.global_descriptor_, 1, &uniform_offset);
+      vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                              VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              object.GetMaterial()->pipeline.GetLayout(), 1, 1,
+                              &frame.object_descriptor_, 0, nullptr);
       if (object.GetMaterial()->texture_set != VK_NULL_HANDLE) {
         vkCmdBindDescriptorSets(
             command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,

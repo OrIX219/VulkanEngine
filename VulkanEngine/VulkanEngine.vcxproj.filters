@@ -109,6 +109,7 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\VulkanProfiler.h" />
+    <ClInclude Include="src\PushBuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\format.cc">
@@ -214,6 +215,7 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\VulkanProfiler.cpp" />
+    <ClCompile Include="src\PushBuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">

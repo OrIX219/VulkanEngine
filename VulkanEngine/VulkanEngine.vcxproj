@@ -100,6 +100,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\PushBuffer.h" />
     <ClInclude Include="src\Buffer.h" />
     <ClInclude Include="src\CVAR.h" />
     <ClInclude Include="src\Camera.h" />
@@ -154,6 +155,7 @@
     <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\PhysicalDevice.cpp" />
     <ClCompile Include="src\Pipeline.cpp" />
+    <ClCompile Include="src\PushBuffer.cpp" />
     <ClCompile Include="src\Queue.cpp" />
     <ClCompile Include="src\RenderPass.cpp" />
     <ClCompile Include="src\Surface.cpp" />
