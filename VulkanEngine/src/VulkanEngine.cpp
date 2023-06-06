@@ -344,7 +344,7 @@ void VulkanEngine::InitPipelines() {
           .SetFragmentShader("Shaders/default_lit.frag.spv")
           .SetVertexInputDescription(Renderer::Vertex::GetDescription())
           .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
-                         VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                         VK_FRONT_FACE_CLOCKWISE)
           .SetDepthStencil()
           .SetLayout(set_layouts, push_constants)
           .SetViewport(viewport)
@@ -378,11 +378,15 @@ void VulkanEngine::LoadMeshes() {
   Renderer::Mesh viking_room;
   viking_room.LoadFromAsset(allocator_, command_buffer,
                             "Assets/viking_room.mesh");
+  Renderer::Mesh star;
+  star.LoadFromAsset(allocator_, command_buffer,
+                     "asset_export/star_GLTF/MESH_0_Cube.mesh");
 
   command_buffer.End();
   command_buffer.AddToBatch();
 
   meshes_["room"] = viking_room;
+  meshes_["star"] = star;
 }
 
 void VulkanEngine::LoadTextures() {
@@ -404,12 +408,17 @@ void VulkanEngine::LoadTextures() {
 void VulkanEngine::InitScene() {
   Renderer::RenderObject room;
   room.Create(GetMesh("room"), GetMaterial("textured"));
-  room.ModelMatrix() = glm::translate(glm::vec3(0, 0, -5));
+  room.ModelMatrix() = glm::translate(room.ModelMatrix(), glm::vec3(0, 0, -5));
   room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-45.f),
                                    glm::vec3(1.f, 0.f, 0.f));
   room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-135.f),
                                    glm::vec3(0.f, 0.f, 1.f));
   renderables_.push_back(room);
+
+  Renderer::RenderObject star;
+  star.Create(GetMesh("star"), GetMaterial("default"));
+  star.ModelMatrix() = glm::translate(star.ModelMatrix() , glm::vec3(10, 10, 10));
+  renderables_.push_back(star);
 
   Renderer::Material* viking_mat = GetMaterial("textured");
   VkDescriptorImageInfo viking_info{};
@@ -772,7 +781,7 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
     }
 
     vkCmdDrawIndexed(command_buffer.GetBuffer(),
-                     object.GetMesh()->GetIndicesCount(), 1, 0, 0, 0);
+                     object.GetMesh()->GetIndicesCount(), 1, 0, 0, i);
   }
 }
 
