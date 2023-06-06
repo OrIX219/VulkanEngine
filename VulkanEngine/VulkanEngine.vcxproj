@@ -100,7 +100,6 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="src\PushBuffer.h" />
     <ClInclude Include="src\Buffer.h" />
     <ClInclude Include="src\CVAR.h" />
     <ClInclude Include="src\Camera.h" />
@@ -116,7 +115,7 @@
     <ClInclude Include="src\Mesh.h" />
     <ClInclude Include="src\PhysicalDevice.h" />
     <ClInclude Include="src\Pipeline.h" />
-    <ClInclude Include="src\VulkanProfiler.h" />
+    <ClInclude Include="src\PushBuffer.h" />
     <ClInclude Include="src\Queue.h" />
     <ClInclude Include="src\RenderObject.h" />
     <ClInclude Include="src\RenderPass.h" />
@@ -130,6 +129,7 @@
     <ClInclude Include="src\VertexBuffer.h" />
     <ClInclude Include="src\VulkanEngine.h" />
     <ClInclude Include="src\VulkanInstance.h" />
+    <ClInclude Include="src\VulkanProfiler.h" />
     <ClInclude Include="src\Window.h" />
   </ItemGroup>
   <ItemGroup>

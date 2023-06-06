@@ -17,7 +17,7 @@ void PushBuffer::Destroy() { buffer_.Destroy(); }
 uint32_t PushBuffer::Push(void* data, uint32_t size) {
   uint32_t offset = current_offset_;
   buffer_.SetData(data, size, current_offset_);
-  current_offset_ += static_cast<uint32_t>(size);
+  current_offset_ += size;
   current_offset_ = PadUniformBufferSize(current_offset_);
     
   return offset;

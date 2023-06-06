@@ -58,6 +58,8 @@ project "AssetConverter"
     }
     includedirs {
         "Libraries/include/vulkan",
+        "Libraries/include/json",
+        "Libraries/include/stb",
         "AssetLib/src"
     }
     
