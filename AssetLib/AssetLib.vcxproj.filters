@@ -24,6 +24,9 @@
     <ClInclude Include="src\TextureAsset.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="src\MaterialAsset.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\AssetLoader.cpp">
@@ -33,6 +36,9 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="src\TextureAsset.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="src\MaterialAsset.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,3 +1,4 @@
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -12,6 +13,7 @@
 #include <tinyobj/tiny_obj_loader.h>
 
 #include "AssetLoader.h"
+#include "MaterialAsset.h"
 #include "MeshAsset.h"
 #include "TextureAsset.h"
 
@@ -379,6 +381,91 @@ bool ExtractGltfMeshes(tinygltf::Model& model, const fs::path& input,
   return true;
 }
 
+std::string CalculateGltfMaterialName(tinygltf::Model& model,
+                                      int material_idx) {
+  char buf[50];
+
+  itoa(material_idx, buf, 10);
+
+  std::string material_name =
+      "MAT_" + std::string{buf} + "_" + model.materials[material_idx].name;
+  return material_name;
+}
+
+void ExtractGltfMaterials(tinygltf::Model& model, const fs::path& input,
+                          const fs::path& output, const ConverterState& state) {
+  int material_idx = 0;
+  for (tinygltf::Material& glmat : model.materials) {
+    std::string material_name = CalculateGltfMaterialName(model, material_idx);
+
+    ++material_idx;
+    tinygltf::PbrMetallicRoughness& pbr = glmat.pbrMetallicRoughness;
+
+    Assets::MaterialInfo material_info;
+    material_info.base_effect = "defaultPBR";
+
+    if (pbr.baseColorTexture.index >= 0) {
+      tinygltf::Texture base_color = model.textures[pbr.baseColorTexture.index];
+      tinygltf::Image base_image = model.images[base_color.source];
+
+      fs::path base_color_path = output.parent_path() / base_image.uri;
+
+      base_color_path.replace_extension(".tx");
+      base_color_path = state.ConvertToExportRelative(base_color_path);
+
+      material_info.textures["base_color"] = base_color_path.string();
+    }
+
+    if (pbr.metallicRoughnessTexture.index >= 0) {
+      tinygltf::Texture texture =
+          model.textures[pbr.metallicRoughnessTexture.index];
+      tinygltf::Image image = model.images[texture.source];
+
+      fs::path image_path = output.parent_path() / image.uri;
+
+      image_path.replace_extension(".tx");
+      image_path = state.ConvertToExportRelative(image_path);
+
+      material_info.textures["normals"] = image_path.string();
+    }
+
+    if (glmat.occlusionTexture.index >= 0) {
+      tinygltf::Texture texture = model.textures[glmat.occlusionTexture.index];
+      tinygltf::Image image = model.images[texture.source];
+
+      fs::path image_path = output.parent_path() / image.uri;
+
+      image_path.replace_extension(".tx");
+      image_path = state.ConvertToExportRelative(image_path);
+
+      material_info.textures["occlusion"] = image_path.string();
+    }
+
+    if (glmat.emissiveTexture.index >= 0) {
+      tinygltf::Texture texture = model.textures[glmat.emissiveTexture.index];
+      tinygltf::Image image = model.images[texture.source];
+
+      fs::path image_path = output.parent_path() / image.uri;
+
+      image_path.replace_extension(".tx");
+      image_path = state.ConvertToExportRelative(image_path);
+
+      material_info.textures["emissive"] = image_path.string();
+    }
+
+    fs::path material_path = output / (material_name + ".mat");
+
+    if (glmat.alphaMode == "BLEND")
+      material_info.transparency = Assets::TransparencyMode::kTransparent;
+    else
+      material_info.transparency = Assets::TransparencyMode::kOpaque;
+
+    Assets::AssetFile file = Assets::PackMaterial(&material_info);
+
+    Assets::SaveBinaryFile(material_path.string().c_str(), file);
+  }
+}
+
 int main(int argc, char* argv[]) {
   if (argc < 2) {
     std::cout << "No path specified\n";
@@ -404,21 +491,21 @@ int main(int argc, char* argv[]) {
     if (!fs::is_directory(export_path.parent_path()))
       fs::create_directory(export_path.parent_path());
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     if (p.path().extension() == ".png") {
       std::cout << "Found texture" << std::endl;
 
       fs::path new_path = p.path();
       new_path.replace_extension(".tx");
       ConvertImage(p.path(), new_path);
-    }
-    if (p.path().extension() == ".obj") {
+    } else if (p.path().extension() == ".obj") {
       std::cout << "Found mesh" << std::endl;
 
       fs::path new_path = p.path();
       new_path.replace_extension(".mesh");
       ConvertMesh(p.path(), new_path);
-    }
-    if (p.path().extension() == ".gltf") {
+    } else if (p.path().extension() == ".gltf") {
       std::cout << "Found mesh" << std::endl;
 
       tinygltf::Model model;
@@ -442,7 +529,17 @@ int main(int argc, char* argv[]) {
       fs::create_directory(folder);
 
       ExtractGltfMeshes(model, p.path(), folder, state);
+      ExtractGltfMaterials(model, p.path(), folder, state);
+    } else {
+      continue;
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto diff = end - start;
+    std::cout
+        << "Conversion took "
+        << std::chrono::duration_cast<std::chrono::milliseconds>(diff).count()
+        << "ms" << std::endl;
   }
 
   return 0; 
