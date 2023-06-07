@@ -15,12 +15,17 @@
 #include "AssetLoader.h"
 #include "MaterialAsset.h"
 #include "MeshAsset.h"
+#include "PrefabAsset.h"
 #include "TextureAsset.h"
 
 #define TINYGLTF_NO_STB_IMAGE
 #define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_IMPLEMENTATION
 #include <tinygltf/tiny_gltf.h>
+
+#include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 namespace fs = std::filesystem;
 
@@ -466,6 +471,140 @@ void ExtractGltfMaterials(tinygltf::Model& model, const fs::path& input,
   }
 }
 
+void ExtractGltfNodes(tinygltf::Model& model, const fs::path& input,
+                      const fs::path& output, const ConverterState& state) {
+  Assets::PrefabInfo prefab_info;
+
+  std::vector<uint64_t> multi_primitive_mesh_nodes;
+  for (size_t i = 0; i < model.nodes.size(); ++i) {
+    tinygltf::Node& node = model.nodes[i];
+
+    std::string node_name = node.name;
+    prefab_info.node_names[i] = node_name;
+
+    std::array<float, 16> matrix;
+    if (node.matrix.size() > 0) {
+      for (size_t j = 0; j < 16; ++j) matrix[j] = node.matrix[j];
+    } else {
+      glm::mat4 translation{1.f};
+      if (node.translation.size() > 0)
+        translation = glm::translate(glm::vec3{
+            node.translation[0], node.translation[1], node.translation[2]});
+
+      glm::mat4 rotation{1.f};
+      if (node.rotation.size() > 0) {
+        glm::quat rot(node.rotation[3], node.rotation[0], node.rotation[1],
+                      node.rotation[2]);
+        rotation = glm::mat4{rot};
+      }
+
+      glm::mat4 scale{1.f};
+      if (node.scale.size() > 0)
+        scale =
+            glm::scale(glm::vec3{node.scale[0], node.scale[1], node.scale[2]});
+
+      glm::mat4 transform_mat = translation * rotation * scale;
+
+      memcpy(matrix.data(), &transform_mat, sizeof(glm::mat4));
+    }
+
+    prefab_info.node_matrices[i] = prefab_info.matrices.size();
+    prefab_info.matrices.push_back(matrix);
+
+    if (node.mesh >= 0) {
+      const tinygltf::Mesh& mesh = model.meshes[node.mesh];
+
+      if (mesh.primitives.size() > 1) {
+        multi_primitive_mesh_nodes.push_back(i);
+      } else {
+        const tinygltf::Primitive& prim = mesh.primitives[0];
+        std::string mesh_name = CalculateGltfMeshName(model, node.mesh, 0);
+        fs::path mesh_path = output / (mesh_name + ".mesh");
+
+        int material = prim.material;
+        std::string material_name = CalculateGltfMaterialName(model, material);
+        fs::path material_path = output / (material_name + ".mat");
+
+        Assets::PrefabInfo::NodeMesh node_mesh;
+        node_mesh.mesh_path = state.ConvertToExportRelative(mesh_path).string();
+        node_mesh.material_path =
+            state.ConvertToExportRelative(material_path).string();
+
+        prefab_info.node_meshes[i] = node_mesh;
+      }
+    }
+  }
+
+  // Calculating parents
+  for (size_t i = 0; i < model.nodes.size(); ++i) {
+    for (int c : model.nodes[i].children) prefab_info.node_parents[c] = i;
+  }
+
+  // Fixing coordinates for each root node
+  glm::mat4 flip{1.f};
+  flip[1][1] = -1;
+  glm::mat4 rotation{1.f};
+  rotation = glm::rotate(glm::radians(-180.f), glm::vec3{1.f, 0.f, 0.f});
+  for (size_t i = 0; i < model.nodes.size(); ++i) {
+    auto iter = prefab_info.node_parents.find(i);
+    if (iter != prefab_info.node_parents.end()) continue;
+
+    std::array<float, 16> matrix =
+        prefab_info.matrices[prefab_info.node_matrices[i]];
+    glm::mat4 mat;
+
+    memcpy(&mat, matrix.data(), sizeof(glm::mat4));
+    mat = rotation * (flip * mat);
+    memcpy(matrix.data(), &mat, sizeof(glm::mat4));
+
+    prefab_info.matrices[prefab_info.node_matrices[i]] = matrix;
+  }
+
+  // Converting each submesh into node
+  int node_idx = model.nodes.size();
+  for (size_t i = 0; i < multi_primitive_mesh_nodes.size(); ++i) {
+    const tinygltf::Node& node = model.nodes[i];
+
+    if (node.mesh < 0) break;
+
+    const tinygltf::Mesh& mesh = model.meshes[node.mesh];
+
+    for (size_t prim_idx = 0; prim_idx < mesh.primitives.size(); ++prim_idx) {
+      const tinygltf::Primitive& prim = mesh.primitives[prim_idx];
+      int new_node = node_idx++;
+
+      char buf[50];
+
+      itoa(prim_idx, buf, 10);
+
+      prefab_info.node_names[new_node] =
+          prefab_info.node_names[i] + "_PRIM_" + buf;
+
+      const tinygltf::Material& mat = model.materials[prim.material];
+      std::string mesh_name = CalculateGltfMeshName(model, node.mesh, prim_idx);
+      std::string material_name =
+          CalculateGltfMaterialName(model, prim.material);
+
+      fs::path mesh_path = output / (mesh_name + ".mesh");
+      fs::path material_path = output / (material_name + ".mat");
+
+      Assets::PrefabInfo::NodeMesh node_mesh;
+      node_mesh.mesh_path = state.ConvertToExportRelative(mesh_path).string();
+      node_mesh.material_path =
+          state.ConvertToExportRelative(material_path).string();
+
+      prefab_info.node_meshes[new_node] = node_mesh;
+    }
+  }
+
+  Assets::AssetFile file = Assets::PackPrefab(&prefab_info);
+
+  fs::path scene_path = (output.parent_path()) / input.stem();
+  scene_path.replace_extension(".pfb");
+
+  Assets::SaveBinaryFile(scene_path.string().c_str(), file);
+}
+
 int main(int argc, char* argv[]) {
   if (argc < 2) {
     std::cout << "No path specified\n";
@@ -530,6 +669,7 @@ int main(int argc, char* argv[]) {
 
       ExtractGltfMeshes(model, p.path(), folder, state);
       ExtractGltfMaterials(model, p.path(), folder, state);
+      ExtractGltfNodes(model, p.path(), folder, state);
     } else {
       continue;
     }

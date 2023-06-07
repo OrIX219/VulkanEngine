@@ -99,12 +99,14 @@
     <ClInclude Include="src\AssetLoader.h" />
     <ClInclude Include="src\MaterialAsset.h" />
     <ClInclude Include="src\MeshAsset.h" />
+    <ClInclude Include="src\PrefabAsset.h" />
     <ClInclude Include="src\TextureAsset.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\AssetLoader.cpp" />
     <ClCompile Include="src\MaterialAsset.cpp" />
     <ClCompile Include="src\MeshAsset.cpp" />
+    <ClCompile Include="src\PrefabAsset.cpp" />
     <ClCompile Include="src\TextureAsset.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

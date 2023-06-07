@@ -15,22 +15,26 @@
     "nodes" : [
         {
             "mesh" : 0,
-            "name" : "Cube"
+            "name" : "Star"
         }
     ],
     "materials" : [
         {
-            "doubleSided" : true,
-            "name" : "Material",
+            "emissiveFactor" : [
+                0.013702082447707653,
+                0.7758221626281738,
+                0.799102783203125
+            ],
+            "name" : "Star",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
-                    0.800000011920929,
-                    0.800000011920929,
-                    0.800000011920929,
+                    0.013550356961786747,
+                    0.7771450877189636,
+                    0.8000000715255737,
                     1
                 ],
                 "metallicFactor" : 0,
-                "roughnessFactor" : 0.4000000059604645
+                "roughnessFactor" : 0.5
             }
         }
     ],
