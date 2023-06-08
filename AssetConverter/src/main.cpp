@@ -5,10 +5,6 @@
 
 #include <json/json.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
-#include <stb/stb_image_write.h>
-
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tinyobj/tiny_obj_loader.h>
 
@@ -18,9 +14,9 @@
 #include "PrefabAsset.h"
 #include "TextureAsset.h"
 
-#define TINYGLTF_NO_STB_IMAGE
-#define TINYGLTF_NO_STB_IMAGE_WRITE
 #define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <tinygltf/tiny_gltf.h>
 
 #include <glm/glm.hpp>
@@ -635,9 +631,8 @@ int main(int argc, char* argv[]) {
     if (p.path().extension() == ".png") {
       std::cout << "Found texture" << std::endl;
 
-      fs::path new_path = p.path();
-      new_path.replace_extension(".tx");
-      ConvertImage(p.path(), new_path);
+      export_path.replace_extension(".tx");
+      ConvertImage(p.path(), export_path);
     } else if (p.path().extension() == ".obj") {
       std::cout << "Found mesh" << std::endl;
 
