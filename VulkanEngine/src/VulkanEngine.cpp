@@ -25,7 +25,7 @@
   do {                                                                    \
     VkResult err = x;                                                     \
     if (err) {                                                            \
-      LOG_FATAL(std::string_view{string_VkResult(err)})                   \
+      LOG_FATAL(std::string_view{string_VkResult(err)});                  \
     }                                                                     \
   } while (0);
 
@@ -49,33 +49,33 @@ VulkanEngine::~VulkanEngine() {}
 
 void VulkanEngine::Init() {
   Logger::Get().SetTime();
-  LOG_INFO("Engine init")
+  LOG_INFO("Engine init");
 
   window_.Init(1600, 900, "Vulkan Engine", this);
   glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-  LOG_SUCCESS("Window created")
+  LOG_SUCCESS("Window created");
   VK_CHECK(
       instance_.Init(kEnableValidationLayers, {"VK_LAYER_KHRONOS_validation"}));
-  LOG_SUCCESS("Vulkan instance initialized")
+  LOG_SUCCESS("Vulkan instance initialized");
 
   Logger::Init(&instance_);
-  LOG_SUCCESS("Logger initialized")
+  LOG_SUCCESS("Logger initialized");
 
   VK_CHECK(surface_.Init(&instance_, &window_));
-  LOG_SUCCESS("GLFW surface initialized")
+  LOG_SUCCESS("GLFW surface initialized");
   VK_CHECK(
       physical_device_.Init(&instance_, &surface_,
                             {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                              VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME}));
-  LOG_SUCCESS("GPU found")
+  LOG_SUCCESS("GPU found");
   VK_CHECK(device_.Init(&physical_device_));
-  LOG_SUCCESS("Logical device initialized")
+  LOG_SUCCESS("Logical device initialized");
 
   profiler_.Init(&device_,
                  physical_device_.GetProperties().limits.timestampPeriod);
-  LOG_SUCCESS("Profiler initialized")
+  LOG_SUCCESS("Profiler initialized");
   InitCVars();
-  LOG_SUCCESS("CVars system initialized")
+  LOG_SUCCESS("CVars system initialized");
 
   VmaAllocatorCreateInfo allocator_info{};
   allocator_info.instance = instance_.GetInstance();
@@ -88,7 +88,7 @@ void VulkanEngine::Init() {
       &device_, device_.GetQueueFamilies().graphics_family.value()));
 
   VK_CHECK(swapchain_.Create(&device_, &surface_));
-  LOG_SUCCESS("Swapchain created")
+  LOG_SUCCESS("Swapchain created");
 
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(allocator_, &device_,
@@ -96,20 +96,20 @@ void VulkanEngine::Init() {
                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                                1, physical_device_.GetMaxSamples()));
-  LOG_SUCCESS("Color image created")
+  LOG_SUCCESS("Color image created");
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1,
       physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT));
-  LOG_SUCCESS("Depth image created")
+  LOG_SUCCESS("Depth image created");
 
   InitRenderPasses();
-  LOG_SUCCESS("Render passes initialized")
+  LOG_SUCCESS("Render passes initialized");
 
   VK_CHECK(swapchain_framebuffers_.Create(&swapchain_, &render_pass_,
                                           &color_image_, &depth_image_));
-  LOG_SUCCESS("Swapchain framebuffers created")
+  LOG_SUCCESS("Swapchain framebuffers created");
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i)
     VK_CHECK(frames_[i].command_pool_.Create(
@@ -117,9 +117,9 @@ void VulkanEngine::Init() {
 
   InitSyncStructures();
   InitDescriptors();
-  LOG_SUCCESS("Descriptors initialized")
+  LOG_SUCCESS("Descriptors initialized");
   InitPipelines();
-  LOG_SUCCESS("Pipelines initialized")
+  LOG_SUCCESS("Pipelines initialized");
 
   Renderer::Queue& init_queue = device_.GetQueue(init_pool_.GetQueueFamily());
 
@@ -344,7 +344,7 @@ void VulkanEngine::InitPipelines() {
           .SetFragmentShader("Shaders/default_lit.frag.spv")
           .SetVertexInputDescription(Renderer::Vertex::GetDescription())
           .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
-                         VK_FRONT_FACE_CLOCKWISE)
+                         VK_FRONT_FACE_COUNTER_CLOCKWISE)
           .SetDepthStencil()
           .SetLayout(set_layouts, push_constants)
           .SetViewport(viewport)
@@ -378,15 +378,16 @@ void VulkanEngine::LoadMeshes() {
   Renderer::Mesh viking_room;
   viking_room.LoadFromAsset(allocator_, command_buffer,
                             "Assets/viking_room.mesh");
-  Renderer::Mesh star;
+  /*Renderer::Mesh star;
   star.LoadFromAsset(allocator_, command_buffer,
-                     "asset_export/star_GLTF/MESH_0_Cube.mesh");
+                     "asset_export/star_GLTF/MESH_0_Cube.mesh");*/
+  LoadPrefab(command_buffer, "asset_export/star.pfb", glm::mat4{1.f});
 
   command_buffer.End();
   command_buffer.AddToBatch();
 
   meshes_["room"] = viking_room;
-  meshes_["star"] = star;
+  //meshes_["star"] = star;
 }
 
 void VulkanEngine::LoadTextures() {
@@ -405,6 +406,73 @@ void VulkanEngine::LoadTextures() {
   textures_["viking"] = viking_texture;
 }
 
+bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
+                              const char* path, glm::mat4 root) {
+  if (prefab_cache_.find(path) == prefab_cache_.end()) {
+    Assets::AssetFile file;
+    bool loaded = Assets::LoadBinaryFile(path, file);
+
+    if (!loaded) {
+      LOG_ERROR("Failed to load prefab: {}", path);
+      return false;
+    } else {
+      LOG_SUCCESS("Prefab {} loaded", path);
+    }
+
+    prefab_cache_[path] = new Assets::PrefabInfo;
+    *prefab_cache_[path] = Assets::ReadPrefabInfo(&file);
+  }
+
+  Assets::PrefabInfo* info = prefab_cache_[path];
+
+  std::unordered_map<uint64_t, glm::mat4> node_world_mats;
+  std::vector<std::pair<uint64_t, glm::mat4>> pending_nodes;
+  for (auto& [key, value] : info->node_matrices) {
+    glm::mat4 node_mat{1.f};
+    const std::array<float, 16>& mat = info->matrices[value];
+    memcpy(&node_mat, mat.data(), sizeof(glm::mat4));
+
+    auto iter = info->node_parents.find(key);
+    if (iter == info->node_parents.end())
+      node_world_mats[key] = root * node_mat;
+    else
+      pending_nodes.push_back({key, node_mat});
+  }
+
+  while (pending_nodes.size() > 0) {
+    for (size_t i = 0; i < pending_nodes.size(); ++i) {
+      uint64_t node = pending_nodes[i].first;
+      uint64_t parent = info->node_parents[node];
+
+      auto iter = node_world_mats.find(parent);
+      if (iter != node_world_mats.end()) {
+        glm::mat4 node_mat = iter->second * pending_nodes[i].second;
+        node_world_mats[node] = node_mat;
+
+        pending_nodes[i] = pending_nodes.back();
+        pending_nodes.pop_back();
+        --i;
+      }
+    }
+  }
+
+  for (auto& [key, value] : info->node_meshes) {
+    if (!GetMesh(value.mesh_path)) {
+      Renderer::Mesh mesh{};
+      std::string asset_path = "asset_export/" + std::string{value.mesh_path};
+      mesh.LoadFromAsset(allocator_, command_buffer, asset_path.c_str());
+      meshes_[value.mesh_path] = mesh;
+    }
+
+    Renderer::RenderObject object(GetMesh(value.mesh_path),
+                                  GetMaterial("default"));
+    object.ModelMatrix() = node_world_mats[key];
+    renderables_.push_back(object);
+  }
+
+  return true;
+}
+
 void VulkanEngine::InitScene() {
   Renderer::RenderObject room;
   room.Create(GetMesh("room"), GetMaterial("textured"));
@@ -415,10 +483,10 @@ void VulkanEngine::InitScene() {
                                    glm::vec3(0.f, 0.f, 1.f));
   renderables_.push_back(room);
 
-  Renderer::RenderObject star;
+  /*Renderer::RenderObject star;
   star.Create(GetMesh("star"), GetMaterial("default"));
   star.ModelMatrix() = glm::translate(star.ModelMatrix() , glm::vec3(10, 10, 10));
-  renderables_.push_back(star);
+  renderables_.push_back(star);*/
 
   Renderer::Material* viking_mat = GetMaterial("textured");
   VkDescriptorImageInfo viking_info{};

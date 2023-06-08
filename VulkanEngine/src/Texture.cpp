@@ -19,7 +19,7 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
   bool loaded = Assets::LoadBinaryFile(path, file);
 
   if (!loaded) {
-    LOG_ERROR("Error when loading texture")
+    LOG_ERROR("Error when loading texture");
     return false;
   }
 

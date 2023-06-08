@@ -12,15 +12,15 @@
 #include "VulkanInstance.h"
 
 #define LOG_FATAL(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kFatal, message, ##__VA_ARGS__);
+  Engine::Logger::Get().Log(Engine::LogType::kFatal, message, ##__VA_ARGS__)
 #define LOG_ERROR(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kError, message, ##__VA_ARGS__);
+  Engine::Logger::Get().Log(Engine::LogType::kError, message, ##__VA_ARGS__)
 #define LOG_WARNING(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kWarning, message, ##__VA_ARGS__);
+  Engine::Logger::Get().Log(Engine::LogType::kWarning, message, ##__VA_ARGS__)
 #define LOG_INFO(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kInfo, message, ##__VA_ARGS__);
+  Engine::Logger::Get().Log(Engine::LogType::kInfo, message, ##__VA_ARGS__)
 #define LOG_SUCCESS(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kSuccess, message, ##__VA_ARGS__);
+  Engine::Logger::Get().Log(Engine::LogType::kSuccess, message, ##__VA_ARGS__)
 
 namespace Engine {
 

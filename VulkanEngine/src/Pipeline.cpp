@@ -141,7 +141,7 @@ Pipeline PipelineBuilder::Build(RenderPass* render_pass) {
   Pipeline pipeline;
 
   if (pipeline.Create(device_, &pipeline_info, foreign_layout_) != VK_SUCCESS) {
-    LOG_ERROR("Failed to create pipeline!")
+    LOG_ERROR("Failed to create pipeline!");
     return Pipeline();
   } else {
     return pipeline;
@@ -360,7 +360,7 @@ VkShaderModule PipelineBuilder::CreateShaderModule(
   VkShaderModule shader_module;
   if (vkCreateShaderModule(device_->GetDevice(), &create_info, nullptr,
                            &shader_module) != VK_SUCCESS) {
-    LOG_ERROR("Failed to create shader module!")
+    LOG_ERROR("Failed to create shader module!");
     return VK_NULL_HANDLE;
   }
 

@@ -48,7 +48,7 @@ bool Mesh::LoadFromAsset(VmaAllocator allocator, CommandBuffer command_buffer,
   bool loaded = Assets::LoadBinaryFile(path, file);
 
   if (!loaded) {
-    LOG_ERROR("Error when loading mesh")
+    LOG_ERROR("Error when loading mesh");
     return false;
   }
 
