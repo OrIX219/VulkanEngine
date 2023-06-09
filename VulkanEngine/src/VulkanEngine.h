@@ -6,6 +6,7 @@
 
 #include "Camera.h"
 #include "CommandPool.h"
+#include "DeletionQueue.h"
 #include "Descriptors.h"
 #include "DescriptorPool.h"
 #include "Image.h"
@@ -129,6 +130,7 @@ class VulkanEngine {
   Renderer::VulkanProfiler profiler_;
 
   VmaAllocator allocator_;
+  DeletionQueue main_deletion_queue_;
   Renderer::CommandPool init_pool_;
 
   Renderer::Swapchain swapchain_;

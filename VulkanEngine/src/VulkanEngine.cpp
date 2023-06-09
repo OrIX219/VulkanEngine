@@ -21,6 +21,8 @@
 #include "CVAR.h"
 #include "Logger.h"
 
+#include "MaterialAsset.h"
+
 #define VK_CHECK(x)                                                       \
   do {                                                                    \
     VkResult err = x;                                                     \
@@ -89,6 +91,8 @@ void VulkanEngine::Init() {
 
   VK_CHECK(swapchain_.Create(&device_, &surface_));
   LOG_SUCCESS("Swapchain created");
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Swapchain::Destroy, swapchain_));
 
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(allocator_, &device_,
@@ -97,12 +101,16 @@ void VulkanEngine::Init() {
                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                                1, physical_device_.GetMaxSamples()));
   LOG_SUCCESS("Color image created");
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Image::Destroy, color_image_));
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1,
       physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT));
   LOG_SUCCESS("Depth image created");
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Image::Destroy, depth_image_));
 
   InitRenderPasses();
   LOG_SUCCESS("Render passes initialized");
@@ -110,10 +118,15 @@ void VulkanEngine::Init() {
   VK_CHECK(swapchain_framebuffers_.Create(&swapchain_, &render_pass_,
                                           &color_image_, &depth_image_));
   LOG_SUCCESS("Swapchain framebuffers created");
+  main_deletion_queue_.PushFunction(std::bind(
+      &Renderer::SwapchainFramebuffers::Destroy, swapchain_framebuffers_));
 
-  for (size_t i = 0; i < kMaxFramesInFlight; ++i)
+  for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(frames_[i].command_pool_.Create(
         &device_, device_.GetQueueFamilies().graphics_family.value()));
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::CommandPool::Destroy, frames_[i].command_pool_));
+  }
 
   InitSyncStructures();
   InitDescriptors();
@@ -124,13 +137,10 @@ void VulkanEngine::Init() {
   Renderer::Queue& init_queue = device_.GetQueue(init_pool_.GetQueueFamily());
 
   init_queue.BeginBatch();
-  LoadMeshes();
-  LoadTextures();
+  InitScene();
   init_queue.EndBatch();
 
   init_queue.SubmitBatches();
-
-  InitScene();
 
   InitImgui();
 
@@ -261,6 +271,9 @@ void VulkanEngine::InitRenderPasses() {
                      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
   render_pass_ = render_pass_builder.Build();
+
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::RenderPass::Destroy, render_pass_));
 }
 
 void VulkanEngine::InitSyncStructures() {
@@ -278,6 +291,14 @@ void VulkanEngine::InitSyncStructures() {
                                &frames_[i].render_semaphore_));
     VK_CHECK(vkCreateSemaphore(device_.GetDevice(), &semaphore_info, nullptr,
                                &frames_[i].present_semaphore_));
+
+    main_deletion_queue_.PushFunction([=]() {
+      vkDestroyFence(device_.GetDevice(), frames_[i].render_fence_, nullptr);
+      vkDestroySemaphore(device_.GetDevice(), frames_[i].render_semaphore_,
+                         nullptr);
+      vkDestroySemaphore(device_.GetDevice(), frames_[i].present_semaphore_,
+                         nullptr);
+    });
   }
 }
 
@@ -291,6 +312,8 @@ void VulkanEngine::InitDescriptors() {
         allocator_, sizeof(ObjectData) * kMaxObjects,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::Buffer<true>::Destroy, frames_[i].object_buffer_));
   }
 
   Renderer::DescriptorSetLayout single_texture_layout;
@@ -298,12 +321,18 @@ void VulkanEngine::InitDescriptors() {
                                    VK_SHADER_STAGE_FRAGMENT_BIT);
   single_texture_layout.Create(&device_);
   single_texture_set_layout_ = single_texture_layout.layout;
+  main_deletion_queue_.PushFunction([=]() {
+    vkDestroyDescriptorSetLayout(device_.GetDevice(),
+                                 single_texture_set_layout_, nullptr);
+  });
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     frames_[i].dynamic_data_.Create(
         allocator_, 8192,
         static_cast<uint32_t>(physical_device_.GetProperties()
                                   .limits.minUniformBufferOffsetAlignment));
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::PushBuffer::Destroy, frames_[i].dynamic_data_));
 
     VkDescriptorBufferInfo scene_info{};
     scene_info.buffer = frames_[i].dynamic_data_.GetBuffer();
@@ -369,6 +398,11 @@ void VulkanEngine::InitPipelines() {
 
   CreateMaterial(mesh_pipeline, "default");
   CreateMaterial(texture_pipeline, "textured");
+
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Pipeline::Destroy, mesh_pipeline));
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Pipeline::Destroy, texture_pipeline));
 }
 
 void VulkanEngine::LoadMeshes() {
@@ -378,20 +412,20 @@ void VulkanEngine::LoadMeshes() {
   Renderer::Mesh viking_room;
   viking_room.LoadFromAsset(allocator_, command_buffer,
                             "Assets/viking_room.mesh");
-  /*Renderer::Mesh star;
-  star.LoadFromAsset(allocator_, command_buffer,
-                     "asset_export/star_GLTF/MESH_0_Cube.mesh");*/
-  LoadPrefab(command_buffer, "asset_export/star.pfb", glm::mat4{1.f});
 
   command_buffer.End();
   command_buffer.AddToBatch();
 
   meshes_["room"] = viking_room;
-  //meshes_["star"] = star;
+
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Mesh::Destroy, viking_room));
 }
 
 void VulkanEngine::LoadTextures() {
   texture_sampler_.SetDefaults().Create(&device_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::TextureSampler::Destroy, texture_sampler_));
 
   Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
@@ -404,6 +438,9 @@ void VulkanEngine::LoadTextures() {
   command_buffer.AddToBatch();
 
   textures_["viking"] = viking_texture;
+
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Texture::Destroy, viking_texture));
 }
 
 bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
@@ -462,10 +499,51 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
       std::string asset_path = "asset_export/" + std::string{value.mesh_path};
       mesh.LoadFromAsset(allocator_, command_buffer, asset_path.c_str());
       meshes_[value.mesh_path] = mesh;
+
+      main_deletion_queue_.PushFunction(
+          std::bind(&Renderer::Mesh::Destroy, mesh));
     }
 
-    Renderer::RenderObject object(GetMesh(value.mesh_path),
-                                  GetMaterial("default"));
+    Assets::AssetFile material_file;
+    std::string material_path = "asset_export/" + value.material_path;
+    bool loaded =
+        Assets::LoadBinaryFile(material_path.c_str(), material_file);
+    if (!loaded) {
+      LOG_ERROR("Failed to load material: {}", material_path.c_str());
+      return false;
+    } else {
+      LOG_SUCCESS("Loaded material: {}", material_path.c_str());
+    }
+
+    Assets::MaterialInfo material_info = Assets::ReadMaterialInfo(&material_file);
+    std::string texture_path =
+        "asset_export/" + material_info.textures["base_color"];
+    Renderer::Texture texture;
+    loaded = texture.LoadFromAsset(allocator_, &device_, command_buffer,
+                                   texture_path.c_str());
+    if (!loaded) {
+      LOG_ERROR("Failed to load texture: {}", texture_path.c_str());
+      return false;
+    } else {
+      LOG_SUCCESS("Loaded texture: {}", texture_path.c_str());
+    }
+    textures_[texture_path] = texture;
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::Texture::Destroy, texture));
+
+    CreateMaterial(GetMaterial("textured")->pipeline, material_path);
+    Renderer::Material* material = GetMaterial(material_path);
+    VkDescriptorImageInfo image_info{};
+    image_info.sampler = texture_sampler_.GetSampler();
+    image_info.imageView = textures_[texture_path].GetView();
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
+        .BindImage(0, &image_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                   VK_SHADER_STAGE_FRAGMENT_BIT)
+        .Build(material->texture_set);
+
+    Renderer::RenderObject object(GetMesh(value.mesh_path), material);
     object.ModelMatrix() = node_world_mats[key];
     renderables_.push_back(object);
   }
@@ -474,6 +552,17 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 }
 
 void VulkanEngine::InitScene() {
+  LoadMeshes();
+  LoadTextures();
+
+  Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
+  command_buffer.Begin();
+
+  LoadPrefab(command_buffer, "asset_export/star.pfb", glm::mat4{1.f});
+
+  command_buffer.End();
+  command_buffer.AddToBatch();
+
   Renderer::RenderObject room;
   room.Create(GetMesh("room"), GetMaterial("textured"));
   room.ModelMatrix() = glm::translate(room.ModelMatrix(), glm::vec3(0, 0, -5));
@@ -482,11 +571,6 @@ void VulkanEngine::InitScene() {
   room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-135.f),
                                    glm::vec3(0.f, 0.f, 1.f));
   renderables_.push_back(room);
-
-  /*Renderer::RenderObject star;
-  star.Create(GetMesh("star"), GetMaterial("default"));
-  star.ModelMatrix() = glm::translate(star.ModelMatrix() , glm::vec3(10, 10, 10));
-  renderables_.push_back(star);*/
 
   Renderer::Material* viking_mat = GetMaterial("textured");
   VkDescriptorImageInfo viking_info{};
@@ -658,36 +742,10 @@ void VulkanEngine::Cleanup() {
     imgui_pool_.Destroy();
     ImGui_ImplVulkan_Shutdown();
 
-    for (auto& texture : textures_) texture.second.Destroy();
-    for (auto& mesh : meshes_) mesh.second.Destroy();
-    for (auto& material : materials_) material.second.Destroy();
-    texture_sampler_.Destroy();
-
-    for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-      vkDestroySemaphore(device_.GetDevice(), frames_[i].render_semaphore_,
-                         nullptr);
-      vkDestroySemaphore(device_.GetDevice(), frames_[i].present_semaphore_,
-                         nullptr);
-      vkDestroyFence(device_.GetDevice(), frames_[i].render_fence_, nullptr);
-
-      frames_[i].command_pool_.Destroy();
-      frames_[i].object_buffer_.Destroy();
-      frames_[i].dynamic_data_.Destroy();
-    }
-
-    vkDestroyDescriptorSetLayout(device_.GetDevice(),
-                                 single_texture_set_layout_, nullptr);
+    main_deletion_queue_.Flush();
 
     layout_cache_.Destroy();
     descriptor_allocator_.Destroy();
-
-    swapchain_framebuffers_.Destroy();
-    render_pass_.Destroy();
-
-    depth_image_.Destroy();
-    color_image_.Destroy();
-
-    swapchain_.Destroy();
 
     vmaDestroyAllocator(allocator_);
 

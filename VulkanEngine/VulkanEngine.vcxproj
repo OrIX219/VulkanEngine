@@ -105,6 +105,7 @@
     <ClInclude Include="src\Camera.h" />
     <ClInclude Include="src\CommandBuffer.h" />
     <ClInclude Include="src\CommandPool.h" />
+    <ClInclude Include="src\DeletionQueue.h" />
     <ClInclude Include="src\DescriptorPool.h" />
     <ClInclude Include="src\Descriptors.h" />
     <ClInclude Include="src\Image.h" />
