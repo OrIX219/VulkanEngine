@@ -17,6 +17,7 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_impl_glfw.h>
 #include <imgui/imgui_impl_vulkan.h>
+#include <imgui/imgui_stdlib.h>
 
 #include "CVAR.h"
 #include "Logger.h"
@@ -563,8 +564,11 @@ void VulkanEngine::InitScene() {
   Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
 
-  LoadPrefab(command_buffer, AssetPath("star.pfb").c_str(), glm::mat4{1.f});
-  LoadPrefab(command_buffer, AssetPath("star_untextured.pfb").c_str(), glm::mat4{1.f});
+  //LoadPrefab(command_buffer, AssetPath("star.pfb").c_str(), glm::mat4{1.f});
+  LoadPrefab(command_buffer, AssetPath("star_untextured.pfb").c_str(),
+             glm::mat4{1.f});
+  LoadPrefab(command_buffer, AssetPath("two_stars.pfb").c_str(),
+             glm::mat4{1.f});
 
   command_buffer.End();
   command_buffer.AddToBatch();
@@ -800,6 +804,12 @@ void VulkanEngine::Draw() {
   Renderer::CommandBuffer command_buffer = frame.command_pool_.GetBuffer();
   VK_CHECK(command_buffer.Begin());
 
+  while (!prefabs_to_load_.empty()) {
+    LoadPrefab(command_buffer, AssetPath(prefabs_to_load_.back()).c_str(),
+               glm::mat4{1.f});
+    prefabs_to_load_.pop_back();
+  }
+
   VkClearValue clear_value{};
   clear_value.color = {{*CVarSystem::Get()->GetFloatCVar("clear_color.r"),
                         *CVarSystem::Get()->GetFloatCVar("clear_color.g"),
@@ -958,6 +968,43 @@ void VulkanEngine::DrawToolbar() {
         ImGui::EndMenu();
       }
       ImGui::EndMenu();
+    }
+
+    bool open_popup = false;
+    if (ImGui::BeginMenu("Scene")) {
+      if (ImGui::MenuItem("Load Prefab")) open_popup = true;
+      ImGui::EndMenu();
+    }
+    if (open_popup) {
+      ImGui::OpenPopup("Load Prefab");
+      open_popup = false;
+    }
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (ImGui::BeginPopupModal("Load Prefab", NULL,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+      static std::string path;
+      ImGui::Text("Path to prefab (relative to assets path):");
+      ImGui::PushID("load_prefab");
+      ImGui::PushItemWidth(-1.f);
+      bool input =
+          ImGui::InputTextWithHint("", "example.pfb", &path,
+                                   ImGuiInputTextFlags_EnterReturnsTrue |
+                                       ImGuiInputTextFlags_AutoSelectAll);
+      ImGui::PopItemWidth();
+      ImGui::PopID();
+
+      if ((input || ImGui::Button("Load", ImVec2(150.f, 0.f))) &&
+          path.size() > 0) {
+        prefabs_to_load_.push_back(path);
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::SameLine();
+      ImGui::SetItemDefaultFocus();
+      if (ImGui::Button("Cancel", ImVec2(150.f, 0.f))) {
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndPopup();
     }
     ImGui::EndMainMenuBar();
   }

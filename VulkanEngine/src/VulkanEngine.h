@@ -157,6 +157,9 @@ class VulkanEngine {
   std::unordered_map<std::string, Renderer::Mesh> meshes_;
   std::unordered_map<std::string, Renderer::Texture> textures_;
   std::unordered_map<std::string, Assets::PrefabInfo*> prefab_cache_;
+
+  std::deque<std::string> prefabs_to_load_;
+
   Renderer::TextureSampler texture_sampler_;
 };
 
