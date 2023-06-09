@@ -53,7 +53,7 @@ class VulkanProfiler {
  public:
   void Init(LogicalDevice* device, float timestamp_period,
             uint32_t per_frame_pool_sizes = 100);
-  void Cleanup();
+  void Destroy();
 
   void GrabQueries(CommandBuffer command_buffer);
 

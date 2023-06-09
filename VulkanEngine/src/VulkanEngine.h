@@ -103,6 +103,7 @@ class VulkanEngine {
 
   void RecreateSwapchain();
 
+  std::string AssetPath(std::string_view path);
   Renderer::Material* CreateMaterial(Renderer::Pipeline pipeline,
                                      const std::string& name);
   Renderer::Material* GetMaterial(const std::string& name);

@@ -224,6 +224,9 @@ void VulkanEngine::InitCVars() {
       "limits.max_sample_count", "Max Sample Count",
       physical_device_.GetMaxSamples(),
       CVarFlagBits::kEditReadOnly | CVarFlagBits::kAdvanced);
+
+  AutoCVar_String CVar_asset_path("assets.path", "Path to assets",
+                                  "asset_export", CVarFlagBits::kAdvanced);
 }
 
 void VulkanEngine::InitRenderPasses() {
@@ -496,7 +499,7 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
   for (auto& [key, value] : info->node_meshes) {
     if (!GetMesh(value.mesh_path)) {
       Renderer::Mesh mesh{};
-      std::string asset_path = "asset_export/" + std::string{value.mesh_path};
+      std::string asset_path = AssetPath(value.mesh_path);
       mesh.LoadFromAsset(allocator_, command_buffer, asset_path.c_str());
       meshes_[value.mesh_path] = mesh;
 
@@ -505,7 +508,7 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
     }
 
     Assets::AssetFile material_file;
-    std::string material_path = "asset_export/" + value.material_path;
+    std::string material_path = AssetPath(value.material_path);
     bool loaded =
         Assets::LoadBinaryFile(material_path.c_str(), material_file);
     if (!loaded) {
@@ -516,32 +519,34 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
     }
 
     Assets::MaterialInfo material_info = Assets::ReadMaterialInfo(&material_file);
-    std::string texture_path =
-        "asset_export/" + material_info.textures["base_color"];
-    Renderer::Texture texture;
-    loaded = texture.LoadFromAsset(allocator_, &device_, command_buffer,
-                                   texture_path.c_str());
-    if (!loaded) {
-      LOG_ERROR("Failed to load texture: {}", texture_path.c_str());
-      return false;
-    } else {
-      LOG_SUCCESS("Loaded texture: {}", texture_path.c_str());
-    }
-    textures_[texture_path] = texture;
-    main_deletion_queue_.PushFunction(
-        std::bind(&Renderer::Texture::Destroy, texture));
+    Renderer::Material* material = GetMaterial("default");
+    if (material_info.textures.size() > 0) {
+      std::string texture_path = AssetPath(material_info.textures["base_color"]);
+      Renderer::Texture texture;
+      loaded = texture.LoadFromAsset(allocator_, &device_, command_buffer,
+                                     texture_path.c_str());
+      if (!loaded) {
+        LOG_ERROR("Failed to load texture: {}", texture_path.c_str());
+        return false;
+      } else {
+        LOG_SUCCESS("Loaded texture: {}", texture_path.c_str());
+      }
+      textures_[texture_path] = texture;
+      main_deletion_queue_.PushFunction(
+          std::bind(&Renderer::Texture::Destroy, texture));
 
-    CreateMaterial(GetMaterial("textured")->pipeline, material_path);
-    Renderer::Material* material = GetMaterial(material_path);
-    VkDescriptorImageInfo image_info{};
-    image_info.sampler = texture_sampler_.GetSampler();
-    image_info.imageView = textures_[texture_path].GetView();
-    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      CreateMaterial(GetMaterial("textured")->pipeline, material_path);
+      material = GetMaterial(material_path);
+      VkDescriptorImageInfo image_info{};
+      image_info.sampler = texture_sampler_.GetSampler();
+      image_info.imageView = textures_[texture_path].GetView();
+      image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
-        .BindImage(0, &image_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                   VK_SHADER_STAGE_FRAGMENT_BIT)
-        .Build(material->texture_set);
+      Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
+          .BindImage(0, &image_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                     VK_SHADER_STAGE_FRAGMENT_BIT)
+          .Build(material->texture_set);
+    } 
 
     Renderer::RenderObject object(GetMesh(value.mesh_path), material);
     object.ModelMatrix() = node_world_mats[key];
@@ -558,7 +563,8 @@ void VulkanEngine::InitScene() {
   Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
 
-  LoadPrefab(command_buffer, "asset_export/star.pfb", glm::mat4{1.f});
+  LoadPrefab(command_buffer, AssetPath("star.pfb").c_str(), glm::mat4{1.f});
+  LoadPrefab(command_buffer, AssetPath("star_untextured.pfb").c_str(), glm::mat4{1.f});
 
   command_buffer.End();
   command_buffer.AddToBatch();
@@ -652,6 +658,11 @@ void VulkanEngine::RecreateSwapchain() {
                       physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
                       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
   swapchain_framebuffers_.Recreate();
+}
+
+std::string VulkanEngine::AssetPath(std::string_view path) {
+  return std::string{CVarSystem::Get()->GetStringCVar("assets.path")} + '/' +
+         std::string{path};
 }
 
 Renderer::Material* VulkanEngine::CreateMaterial(Renderer::Pipeline pipeline,
@@ -749,7 +760,7 @@ void VulkanEngine::Cleanup() {
 
     vmaDestroyAllocator(allocator_);
 
-    profiler_.Cleanup();
+    profiler_.Destroy();
 
     device_.Destroy();
     surface_.Destroy();

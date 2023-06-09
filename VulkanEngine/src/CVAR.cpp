@@ -457,20 +457,19 @@ void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
       }
       break;
     case CVarType::kString:
+      ImGui::PushID(p->name.c_str());
       if (readonly_flag) {
-        ImGui::PushID(p->name.c_str());
         ImGui::Text((p->name + ":").c_str());
         ImGui::SameLine();
         ImGui::TextColored(
             kYellow, "%s",
             GetCVarArray<std::string>()->GetCurrent(p->array_index).c_str());
-        ImGui::PopID();
       } else {
         Label(p->name.c_str(), text_width);
         ImGui::InputText(
             "", GetCVarArray<std::string>()->GetCurrentPtr(p->array_index));
-        ImGui::PopID();
       }
+      ImGui::PopID();
       break;
     default:
       break;

@@ -72,7 +72,7 @@ void VulkanProfiler::Init(LogicalDevice* device, float timestamp_period,
   }
 }
 
-void VulkanProfiler::Cleanup() {
+void VulkanProfiler::Destroy() {
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     vkDestroyQueryPool(device_->GetDevice(), query_frames_[i].timer_pool,
                        nullptr);
