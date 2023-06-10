@@ -36,6 +36,9 @@
     <ClInclude Include="src\CommandPool.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\DeletionQueue.h">
+      <Filter>src</Filter>
+    </ClInclude>
     <ClInclude Include="src\DescriptorPool.h">
       <Filter>src</Filter>
     </ClInclude>
@@ -114,7 +117,6 @@
     <ClInclude Include="src\Window.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\DeletionQueue.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\format.cc">

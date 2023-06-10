@@ -410,7 +410,7 @@ void VulkanEngine::InitPipelines() {
 }
 
 void VulkanEngine::LoadMeshes() {
-  Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
+  /*Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
 
   Renderer::Mesh viking_room;
@@ -423,7 +423,7 @@ void VulkanEngine::LoadMeshes() {
   meshes_["room"] = viking_room;
 
   main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Mesh::Destroy, viking_room));
+      std::bind(&Renderer::Mesh::Destroy, viking_room));*/
 }
 
 void VulkanEngine::LoadTextures() {
@@ -431,7 +431,7 @@ void VulkanEngine::LoadTextures() {
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::TextureSampler::Destroy, texture_sampler_));
 
-  Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
+  /*Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
 
   Renderer::Texture viking_texture;
@@ -444,7 +444,7 @@ void VulkanEngine::LoadTextures() {
   textures_["viking"] = viking_texture;
 
   main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Texture::Destroy, viking_texture));
+      std::bind(&Renderer::Texture::Destroy, viking_texture));*/
 }
 
 bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
@@ -564,34 +564,18 @@ void VulkanEngine::InitScene() {
   Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
 
+  glm::mat4 room_root = glm::translate(glm::mat4{1.f}, glm::vec3(0, 0, -5));
+  room_root =
+      glm::rotate(room_root, glm::radians(-45.f), glm::vec3(0.f, 1.f, 0.f));
+  room_root =
+      glm::rotate(room_root, glm::radians(-45.f), glm::vec3(0.f, 0.f, 1.f));
+  LoadPrefab(command_buffer, AssetPath("viking_room.pfb").c_str(), room_root);
   //LoadPrefab(command_buffer, AssetPath("star.pfb").c_str(), glm::mat4{1.f});
-  LoadPrefab(command_buffer, AssetPath("star_untextured.pfb").c_str(),
-             glm::mat4{1.f});
-  LoadPrefab(command_buffer, AssetPath("two_stars.pfb").c_str(),
-             glm::mat4{1.f});
+  LoadPrefab(command_buffer, AssetPath("star_untextured.pfb").c_str());
+  LoadPrefab(command_buffer, AssetPath("two_stars.pfb").c_str());
 
   command_buffer.End();
   command_buffer.AddToBatch();
-
-  Renderer::RenderObject room;
-  room.Create(GetMesh("room"), GetMaterial("textured"));
-  room.ModelMatrix() = glm::translate(room.ModelMatrix(), glm::vec3(0, 0, -5));
-  room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-45.f),
-                                   glm::vec3(1.f, 0.f, 0.f));
-  room.ModelMatrix() = glm::rotate(room.ModelMatrix(), glm::radians(-135.f),
-                                   glm::vec3(0.f, 0.f, 1.f));
-  renderables_.push_back(room);
-
-  Renderer::Material* viking_mat = GetMaterial("textured");
-  VkDescriptorImageInfo viking_info{};
-  viking_info.sampler = texture_sampler_.GetSampler();
-  viking_info.imageView = textures_["viking"].GetView();
-  viking_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-  Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
-      .BindImage(0, &viking_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                 VK_SHADER_STAGE_FRAGMENT_BIT)
-      .Build(viking_mat->texture_set);
 }
 
 void VulkanEngine::InitImgui() {
@@ -934,10 +918,8 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
 
 void VulkanEngine::DrawMenu() {
   ImGui::SetNextWindowSize(ImVec2{100.f, 0.f});
-  VkExtent2D window_extent = window_.GetFramebufferSize();
-  ImGui::SetNextWindowPos(ImVec2{static_cast<float>(window_extent.width) / 2,
-                                 static_cast<float>(window_extent.height) / 2},
-                          ImGuiCond_Always, ImVec2{0.5f, 0.5f});
+  ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+  ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
   ImGui::Begin("Menu", &menu_opened_,
                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
   ImVec2 region = ImGui::GetContentRegionAvail();

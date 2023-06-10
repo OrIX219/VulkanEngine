@@ -269,8 +269,8 @@ void ExtractGltfVertices(tinygltf::Primitive& primitive, tinygltf::Model& model,
 
     float* data = reinterpret_cast<float*>(uv_data.data());
 
-    vertices[i].uv[0] = *(data + (i * 3) + 0);
-    vertices[i].uv[1] = *(data + (i * 3) + 1);
+    vertices[i].uv[0] = *(data + (i * 2) + 0);
+    vertices[i].uv[1] = *(data + (i * 2) + 1);
   }
 }
 
