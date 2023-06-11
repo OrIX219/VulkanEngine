@@ -13,6 +13,9 @@
     <Filter Include="Libraries\include\imgui">
       <UniqueIdentifier>{9FB39B21-0BEB-E3B8-14F5-47DC80AB0AB2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Libraries\include\spirv_reflect">
+      <UniqueIdentifier>{1C9A4D65-887D-5CA5-9180-8AE1FDE222F6}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{EFAC8DF2-5B8C-0C8E-64A4-9764D00273EF}</UniqueIdentifier>
     </Filter>
@@ -148,6 +151,9 @@
     </ClCompile>
     <ClCompile Include="..\Libraries\include\imgui\imgui_widgets.cpp">
       <Filter>Libraries\include\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\spirv_reflect\spirv_reflect.c">
+      <Filter>Libraries\include\spirv_reflect</Filter>
     </ClCompile>
     <ClCompile Include="src\CVAR.cpp">
       <Filter>src</Filter>

@@ -94,8 +94,10 @@ class VulkanEngine {
   void InitSyncStructures();
   void InitDescriptors();
   void InitPipelines();
-  void LoadMeshes();
-  void LoadTextures();
+  bool LoadMesh(Renderer::CommandBuffer command_buffer, const char* name,
+                const char* path);
+  bool LoadTexture(Renderer::CommandBuffer command_buffer, const char* name,
+                   const char* path);
   bool LoadPrefab(Renderer::CommandBuffer command_buffer, const char* path,
                   glm::mat4 root = glm::mat4{1.f});
   void InitScene();

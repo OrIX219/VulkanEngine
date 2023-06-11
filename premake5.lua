@@ -93,7 +93,8 @@ project "VulkanEngine"
         "%{prj.name}/Shaders/**.vert",
         "%{prj.name}/Shaders/**.frag",
         "Libraries/include/imgui/**.cpp",
-        "Libraries/include/fmt/**.cc"
+        "Libraries/include/fmt/**.cc",
+        "Libraries/include/spirv_reflect/**.c"
     }
     includedirs {
         "Libraries/include/vulkan",

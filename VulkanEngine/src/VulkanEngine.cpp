@@ -57,8 +57,8 @@ void VulkanEngine::Init() {
   window_.Init(1600, 900, "Vulkan Engine", this);
   glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   LOG_SUCCESS("Window created");
-  VK_CHECK(
-      instance_.Init(kEnableValidationLayers, {"VK_LAYER_KHRONOS_validation"}));
+  VK_CHECK(instance_.Init(kEnableValidationLayers,
+                          {"VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_monitor"}));
   LOG_SUCCESS("Vulkan instance initialized");
 
   Logger::Init(&instance_);
@@ -136,6 +136,10 @@ void VulkanEngine::Init() {
   LOG_SUCCESS("Pipelines initialized");
 
   Renderer::Queue& init_queue = device_.GetQueue(init_pool_.GetQueueFamily());
+
+  texture_sampler_.SetDefaults().Create(&device_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::TextureSampler::Destroy, texture_sampler_));
 
   init_queue.BeginBatch();
   InitScene();
@@ -409,42 +413,38 @@ void VulkanEngine::InitPipelines() {
       std::bind(&Renderer::Pipeline::Destroy, texture_pipeline));
 }
 
-void VulkanEngine::LoadMeshes() {
-  /*Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
-  command_buffer.Begin();
+bool VulkanEngine::LoadMesh(Renderer::CommandBuffer command_buffer,
+                              const char* name, const char* path) {
+  Renderer::Mesh mesh{};
+  bool loaded = mesh.LoadFromAsset(allocator_, command_buffer, path);
+  if (!loaded) {
+    LOG_ERROR("Failed to load mesh '{}' from {}", name, path);
+    return false;
+  } else {
+    LOG_SUCCESS("Loaded mesh '{}'", name);
+  }
+  meshes_[name] = mesh;
+  main_deletion_queue_.PushFunction(std::bind(&Renderer::Mesh::Destroy, mesh));
 
-  Renderer::Mesh viking_room;
-  viking_room.LoadFromAsset(allocator_, command_buffer,
-                            "Assets/viking_room.mesh");
-
-  command_buffer.End();
-  command_buffer.AddToBatch();
-
-  meshes_["room"] = viking_room;
-
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Mesh::Destroy, viking_room));*/
+  return true;
 }
 
-void VulkanEngine::LoadTextures() {
-  texture_sampler_.SetDefaults().Create(&device_);
+bool VulkanEngine::LoadTexture(Renderer::CommandBuffer command_buffer,
+                                const char* name, const char* path) {
+  Renderer::Texture texture{};
+  bool loaded =
+      texture.LoadFromAsset(allocator_, &device_, command_buffer, path);
+  if (!loaded) {
+    LOG_ERROR("Failed to load texture '{}' from {}", name, path);
+    return false;
+  } else {
+    LOG_SUCCESS("Loaded texture '{}'", name);
+  }
+  textures_[name] = texture;
   main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::TextureSampler::Destroy, texture_sampler_));
+      std::bind(&Renderer::Texture::Destroy, texture));
 
-  /*Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
-  command_buffer.Begin();
-
-  Renderer::Texture viking_texture;
-  viking_texture.LoadFromAsset(allocator_, &device_, command_buffer,
-                               "Assets/viking_room.tx");
-
-  command_buffer.End();
-  command_buffer.AddToBatch();
-
-  textures_["viking"] = viking_texture;
-
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Texture::Destroy, viking_texture));*/
+  return true;
 }
 
 bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
@@ -454,10 +454,10 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
     bool loaded = Assets::LoadBinaryFile(path, file);
 
     if (!loaded) {
-      LOG_ERROR("Failed to load prefab: {}", path);
+      LOG_ERROR("Failed to load prefab '{}'", path);
       return false;
     } else {
-      LOG_SUCCESS("Prefab {} loaded", path);
+      LOG_SUCCESS("Loaded prefab '{}'", path);
     }
 
     prefab_cache_[path] = new Assets::PrefabInfo;
@@ -499,13 +499,8 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 
   for (auto& [key, value] : info->node_meshes) {
     if (!GetMesh(value.mesh_path)) {
-      Renderer::Mesh mesh{};
-      std::string asset_path = AssetPath(value.mesh_path);
-      mesh.LoadFromAsset(allocator_, command_buffer, asset_path.c_str());
-      meshes_[value.mesh_path] = mesh;
-
-      main_deletion_queue_.PushFunction(
-          std::bind(&Renderer::Mesh::Destroy, mesh));
+      LoadMesh(command_buffer, value.mesh_path.c_str(),
+               AssetPath(value.mesh_path).c_str());
     }
 
     Assets::AssetFile material_file;
@@ -513,34 +508,25 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
     bool loaded =
         Assets::LoadBinaryFile(material_path.c_str(), material_file);
     if (!loaded) {
-      LOG_ERROR("Failed to load material: {}", material_path.c_str());
+      LOG_ERROR("Failed to load material '{}' from '{}'",
+                value.material_path.c_str(), material_path.c_str());
       return false;
     } else {
-      LOG_SUCCESS("Loaded material: {}", material_path.c_str());
+      LOG_SUCCESS("Loaded material '{}'", value.material_path.c_str());
     }
 
     Assets::MaterialInfo material_info = Assets::ReadMaterialInfo(&material_file);
     Renderer::Material* material = GetMaterial("default");
     if (material_info.textures.size() > 0) {
-      std::string texture_path = AssetPath(material_info.textures["base_color"]);
-      Renderer::Texture texture;
-      loaded = texture.LoadFromAsset(allocator_, &device_, command_buffer,
-                                     texture_path.c_str());
-      if (!loaded) {
-        LOG_ERROR("Failed to load texture: {}", texture_path.c_str());
-        return false;
-      } else {
-        LOG_SUCCESS("Loaded texture: {}", texture_path.c_str());
-      }
-      textures_[texture_path] = texture;
-      main_deletion_queue_.PushFunction(
-          std::bind(&Renderer::Texture::Destroy, texture));
+      std::string texture_name = material_info.textures["base_color"];
+      LoadTexture(command_buffer, texture_name.c_str(),
+                  AssetPath(texture_name).c_str());
 
       CreateMaterial(GetMaterial("textured")->pipeline, material_path);
       material = GetMaterial(material_path);
       VkDescriptorImageInfo image_info{};
       image_info.sampler = texture_sampler_.GetSampler();
-      image_info.imageView = textures_[texture_path].GetView();
+      image_info.imageView = textures_[texture_name].GetView();
       image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
       Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
@@ -558,9 +544,6 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 }
 
 void VulkanEngine::InitScene() {
-  LoadMeshes();
-  LoadTextures();
-
   Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
 
