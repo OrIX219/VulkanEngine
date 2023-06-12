@@ -30,29 +30,22 @@ struct SampledTexture {
   VkImageView view;
 };
 
-enum class MeshPassType { kNone, kForward, kTransparency, kDirectionalShadow };
+enum class MeshPassType { kForward, kTransparency, kDirectionalShadow, _Size };
 
 template<typename T>
 class PerPassData {
  public:
   T& operator[](MeshPassType pass) {
-    switch (pass) {
-      case MeshPassType::kForward:
-        return data[0];
-      case MeshPassType::kTransparency:
-        return data[1];
-      case MeshPassType::kDirectionalShadow:
-        return data[2];
-    }
-    return data[0];
+    return data[static_cast<uint32_t>(pass)];
   }
 
   void Clear(T&& val) {
-    for (size_t i = 0; i < 3; ++i) data[i] = val;
+    for (size_t i = 0; i < static_cast<size_t>(MeshPassType::_Size); ++i)
+      data[i] = val;
   }
 
  private:
-  std::array<T, 3> data;
+  std::array<T, static_cast<size_t>(MeshPassType::_Size)> data;
 };
 
 struct EffectTemplate {

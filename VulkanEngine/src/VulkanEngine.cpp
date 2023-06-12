@@ -57,8 +57,9 @@ void VulkanEngine::Init() {
   window_.Init(1600, 900, "Vulkan Engine", this);
   glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   LOG_SUCCESS("Window created");
-  VK_CHECK(instance_.Init(kEnableValidationLayers,
-                          {"VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_monitor"}));
+  VK_CHECK(instance_.Init(
+      kEnableValidationLayers,
+      {"VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_monitor"}));
   LOG_SUCCESS("Vulkan instance initialized");
 
   Logger::Init(&instance_);
@@ -87,7 +88,9 @@ void VulkanEngine::Init() {
   allocator_info.vulkanApiVersion = VK_API_VERSION_1_2;
 
   VK_CHECK(vmaCreateAllocator(&allocator_info, &allocator_));
-  VK_CHECK(init_pool_.Create(
+
+  Renderer::CommandPool init_pool;
+  VK_CHECK(init_pool.Create(
       &device_, device_.GetQueueFamilies().graphics_family.value()));
 
   VK_CHECK(swapchain_.Create(&device_, &surface_));
@@ -134,27 +137,27 @@ void VulkanEngine::Init() {
   InitSyncStructures();
   InitDescriptors();
   LOG_SUCCESS("Descriptors initialized");
-  InitPipelines();
-  LOG_SUCCESS("Pipelines initialized");
+  Renderer::MaterialSystem::Init(this);
+  LOG_SUCCESS("Material System initialized");
 
-  Renderer::Queue& init_queue = device_.GetQueue(init_pool_.GetQueueFamily());
+  Renderer::Queue& init_queue = device_.GetQueue(init_pool.GetQueueFamily());
 
   texture_sampler_.SetDefaults().Create(&device_);
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::TextureSampler::Destroy, texture_sampler_));
 
   init_queue.BeginBatch();
-  InitScene();
+  InitScene(init_pool);
   init_queue.EndBatch();
 
   init_queue.SubmitBatches();
 
-  InitImgui();
+  InitImgui(init_pool);
 
   device_.WaitIdle();
   is_initialized_ = true;
 
-  init_pool_.Destroy();
+  init_pool.Destroy();
 }
 
 void VulkanEngine::InitCVars() {
@@ -326,16 +329,6 @@ void VulkanEngine::InitDescriptors() {
         std::bind(&Renderer::Buffer<true>::Destroy, frames_[i].object_buffer_));
   }
 
-  Renderer::DescriptorSetLayout single_texture_layout;
-  single_texture_layout.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                   VK_SHADER_STAGE_FRAGMENT_BIT);
-  single_texture_layout.Create(&device_);
-  single_texture_set_layout_ = single_texture_layout.layout;
-  main_deletion_queue_.PushFunction([=]() {
-    vkDestroyDescriptorSetLayout(device_.GetDevice(),
-                                 single_texture_set_layout_, nullptr);
-  });
-
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     frames_[i].dynamic_data_.Create(
         allocator_, 8192,
@@ -357,21 +350,17 @@ void VulkanEngine::InitDescriptors() {
     Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
         .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-        .Build(frames_[i].global_descriptor_, global_set_layout_);
+        .Build(frames_[i].global_descriptor_);
 
     Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
         .BindBuffer(0, &object_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                     VK_SHADER_STAGE_VERTEX_BIT)
-        .Build(frames_[i].object_descriptor_, object_set_layout_);
+        .Build(frames_[i].object_descriptor_);
   }
 }
 
-void VulkanEngine::InitPipelines() {
-  Renderer::MaterialSystem::Init(this);
-}
-
 bool VulkanEngine::LoadMesh(Renderer::CommandBuffer command_buffer,
-                              const char* name, const char* path) {
+                            const char* name, const char* path) {
   Renderer::Mesh mesh{};
   bool loaded = mesh.LoadFromAsset(allocator_, command_buffer, path);
   if (!loaded) {
@@ -387,7 +376,7 @@ bool VulkanEngine::LoadMesh(Renderer::CommandBuffer command_buffer,
 }
 
 bool VulkanEngine::LoadTexture(Renderer::CommandBuffer command_buffer,
-                                const char* name, const char* path) {
+                               const char* name, const char* path) {
   Renderer::Texture texture{};
   bool loaded =
       texture.LoadFromAsset(allocator_, &device_, command_buffer, path);
@@ -476,8 +465,9 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
         LOG_SUCCESS("Loaded material '{}'", value.material_path.c_str());
       }
 
-      Assets::MaterialInfo material_info = Assets::ReadMaterialInfo(&material_file);
-      
+      Assets::MaterialInfo material_info =
+          Assets::ReadMaterialInfo(&material_file);
+
       std::string texture;
       if (material_info.textures.size() == 0)
         texture = "white.tx";
@@ -522,8 +512,8 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
   return true;
 }
 
-void VulkanEngine::InitScene() {
-  Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
+void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
+  Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin();
 
   LoadTexture(command_buffer, "white", AssetPath("white.tx").c_str());
@@ -548,7 +538,7 @@ void VulkanEngine::InitScene() {
   room_root =
       glm::rotate(room_root, glm::radians(-45.f), glm::vec3(0.f, 0.f, 1.f));
   LoadPrefab(command_buffer, AssetPath("viking_room.pfb").c_str(), room_root);
-  //LoadPrefab(command_buffer, AssetPath("star.pfb").c_str(), glm::mat4{1.f});
+  // LoadPrefab(command_buffer, AssetPath("star.pfb").c_str(), glm::mat4{1.f});
   LoadPrefab(command_buffer, AssetPath("star_untextured.pfb").c_str());
   LoadPrefab(command_buffer, AssetPath("two_stars.pfb").c_str());
 
@@ -556,24 +546,31 @@ void VulkanEngine::InitScene() {
   command_buffer.AddToBatch();
 }
 
-void VulkanEngine::InitImgui() {
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_SAMPLER, 1000);
+void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
+  constexpr uint32_t kMaxCount = 128;
+
+  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_SAMPLER, kMaxCount);
   imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                    1000);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000);
+                                    kMaxCount);
+  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                    kMaxCount);
+  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                    kMaxCount);
   imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,
-                                    1000);
+                                    kMaxCount);
   imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
-                                    1000);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000);
+                                    kMaxCount);
+  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                                    kMaxCount);
+  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                    kMaxCount);
   imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                                    1000);
+                                    kMaxCount);
   imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
-                                    1000);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000);
-  imgui_pool_.Create(&device_, 1000);
+                                    kMaxCount);
+  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                                    kMaxCount);
+  imgui_pool_.Create(&device_, kMaxCount);
 
   ImGui::CreateContext();
 
@@ -591,7 +588,7 @@ void VulkanEngine::InitImgui() {
 
   ImGui_ImplVulkan_Init(&init_info, render_pass_.GetRenderPass());
 
-  Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
+  Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin();
   ImGui_ImplVulkan_CreateFontsTexture(command_buffer.GetBuffer());
   command_buffer.End();
@@ -926,13 +923,13 @@ void VulkanEngine::DrawToolbar() {
       if (ImGui::BeginMenu("CVAR")) {
         CVarSystem::Get()->DrawImguiEditor();
         ImGui::EndMenu();
-      } 
+      }
       if (ImGui::BeginMenu("Timings")) {
         for (auto& [k, v] : profiler_.timings) {
           ImGui::Text("%s %f ms", k.c_str(), v);
         }
         ImGui::EndMenu();
-      } 
+      }
       if (ImGui::BeginMenu("Stats")) {
         for (auto& [k, v] : profiler_.stats) {
           ImGui::Text("%s %d", k.c_str(), v);

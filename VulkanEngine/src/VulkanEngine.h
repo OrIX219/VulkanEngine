@@ -96,15 +96,14 @@ class VulkanEngine {
   void InitRenderPasses();
   void InitSyncStructures();
   void InitDescriptors();
-  void InitPipelines();
   bool LoadMesh(Renderer::CommandBuffer command_buffer, const char* name,
                 const char* path);
   bool LoadTexture(Renderer::CommandBuffer command_buffer, const char* name,
                    const char* path);
   bool LoadPrefab(Renderer::CommandBuffer command_buffer, const char* path,
                   glm::mat4 root = glm::mat4{1.f});
-  void InitScene();
-  void InitImgui();
+  void InitScene(Renderer::CommandPool& init_pool);
+  void InitImgui(Renderer::CommandPool& init_pool);
 
   void RecreateSwapchain();
 
@@ -134,7 +133,6 @@ class VulkanEngine {
 
   VmaAllocator allocator_;
   DeletionQueue main_deletion_queue_;
-  Renderer::CommandPool init_pool_;
 
   Renderer::Swapchain swapchain_;
   Renderer::Image color_image_;
@@ -145,10 +143,6 @@ class VulkanEngine {
   Renderer::DescriptorAllocator descriptor_allocator_;
   Renderer::DescriptorLayoutCache layout_cache_;
   Renderer::DescriptorPool imgui_pool_;
-
-  VkDescriptorSetLayout global_set_layout_;
-  VkDescriptorSetLayout object_set_layout_;
-  VkDescriptorSetLayout single_texture_set_layout_;
 
   std::array<FrameData, kMaxFramesInFlight> frames_;
   SceneData scene_data_;

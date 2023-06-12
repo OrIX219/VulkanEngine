@@ -42,6 +42,7 @@ void MaterialSystem::Cleanup() {}
 ShaderEffect* MaterialSystem::BuildEffect(std::string_view vertex_shader,
                                           std::string_view fragment_shader) {
   MaterialSystem& system = Get();
+
   std::array<ShaderEffect::ReflectionOverrides, 1> overrides = {
       {"sceneData", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC}};
 
@@ -86,7 +87,7 @@ void MaterialSystem::BuildDefaultTemplates() {
   ShaderPass* default_lit_pass = BuildShader(
       &system.engine_->render_pass_, system.forward_builder_, default_lit);
 
-  { 
+  {
     EffectTemplate default_textured;
     default_textured.pass_shaders[MeshPassType::kForward] = textured_lit_pass;
     default_textured.pass_shaders[MeshPassType::kTransparency] = nullptr;
@@ -96,7 +97,7 @@ void MaterialSystem::BuildDefaultTemplates() {
 
     system.template_cache_["texturedPBR_opaque"] = default_textured;
   }
-  { 
+  {
     PipelineBuilder transparend_forward = system.forward_builder_;
     VkPipelineColorBlendAttachmentState blend{};
     blend.blendEnable = VK_TRUE;
@@ -104,7 +105,7 @@ void MaterialSystem::BuildDefaultTemplates() {
     blend.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
     blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                           VK_COLOR_COMPONENT_B_BIT;  
+                           VK_COLOR_COMPONENT_B_BIT;
     transparend_forward.SetColorBlendAttachment(&blend)
         .SetDepthStencil(VK_TRUE, VK_FALSE)
         .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_NONE);
@@ -112,24 +113,28 @@ void MaterialSystem::BuildDefaultTemplates() {
     ShaderPass* transparent_lit_pass = BuildShader(
         &system.engine_->render_pass_, transparend_forward, textured_lit);
 
-    EffectTemplate default_textured;
-    default_textured.pass_shaders[MeshPassType::kForward] = nullptr;
-    default_textured.pass_shaders[MeshPassType::kTransparency] = transparent_lit_pass;
-    default_textured.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+    EffectTemplate default_textured_transparent;
+    default_textured_transparent.pass_shaders[MeshPassType::kForward] = nullptr;
+    default_textured_transparent.pass_shaders[MeshPassType::kTransparency] =
+        transparent_lit_pass;
+    default_textured_transparent
+        .pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
 
-    default_textured.transparency = Assets::TransparencyMode::kTransparent;
+    default_textured_transparent.transparency =
+        Assets::TransparencyMode::kTransparent;
 
-    system.template_cache_["texturedPBR_transparent"] = default_textured;
+    system.template_cache_["texturedPBR_transparent"] =
+        default_textured_transparent;
   }
   {
-    EffectTemplate default_textured;
-    default_textured.pass_shaders[MeshPassType::kForward] = default_lit_pass;
-    default_textured.pass_shaders[MeshPassType::kTransparency] = nullptr;
-    default_textured.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+    EffectTemplate default_colored;
+    default_colored.pass_shaders[MeshPassType::kForward] = default_lit_pass;
+    default_colored.pass_shaders[MeshPassType::kTransparency] = nullptr;
+    default_colored.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
 
-    default_textured.transparency = Assets::TransparencyMode::kOpaque;
+    default_colored.transparency = Assets::TransparencyMode::kOpaque;
 
-    system.template_cache_["colored_opaque"] = default_textured;
+    system.template_cache_["colored_opaque"] = default_colored;
   }
 }
 
@@ -199,7 +204,7 @@ Material* MaterialSystem::GetMaterial(const std::string& name) {
 
   auto iter = system.materials_.find(name);
   if (iter != system.materials_.end()) return iter->second;
-  return nullptr; 
+  return nullptr;
 }
 
 void MaterialSystem::FillBuilders() {

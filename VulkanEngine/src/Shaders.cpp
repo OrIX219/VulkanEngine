@@ -276,7 +276,7 @@ void ShaderDescriptorBinder::BindDynamicBuffer(
 }
 
 void ShaderDescriptorBinder::ApplyBinds(CommandBuffer command_buffer) {
-  for (uint32_t i = 0; i < 2; ++i) {
+  for (uint32_t i = 0; i < 4; ++i) {
     if (cached_descriptor_sets[i] == VK_NULL_HANDLE) continue;
     vkCmdBindDescriptorSets(
         command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,

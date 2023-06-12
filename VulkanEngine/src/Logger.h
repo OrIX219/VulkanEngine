@@ -12,15 +12,15 @@
 #include "VulkanInstance.h"
 
 #define LOG_FATAL(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kFatal, message, ##__VA_ARGS__)
+  Engine::Logger::Log(Engine::LogType::kFatal, message, ##__VA_ARGS__)
 #define LOG_ERROR(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kError, message, ##__VA_ARGS__)
+  Engine::Logger::Log(Engine::LogType::kError, message, ##__VA_ARGS__)
 #define LOG_WARNING(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kWarning, message, ##__VA_ARGS__)
+  Engine::Logger::Log(Engine::LogType::kWarning, message, ##__VA_ARGS__)
 #define LOG_INFO(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kInfo, message, ##__VA_ARGS__)
+  Engine::Logger::Log(Engine::LogType::kInfo, message, ##__VA_ARGS__)
 #define LOG_SUCCESS(message, ...) \
-  Engine::Logger::Get().Log(Engine::LogType::kSuccess, message, ##__VA_ARGS__)
+  Engine::Logger::Log(Engine::LogType::kSuccess, message, ##__VA_ARGS__)
 
 namespace Engine {
 
@@ -29,8 +29,10 @@ enum class LogType { kFatal, kError, kInfo, kWarning, kSuccess };
 class Logger {
  public:
   static void Init(Renderer::VulkanInstance* instance) {
-    Get().instance_ = instance;
-    if (!Get().instance_->ValidationLayersEnabled()) return;
+    Logger& logger = Get();
+
+    logger.instance_ = instance;
+    if (!logger.instance_->ValidationLayersEnabled()) return;
 
     VkDebugUtilsMessengerCreateInfoEXT create_info;
     create_info = {};
@@ -45,17 +47,19 @@ class Logger {
     create_info.pfnUserCallback = DebugCallback;
     create_info.pUserData = nullptr;
 
-    CreateDebugUtilsMessengerEXT(Get().instance_->GetInstance(), &create_info,
-                                 nullptr, &Get().debug_messenger_);
+    CreateDebugUtilsMessengerEXT(logger.instance_->GetInstance(), &create_info,
+                                 nullptr, &logger.debug_messenger_);
   }
 
   static void Cleanup() {
-    if (!Get().instance_->ValidationLayersEnabled()) return;
-    DestroyDebugUtilsMessengerEXT(Get().instance_->GetInstance(),
-                                  Get().debug_messenger_, nullptr);
+    Logger& logger = Get();
+
+    if (!logger.instance_->ValidationLayersEnabled()) return;
+    DestroyDebugUtilsMessengerEXT(logger.instance_->GetInstance(),
+                                  logger.debug_messenger_, nullptr);
   }
 
-  template<typename...Args>
+  template <typename... Args>
   inline static void Print(std::string_view message, Args... args) {
     fmt::print((message), args...);
     fmt::print("\n");
@@ -107,15 +111,17 @@ class Logger {
                 VkDebugUtilsMessageTypeFlagsEXT messageType,
                 const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
                 void* pUserData) {
+    Logger& logger = Get();
+
     switch (messageSeverity) {
       case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-        Get().Log(LogType::kError, pCallbackData->pMessage);
+        logger.Log(LogType::kError, pCallbackData->pMessage);
         break;
       case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-        Get().Log(LogType::kWarning, pCallbackData->pMessage);
+        logger.Log(LogType::kWarning, pCallbackData->pMessage);
         break;
       case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-        Get().Log(LogType::kInfo, pCallbackData->pMessage);
+        logger.Log(LogType::kInfo, pCallbackData->pMessage);
         break;
     }
 
@@ -124,10 +130,10 @@ class Logger {
 
  private:
   static VkResult CreateDebugUtilsMessengerEXT(
-     VkInstance instance,
-     const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-     const VkAllocationCallbacks* pAllocator,
-     VkDebugUtilsMessengerEXT* pDebugMessenger) {
+      VkInstance instance,
+      const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+      const VkAllocationCallbacks* pAllocator,
+      VkDebugUtilsMessengerEXT* pDebugMessenger) {
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
         instance, "vkCreateDebugUtilsMessengerEXT");
     if (func != nullptr) {
@@ -152,4 +158,4 @@ class Logger {
   Renderer::VulkanInstance* instance_;
 };
 
-}  // namespace Renderer
+}  // namespace Engine
