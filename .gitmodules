@@ -1,25 +1,25 @@
 
 [submodule "Libraries\\include\\vma"]
-	path = Libraries\\include\\vma
+	path = Libraries/include/vma
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 [submodule "Libraries\\include\\tinygltf"]
-	path = Libraries\\include\\tinygltf
+	path = Libraries/include/tinygltf
 	url = https://github.com/syoyo/tinygltf
 [submodule "Libraries\\include\\stb"]
-	path = Libraries\\include\\stb
+	path = Libraries/include/stb
 	url = https://github.com/nothings/stb
 [submodule "Libraries\\include\\spirv_reflect"]
-	path = Libraries\\include\\spirv_reflect
+	path = Libraries/include/spirv_reflect
 	url = https://github.com/KhronosGroup/SPIRV-Reflect
 [submodule "Libraries\\include\\lz4"]
-	path = Libraries\\include\\lz4
+	path = Libraries/include/lz4
 	url = https://github.com/lz4/lz4
 [submodule "Libraries\\include\\json"]
-	path = Libraries\\include\\json
+	path = Libraries/include/json
 	url = https://github.com/nlohmann/json
 [submodule "Libraries\\include\\imgui"]
-	path = Libraries\\include\\imgui
+	path = Libraries/include/imgui
 	url = https://github.com/ocornut/imgui
 [submodule "Libraries\\include\\fmt"]
-	path = Libraries\\include\\fmt
+	path = Libraries/include/fmt
 	url = https://github.com/fmtlib/fmt
