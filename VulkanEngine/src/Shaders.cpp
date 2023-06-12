@@ -156,7 +156,7 @@ void ShaderEffect::ReflectLayout(LogicalDevice* device,
   }
 
   std::array<DescriptorSetLayoutData, 4> merged_layouts;
-  for (size_t i = 0; i < 4; ++i) {
+  for (uint32_t i = 0; i < 4; ++i) {
     DescriptorSetLayoutData& layout = merged_layouts[i];
     layout.set_number = i;
     layout.create_info.sType =
@@ -190,6 +190,7 @@ void ShaderEffect::ReflectLayout(LogicalDevice* device,
 
     if (layout.create_info.bindingCount > 0) {
       set_hashes[i] = HashDescriptorLayoutInfo(&layout.create_info);
+      
       vkCreateDescriptorSetLayout(device->GetDevice(), &layout.create_info,
                                   nullptr, &set_layouts[i]);
     } else {
@@ -205,7 +206,7 @@ void ShaderEffect::ReflectLayout(LogicalDevice* device,
   pipeline_layout_info.pPushConstantRanges = constant_ranges.data();
 
   std::array<VkDescriptorSetLayout, 4> compacted_layouts;
-  size_t s = 0;
+  uint32_t s = 0;
   for (size_t i = 0; i < 4; ++i) {
     if (set_layouts[i] != VK_NULL_HANDLE) {
       compacted_layouts[s] = set_layouts[i];
@@ -227,6 +228,7 @@ void ShaderEffect::FillStages(
     info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     info.stage = stage.stage;
     info.module = stage.shader_module->module;
+    info.pName = "main";
     pipeline_stages.push_back(info);
   }
 }
@@ -274,7 +276,7 @@ void ShaderDescriptorBinder::BindDynamicBuffer(
 }
 
 void ShaderDescriptorBinder::ApplyBinds(CommandBuffer command_buffer) {
-  for (size_t i = 0; i < 2; ++i) {
+  for (uint32_t i = 0; i < 2; ++i) {
     if (cached_descriptor_sets[i] == VK_NULL_HANDLE) continue;
     vkCmdBindDescriptorSets(
         command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -350,6 +352,11 @@ void ShaderDescriptorBinder::SetShader(ShaderEffect* shader) {
 }
 
 void ShaderCache::Init(LogicalDevice* device) { device_ = device; }
+
+void ShaderCache::Destroy() {
+  for (auto& module : module_cache_)
+    vkDestroyShaderModule(device_->GetDevice(), module.second.module, nullptr);
+}
 
 ShaderModule* ShaderCache::GetShader(const std::string& path) {
   if (module_cache_.count(path) == 0) {

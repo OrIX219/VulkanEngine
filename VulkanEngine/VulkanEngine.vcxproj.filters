@@ -60,9 +60,6 @@
     <ClInclude Include="src\LogicalDevice.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Material.h">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="src\Mesh.h">
       <Filter>src</Filter>
     </ClInclude>
@@ -120,6 +117,8 @@
     <ClInclude Include="src\Window.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\Shaders.h" />
+    <ClInclude Include="src\MaterialSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\format.cc">
@@ -233,6 +232,8 @@
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Shaders.cpp" />
+    <ClCompile Include="src\MaterialSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">

@@ -112,7 +112,7 @@
     <ClInclude Include="src\IndexBuffer.h" />
     <ClInclude Include="src\Logger.h" />
     <ClInclude Include="src\LogicalDevice.h" />
-    <ClInclude Include="src\Material.h" />
+    <ClInclude Include="src\MaterialSystem.h" />
     <ClInclude Include="src\Mesh.h" />
     <ClInclude Include="src\PhysicalDevice.h" />
     <ClInclude Include="src\Pipeline.h" />
@@ -120,6 +120,7 @@
     <ClInclude Include="src\Queue.h" />
     <ClInclude Include="src\RenderObject.h" />
     <ClInclude Include="src\RenderPass.h" />
+    <ClInclude Include="src\Shaders.h" />
     <ClInclude Include="src\StringHash.h" />
     <ClInclude Include="src\Surface.h" />
     <ClInclude Include="src\Swapchain.h" />
@@ -154,12 +155,14 @@
     <ClCompile Include="src\Image.cpp" />
     <ClCompile Include="src\IndexBuffer.cpp" />
     <ClCompile Include="src\LogicalDevice.cpp" />
+    <ClCompile Include="src\MaterialSystem.cpp" />
     <ClCompile Include="src\Mesh.cpp" />
     <ClCompile Include="src\PhysicalDevice.cpp" />
     <ClCompile Include="src\Pipeline.cpp" />
     <ClCompile Include="src\PushBuffer.cpp" />
     <ClCompile Include="src\Queue.cpp" />
     <ClCompile Include="src\RenderPass.cpp" />
+    <ClCompile Include="src\Shaders.cpp" />
     <ClCompile Include="src\Surface.cpp" />
     <ClCompile Include="src\Swapchain.cpp" />
     <ClCompile Include="src\SwapchainFramebuffers.cpp" />

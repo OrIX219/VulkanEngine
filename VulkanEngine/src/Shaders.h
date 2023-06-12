@@ -96,6 +96,7 @@ class ShaderDescriptorBinder {
 class ShaderCache {
  public:
   void Init(LogicalDevice* device);
+  void Destroy();
 
   ShaderModule* GetShader(const std::string& path);
 

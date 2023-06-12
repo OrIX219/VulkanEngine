@@ -11,12 +11,14 @@
 #include "DescriptorPool.h"
 #include "Image.h"
 #include "LogicalDevice.h"
+#include "MaterialSystem.h"
 #include "Mesh.h"
 #include "PhysicalDevice.h"
 #include "Pipeline.h"
 #include "PushBuffer.h"
 #include "RenderObject.h"
 #include "RenderPass.h"
+#include "Shaders.h"
 #include "Surface.h"
 #include "Swapchain.h"
 #include "SwapchainFramebuffers.h"
@@ -69,6 +71,7 @@ struct FrameData {
 };
 
 class VulkanEngine {
+  friend class Renderer::MaterialSystem;
  public:
   VulkanEngine();
   ~VulkanEngine();
@@ -106,9 +109,6 @@ class VulkanEngine {
   void RecreateSwapchain();
 
   std::string AssetPath(std::string_view path);
-  Renderer::Material* CreateMaterial(Renderer::Pipeline pipeline,
-                                     const std::string& name);
-  Renderer::Material* GetMaterial(const std::string& name);
   Renderer::Mesh* GetMesh(const std::string& name);
 
   void EnableCursor(bool enable);
@@ -152,6 +152,8 @@ class VulkanEngine {
 
   std::array<FrameData, kMaxFramesInFlight> frames_;
   SceneData scene_data_;
+
+  Renderer::ShaderCache shader_cache_;
 
   std::vector<Renderer::RenderObject> renderables_;
 

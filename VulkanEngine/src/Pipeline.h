@@ -65,15 +65,14 @@ class Pipeline {
 
 class PipelineBuilder {
  public: 
-  PipelineBuilder(LogicalDevice* device);
+  PipelineBuilder();
   ~PipelineBuilder();
+
+  static PipelineBuilder Begin(LogicalDevice* device);
 
   Pipeline Build(RenderPass* render_pass);
 
-  PipelineBuilder& SetVertexShader(const char* path);
-  PipelineBuilder& SetVertexShader(VkShaderModule shader_module);
-  PipelineBuilder& SetFragmentShader(const char* path);
-  PipelineBuilder& SetFragmentShader(VkShaderModule shader_module);
+  PipelineBuilder& SetShaders(class ShaderEffect* effect); 
   PipelineBuilder& SetVertexInputDescription(
       VertexInputDescription vertex_input);
   PipelineBuilder& SetInputAssembly(
@@ -117,11 +116,7 @@ class PipelineBuilder {
   PipelineBuilder& SetDefaults();
 
  private:
-  VkShaderModule CreateShaderModule(const std::vector<char>& code);
-
-  VkShaderModule vertex_module_, fragment_module_;
-  VkPipelineShaderStageCreateInfo vertex_shader_;
-  VkPipelineShaderStageCreateInfo fragment_shader_;
+  std::vector<VkPipelineShaderStageCreateInfo> shader_stages_;
   VkPipelineVertexInputStateCreateInfo vertex_input_info_;
   VertexInputDescription vertex_description_;
   VkPipelineInputAssemblyStateCreateInfo input_assembly_info_;

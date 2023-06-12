@@ -129,6 +129,8 @@ void VulkanEngine::Init() {
         std::bind(&Renderer::CommandPool::Destroy, frames_[i].command_pool_));
   }
 
+  shader_cache_.Init(&device_);
+
   InitSyncStructures();
   InitDescriptors();
   LOG_SUCCESS("Descriptors initialized");
@@ -365,52 +367,7 @@ void VulkanEngine::InitDescriptors() {
 }
 
 void VulkanEngine::InitPipelines() {
-  VkExtent2D extent = swapchain_.GetImageExtent();
-  VkViewport viewport{0.f, 0.f, (float)extent.width, (float)extent.height,
-                      0.f, 1.f};
-  VkRect2D scissors{{0, 0}, extent};
-  Renderer::PipelineBuilder builder(&device_);
-
-  std::vector<VkDescriptorSetLayout> set_layouts;
-  set_layouts.push_back(global_set_layout_);
-  set_layouts.push_back(object_set_layout_);
-  std::vector<VkPushConstantRange> push_constants;
-  Renderer::Pipeline mesh_pipeline =
-      builder.SetDefaults()
-          .SetVertexShader("Shaders/tri_mesh.vert.spv")
-          .SetFragmentShader("Shaders/default_lit.frag.spv")
-          .SetVertexInputDescription(Renderer::Vertex::GetDescription())
-          .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
-                         VK_FRONT_FACE_COUNTER_CLOCKWISE)
-          .SetDepthStencil()
-          .SetLayout(set_layouts, push_constants)
-          .SetViewport(viewport)
-          .SetScissors(scissors)
-          .SetMultisampling(physical_device_.GetMaxSamples(), VK_TRUE)
-          .Build(&render_pass_);
-
-  set_layouts.push_back(single_texture_set_layout_);
-  Renderer::Pipeline texture_pipeline =
-      builder.SetDefaults()
-          .SetVertexShader("Shaders/tri_mesh.vert.spv")
-          .SetFragmentShader("Shaders/textured_lit.frag.spv")
-          .SetVertexInputDescription(Renderer::Vertex::GetDescription())
-          .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
-                         VK_FRONT_FACE_COUNTER_CLOCKWISE)
-          .SetDepthStencil()
-          .SetLayout(set_layouts, push_constants)
-          .SetViewport(viewport)
-          .SetScissors(scissors)
-          .SetMultisampling(physical_device_.GetMaxSamples(), VK_TRUE)
-          .Build(&render_pass_);
-
-  CreateMaterial(mesh_pipeline, "default");
-  CreateMaterial(texture_pipeline, "textured");
-
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Pipeline::Destroy, mesh_pipeline));
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Pipeline::Destroy, texture_pipeline));
+  Renderer::MaterialSystem::Init(this);
 }
 
 bool VulkanEngine::LoadMesh(Renderer::CommandBuffer command_buffer,
@@ -503,40 +460,62 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
                AssetPath(value.mesh_path).c_str());
     }
 
-    Assets::AssetFile material_file;
-    std::string material_path = AssetPath(value.material_path);
-    bool loaded =
-        Assets::LoadBinaryFile(material_path.c_str(), material_file);
-    if (!loaded) {
-      LOG_ERROR("Failed to load material '{}' from '{}'",
-                value.material_path.c_str(), material_path.c_str());
-      return false;
-    } else {
-      LOG_SUCCESS("Loaded material '{}'", value.material_path.c_str());
+    Renderer::Material* material =
+        Renderer::MaterialSystem::GetMaterial(value.material_path);
+
+    if (!material) {
+      Assets::AssetFile material_file;
+      std::string material_path = AssetPath(value.material_path);
+      bool loaded =
+          Assets::LoadBinaryFile(material_path.c_str(), material_file);
+      if (!loaded) {
+        LOG_ERROR("Failed to load material '{}' from '{}'",
+                  value.material_path.c_str(), material_path.c_str());
+        return false;
+      } else {
+        LOG_SUCCESS("Loaded material '{}'", value.material_path.c_str());
+      }
+
+      Assets::MaterialInfo material_info = Assets::ReadMaterialInfo(&material_file);
+      
+      std::string texture;
+      if (material_info.textures.size() == 0)
+        texture = "white.tx";
+      else
+        texture = material_info.textures["base_color"];
+
+      LoadTexture(command_buffer, texture.c_str(), AssetPath(texture).c_str());
+
+      Renderer::SampledTexture tex;
+      tex.sampler = texture_sampler_.GetSampler();
+      tex.view = textures_[texture].GetView();
+
+      Renderer::MaterialData info;
+      if (material_info.transparency == Assets::TransparencyMode::kTransparent)
+        info.base_template = "texturedPBR_transparent";
+      else
+        info.base_template = "texturedPBR_opaque";
+
+      info.textures.push_back(tex);
+
+      material =
+          Renderer::MaterialSystem::BuildMaterial(value.material_path, info);
+
+      if (!material)
+        LOG_ERROR("Failed to build material '{}'", value.material_path);
     }
 
-    Assets::MaterialInfo material_info = Assets::ReadMaterialInfo(&material_file);
-    Renderer::Material* material = GetMaterial("default");
-    if (material_info.textures.size() > 0) {
-      std::string texture_name = material_info.textures["base_color"];
-      LoadTexture(command_buffer, texture_name.c_str(),
-                  AssetPath(texture_name).c_str());
+    Renderer::RenderObject object;
+    glm::mat4 node_matrix{1.f};
 
-      CreateMaterial(GetMaterial("textured")->pipeline, material_path);
-      material = GetMaterial(material_path);
-      VkDescriptorImageInfo image_info{};
-      image_info.sampler = texture_sampler_.GetSampler();
-      image_info.imageView = textures_[texture_name].GetView();
-      image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    auto matrix_iter = node_world_mats.find(key);
+    if (matrix_iter != node_world_mats.end()) {
+      memcpy(&node_matrix, &(matrix_iter->second), sizeof(glm::mat4));
+    }
 
-      Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
-          .BindImage(0, &image_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                     VK_SHADER_STAGE_FRAGMENT_BIT)
-          .Build(material->texture_set);
-    } 
+    object.Create(GetMesh(value.mesh_path), material);
+    object.ModelMatrix() = node_matrix;
 
-    Renderer::RenderObject object(GetMesh(value.mesh_path), material);
-    object.ModelMatrix() = node_world_mats[key];
     renderables_.push_back(object);
   }
 
@@ -546,6 +525,22 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 void VulkanEngine::InitScene() {
   Renderer::CommandBuffer command_buffer = init_pool_.GetBuffer();
   command_buffer.Begin();
+
+  LoadTexture(command_buffer, "white", AssetPath("white.tx").c_str());
+
+  Renderer::SampledTexture white_texture;
+  white_texture.sampler = texture_sampler_.GetSampler();
+  white_texture.view = textures_["white"].GetView();
+
+  Renderer::MaterialData material_info;
+  material_info.base_template = "texturedPBR_opaque";
+  material_info.textures.push_back(white_texture);
+  Renderer::MaterialSystem::BuildMaterial("default", material_info);
+
+  Renderer::MaterialData textured_info;
+  textured_info.base_template = "texturedPBR_opaque";
+  textured_info.textures.push_back(white_texture);
+  Renderer::MaterialSystem::BuildMaterial("textured", textured_info);
 
   glm::mat4 room_root = glm::translate(glm::mat4{1.f}, glm::vec3(0, 0, -5));
   room_root =
@@ -636,19 +631,6 @@ std::string VulkanEngine::AssetPath(std::string_view path) {
          std::string{path};
 }
 
-Renderer::Material* VulkanEngine::CreateMaterial(Renderer::Pipeline pipeline,
-                                                 const std::string& name) {
-  Renderer::Material mat{VK_NULL_HANDLE, pipeline};
-  materials_[name] = mat;
-  return &materials_[name];
-}
-
-Renderer::Material* VulkanEngine::GetMaterial(const std::string& name) {
-  auto iter = materials_.find(name);
-  if (iter == materials_.end()) return nullptr;
-  return &(*iter).second;
-}
-
 Renderer::Mesh* VulkanEngine::GetMesh(const std::string& name) {
   auto iter = meshes_.find(name);
   if (iter == meshes_.end()) return nullptr;
@@ -726,6 +708,10 @@ void VulkanEngine::Cleanup() {
 
     main_deletion_queue_.Flush();
 
+    Renderer::MaterialSystem::Cleanup();
+
+    shader_cache_.Destroy();
+
     layout_cache_.Destroy();
     descriptor_allocator_.Destroy();
 
@@ -795,6 +781,14 @@ void VulkanEngine::Draw() {
                        swapchain_framebuffers_.GetFramebuffer(image_index),
                        {{0, 0}, swapchain_.GetImageExtent()},
                        {clear_value, depth_clear, clear_value});
+
+    VkExtent2D extent = swapchain_.GetImageExtent();
+    VkViewport viewport{0.f, 0.f, (float)extent.width, (float)extent.height,
+                        0.f, 1.f};
+    VkRect2D scissors{{0, 0}, extent};
+
+    vkCmdSetViewport(command_buffer.GetBuffer(), 0, 1, &viewport);
+    vkCmdSetScissor(command_buffer.GetBuffer(), 0, 1, &scissors);
 
     DrawObjects(command_buffer, renderables_.data(), renderables_.size());
 
@@ -867,26 +861,39 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
 
   Renderer::Mesh* last_mesh = nullptr;
   Renderer::Material* last_material = nullptr;
-  for (size_t i = 0; i < count; ++i) {
+  VkPipeline last_pipeline = nullptr;
+  VkDescriptorSet last_material_set = nullptr;
+  for (uint32_t i = 0; i < count; ++i) {
     Renderer::RenderObject& object = first[i];
 
-    if (object.GetMaterial() != last_material) {
-      object.GetMaterial()->pipeline.Bind(command_buffer);
-      last_material = object.GetMaterial();
+    Renderer::Mesh* new_mesh = object.GetMesh();
+    Renderer::Material* new_material = object.GetMaterial();
+    VkPipeline new_pipeline =
+        new_material->original->pass_shaders[Renderer::MeshPassType::kForward]
+            ->pipeline;
+    VkPipelineLayout new_layout =
+        new_material->original->pass_shaders[Renderer::MeshPassType::kForward]
+            ->pipeline_layout;
+    VkDescriptorSet new_material_set =
+        new_material->pass_sets[Renderer::MeshPassType::kForward];
+
+    if (new_pipeline != last_pipeline) {
+      last_pipeline = new_pipeline;
+      vkCmdBindPipeline(command_buffer.GetBuffer(),
+                        VK_PIPELINE_BIND_POINT_GRAPHICS, new_pipeline);
       vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                              VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              object.GetMaterial()->pipeline.GetLayout(), 0, 1,
+                              VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 0, 1,
                               &frame.global_descriptor_, 1, &uniform_offset);
       vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                              VK_PIPELINE_BIND_POINT_GRAPHICS,
-                              object.GetMaterial()->pipeline.GetLayout(), 1, 1,
+                              VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 1, 1,
                               &frame.object_descriptor_, 0, nullptr);
-      if (object.GetMaterial()->texture_set != VK_NULL_HANDLE) {
-        vkCmdBindDescriptorSets(
-            command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-            object.GetMaterial()->pipeline.GetLayout(), 2, 1,
-            &object.GetMaterial()->texture_set, 0, nullptr);
-      }
+    }
+
+    if (new_material_set != last_material_set) {
+      last_material_set = new_material_set;
+      vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                              VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 2, 1,
+                              &new_material_set, 0, nullptr);
     }
 
     if (object.GetMesh() != last_mesh) {

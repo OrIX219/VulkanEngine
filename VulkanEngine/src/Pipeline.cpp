@@ -2,22 +2,9 @@
 
 #include <fstream>
 #include "Logger.h"
+#include "Shaders.h"
 
 namespace Renderer {
-
-std::vector<char> ReadFileBinary(const std::string& filename) {
-  std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-  if (!file.is_open()) return {};
-
-  size_t file_size = (size_t)file.tellg();
-  std::vector<char> buffer(file_size);
-
-  file.seekg(0);
-  file.read(buffer.data(), file_size);
-
-  return buffer;
-}
 
 Pipeline::Pipeline()
     : pipeline_(VK_NULL_HANDLE), pipeline_layout_(VK_NULL_HANDLE) {}
@@ -53,11 +40,8 @@ void Pipeline::Bind(CommandBuffer command_buffer,
   vkCmdBindPipeline(command_buffer.GetBuffer(), bind_point, pipeline_);
 }
 
-PipelineBuilder::PipelineBuilder(LogicalDevice* device)
-    : device_(device),
-      foreign_layout_(false),
-      vertex_shader_{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
-      fragment_shader_{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
+PipelineBuilder::PipelineBuilder()
+    : foreign_layout_(false),
       vertex_input_info_{
           VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO},
       input_assembly_info_{
@@ -66,19 +50,17 @@ PipelineBuilder::PipelineBuilder(LogicalDevice* device)
       color_blend_attachment_{
           VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO},
       multisampling_{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO},
-      pipeline_layout_{},
-      vertex_module_(VK_NULL_HANDLE),
-      fragment_module_(VK_NULL_HANDLE) {}
+      pipeline_layout_{} {}
 
-PipelineBuilder::~PipelineBuilder() {
-  vkDestroyShaderModule(device_->GetDevice(), vertex_module_, nullptr);
-  vkDestroyShaderModule(device_->GetDevice(), fragment_module_, nullptr);
+PipelineBuilder::~PipelineBuilder() {}
+
+PipelineBuilder PipelineBuilder::Begin(LogicalDevice* device) {
+  PipelineBuilder builder;
+  builder.device_ = device;
+  return builder;
 }
 
 Pipeline PipelineBuilder::Build(RenderPass* render_pass) {
-  VkPipelineShaderStageCreateInfo shader_stages[] = {vertex_shader_,
-                                                     fragment_shader_};
-
   std::vector<VkDynamicState> dynamic_states;
   if (!viewport_.has_value())
     dynamic_states.push_back(VK_DYNAMIC_STATE_VIEWPORT);
@@ -122,8 +104,8 @@ Pipeline PipelineBuilder::Build(RenderPass* render_pass) {
 
   VkGraphicsPipelineCreateInfo pipeline_info{};
   pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-  pipeline_info.stageCount = 2;
-  pipeline_info.pStages = shader_stages;
+  pipeline_info.stageCount = static_cast<uint32_t>(shader_stages_.size());
+  pipeline_info.pStages = shader_stages_.data();
   pipeline_info.pVertexInputState = &vertex_input_info_;
   pipeline_info.pInputAssemblyState = &input_assembly_info_;
   pipeline_info.pViewportState = &viewport_state;
@@ -148,58 +130,10 @@ Pipeline PipelineBuilder::Build(RenderPass* render_pass) {
   }
 }
 
-PipelineBuilder& PipelineBuilder::SetVertexShader(const char* path) {
-  if (vertex_module_ != VK_NULL_HANDLE)
-    vkDestroyShaderModule(device_->GetDevice(), vertex_module_, nullptr);
-
-  std::vector<char> shader_code = ReadFileBinary(path);
-  vertex_module_ = CreateShaderModule(shader_code);
-
-  vertex_shader_.stage = VK_SHADER_STAGE_VERTEX_BIT;
-  vertex_shader_.module = vertex_module_;
-  vertex_shader_.pName = "main";
-
-  return *this;
-}
-
-PipelineBuilder& PipelineBuilder::SetVertexShader(
-    VkShaderModule shader_module) {
-  if (vertex_module_ != VK_NULL_HANDLE)
-    vkDestroyShaderModule(device_->GetDevice(), vertex_module_, nullptr);
-
-  vertex_module_ = VK_NULL_HANDLE;
-
-  vertex_shader_.stage = VK_SHADER_STAGE_VERTEX_BIT;
-  vertex_shader_.module = shader_module;
-  vertex_shader_.pName = "main";
-
-  return *this;
-}
-
-PipelineBuilder& PipelineBuilder::SetFragmentShader(const char* path) {
-  if (fragment_module_ != VK_NULL_HANDLE)
-    vkDestroyShaderModule(device_->GetDevice(), fragment_module_, nullptr);
-
-  std::vector<char> shader_code = ReadFileBinary(path);
-  fragment_module_ = CreateShaderModule(shader_code);
-
-  fragment_shader_.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  fragment_shader_.module = fragment_module_;
-  fragment_shader_.pName = "main";
-
-  return *this;
-}
-
-PipelineBuilder& PipelineBuilder::SetFragmentShader(
-    VkShaderModule shader_module) {
-  if (fragment_module_ != VK_NULL_HANDLE)
-    vkDestroyShaderModule(device_->GetDevice(), fragment_module_, nullptr);
-
-  fragment_module_ = VK_NULL_HANDLE;
-
-  fragment_shader_.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  fragment_shader_.module = shader_module;
-  fragment_shader_.pName = "main";
+PipelineBuilder& PipelineBuilder::SetShaders(ShaderEffect* effect) {
+  shader_stages_.clear();
+  effect->FillStages(shader_stages_);
+  SetLayout(effect->built_layout);
 
   return *this;
 }
@@ -348,23 +282,6 @@ PipelineBuilder& PipelineBuilder::SetDefaults() {
       .SetLayout(empty_layouts, empty_push_constants);
 
   return *this;
-}
-
-VkShaderModule PipelineBuilder::CreateShaderModule(
-    const std::vector<char>& code) {
-  VkShaderModuleCreateInfo create_info{};
-  create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  create_info.codeSize = code.size();
-  create_info.pCode = reinterpret_cast<const uint32_t*>(code.data());
-
-  VkShaderModule shader_module;
-  if (vkCreateShaderModule(device_->GetDevice(), &create_info, nullptr,
-                           &shader_module) != VK_SUCCESS) {
-    LOG_ERROR("Failed to create shader module!");
-    return VK_NULL_HANDLE;
-  }
-
-  return shader_module;
 }
 
 }  // namespace Renderer
