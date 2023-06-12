@@ -19,7 +19,7 @@
 #include <imgui/imgui_impl_vulkan.h>
 #include <imgui/imgui_stdlib.h>
 
-#include "CVAR.h"
+#include "Console/CVAR.h"
 #include "Logger.h"
 
 #include "MaterialAsset.h"
@@ -549,28 +549,30 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
 void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   constexpr uint32_t kMaxCount = 128;
 
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_SAMPLER, kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
-                                    kMaxCount);
-  imgui_pool_.SetMaxDescriptorCount(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
-                                    kMaxCount);
-  imgui_pool_.Create(&device_, kMaxCount);
+  std::vector<VkDescriptorPoolSize> sizes = {
+      {VK_DESCRIPTOR_TYPE_SAMPLER, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, kMaxCount},
+      {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, kMaxCount}};
+  
+  VkDescriptorPoolCreateInfo pool_info{};
+  pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  pool_info.poolSizeCount = static_cast<uint32_t>(sizes.size());
+  pool_info.pPoolSizes = sizes.data();
+  pool_info.maxSets = kMaxCount;
+
+  VK_CHECK(vkCreateDescriptorPool(device_.GetDevice(), &pool_info, nullptr,
+                                  &imgui_pool_));
+  main_deletion_queue_.PushFunction([=]() {
+    vkDestroyDescriptorPool(device_.GetDevice(), imgui_pool_, nullptr);
+  });
 
   ImGui::CreateContext();
 
@@ -581,7 +583,7 @@ void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   init_info.PhysicalDevice = physical_device_.GetDevice();
   init_info.Device = device_.GetDevice();
   init_info.Queue = device_.GetGraphicsQueue().GetQueue();
-  init_info.DescriptorPool = imgui_pool_.GetPool();
+  init_info.DescriptorPool = imgui_pool_;
   init_info.MinImageCount = 3;
   init_info.ImageCount = 3;
   init_info.MSAASamples = physical_device_.GetMaxSamples();
@@ -700,7 +702,6 @@ void VulkanEngine::ProcessInput() {
 
 void VulkanEngine::Cleanup() {
   if (is_initialized_) {
-    imgui_pool_.Destroy();
     ImGui_ImplVulkan_Shutdown();
 
     main_deletion_queue_.Flush();

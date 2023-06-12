@@ -22,103 +22,116 @@
     <Filter Include="src">
       <UniqueIdentifier>{2DAB880B-99B4-887C-2230-9F7C8E38947C}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Renderer">
+      <UniqueIdentifier>{73D1DFBF-5F34-6F64-08BA-A71AF4FB3AE7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Renderer\Console">
+      <UniqueIdentifier>{95AB8FAB-813A-1975-2A59-2D7016C7291B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Renderer\MaterialSystem">
+      <UniqueIdentifier>{D6ADC3C5-42BB-F1AB-CBA1-ED9637AEBD62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\Renderer\Vulkan">
+      <UniqueIdentifier>{935F6C22-FFC0-4930-882E-90E2F48E80EF}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Buffer.h">
+    <ClInclude Include="src\Renderer\Buffer.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\CVAR.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Camera.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CommandBuffer.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CommandPool.h">
+    <ClInclude Include="src\Renderer\Camera.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\DeletionQueue.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\DescriptorPool.h">
+    <ClInclude Include="src\Renderer\Descriptors.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Descriptors.h">
+    <ClInclude Include="src\Renderer\Image.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Image.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\IndexBuffer.h">
+    <ClInclude Include="src\Renderer\IndexBuffer.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\Logger.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\LogicalDevice.h">
+    <ClInclude Include="src\Renderer\Mesh.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Mesh.h">
+    <ClInclude Include="src\Renderer\PushBuffer.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\PhysicalDevice.h">
+    <ClInclude Include="src\Renderer\RenderObject.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Pipeline.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Console\CVAR.h">
+      <Filter>src\Renderer\Console</Filter>
     </ClInclude>
-    <ClInclude Include="src\PushBuffer.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Renderer\MaterialSystem\MaterialSystem.h">
+      <Filter>src\Renderer\MaterialSystem</Filter>
     </ClInclude>
-    <ClInclude Include="src\Queue.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Renderer\MaterialSystem\Shaders.h">
+      <Filter>src\Renderer\MaterialSystem</Filter>
     </ClInclude>
-    <ClInclude Include="src\RenderObject.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Renderer\Vulkan\CommandBuffer.h">
+      <Filter>src\Renderer\Vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="src\RenderPass.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Renderer\Vulkan\CommandPool.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\LogicalDevice.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\PhysicalDevice.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\Pipeline.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\Queue.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\RenderPass.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\Surface.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\Swapchain.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\SwapchainFramebuffers.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\VulkanInstance.h">
+      <Filter>src\Renderer\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="src\StringHash.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Surface.h">
+    <ClInclude Include="src\Renderer\Texture.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Swapchain.h">
+    <ClInclude Include="src\Renderer\TextureSampler.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\SwapchainFramebuffers.h">
+    <ClInclude Include="src\Renderer\Vertex.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Texture.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\TextureSampler.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Vertex.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\VertexBuffer.h">
+    <ClInclude Include="src\Renderer\VertexBuffer.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\VulkanEngine.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\VulkanInstance.h">
+    <ClInclude Include="src\Renderer\VulkanProfiler.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\VulkanProfiler.h">
+    <ClInclude Include="src\Renderer\Window.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Window.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Shaders.h" />
-    <ClInclude Include="src\MaterialSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\format.cc">
@@ -154,86 +167,87 @@
     <ClCompile Include="..\Libraries\include\spirv_reflect\spirv_reflect.c">
       <Filter>Libraries\include\spirv_reflect</Filter>
     </ClCompile>
-    <ClCompile Include="src\CVAR.cpp">
+    <ClCompile Include="src\Renderer\Camera.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Camera.cpp">
+    <ClCompile Include="src\Renderer\Descriptors.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\CommandBuffer.cpp">
+    <ClCompile Include="src\Renderer\Image.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\CommandPool.cpp">
+    <ClCompile Include="src\Renderer\IndexBuffer.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\DescriptorPool.cpp">
+    <ClCompile Include="src\Renderer\Mesh.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Descriptors.cpp">
+    <ClCompile Include="src\Renderer\PushBuffer.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Image.cpp">
+    <ClCompile Include="src\Console\CVAR.cpp">
+      <Filter>src\Renderer\Console</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\MaterialSystem\MaterialSystem.cpp">
+      <Filter>src\Renderer\MaterialSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\MaterialSystem\Shaders.cpp">
+      <Filter>src\Renderer\MaterialSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\CommandBuffer.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\CommandPool.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\LogicalDevice.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\PhysicalDevice.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\Pipeline.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\Queue.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\RenderPass.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\Surface.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\Swapchain.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\SwapchainFramebuffers.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\VulkanInstance.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Texture.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\IndexBuffer.cpp">
+    <ClCompile Include="src\Renderer\TextureSampler.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\LogicalDevice.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Mesh.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\PhysicalDevice.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Pipeline.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\PushBuffer.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Queue.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\RenderPass.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Surface.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Swapchain.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\SwapchainFramebuffers.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Texture.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\TextureSampler.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\VertexBuffer.cpp">
+    <ClCompile Include="src\Renderer\VertexBuffer.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\VulkanEngine.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\VulkanInstance.cpp">
+    <ClCompile Include="src\Renderer\VulkanProfiler.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\VulkanProfiler.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Window.cpp">
+    <ClCompile Include="src\Renderer\Window.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Shaders.cpp" />
-    <ClCompile Include="src\MaterialSystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">

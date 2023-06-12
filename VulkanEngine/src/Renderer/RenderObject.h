@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MaterialSystem.h"
+#include "MaterialSystem/MaterialSystem.h"
 #include "Mesh.h"
 
 #include <glm\mat4x4.hpp>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vulkan/vulkan.hpp"
+#include <vulkan/vulkan.hpp>
 
 #include <chrono>
 #include <iostream>
@@ -9,7 +9,7 @@
 #include <fmt/core.h>
 #include <fmt/os.h>
 #include <fmt/color.h>
-#include "VulkanInstance.h"
+#include "Vulkan/VulkanInstance.h"
 
 #define LOG_FATAL(message, ...) \
   Engine::Logger::Log(Engine::LogType::kFatal, message, ##__VA_ARGS__)

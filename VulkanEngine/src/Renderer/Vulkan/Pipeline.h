@@ -8,36 +8,6 @@
 
 namespace Renderer {
 
-struct DescriptorSetLayout {
-  DescriptorSetLayout() : layout(VK_NULL_HANDLE) {}
-
-  void AddBinding(uint32_t binding, VkDescriptorType type,
-                  VkShaderStageFlags stage, uint32_t descriptor_count = 1,
-                  const VkSampler* immutable_samplers = nullptr) {
-    bindings.push_back(
-        {binding, type, descriptor_count, stage, immutable_samplers});
-  }
-
-  void AddBinding(VkDescriptorSetLayoutBinding binding) {
-    bindings.push_back(std::move(binding));
-  }
-
-  VkResult Create(LogicalDevice* device) {
-    VkDescriptorSetLayoutCreateInfo layout_info{};
-    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layout_info.bindingCount = static_cast<uint32_t>(bindings.size());
-    layout_info.pBindings = bindings.data();
-
-    VkResult res = vkCreateDescriptorSetLayout(device->GetDevice(),
-                                               &layout_info, nullptr, &layout);
-    bindings.clear();
-    return res;
-  }
-
-  VkDescriptorSetLayout layout;
-  std::vector<VkDescriptorSetLayoutBinding> bindings;
-};
-
 class Pipeline {
  public:
   Pipeline();

@@ -5,28 +5,27 @@
 #include <unordered_map>
 
 #include "Camera.h"
-#include "CommandPool.h"
 #include "DeletionQueue.h"
 #include "Descriptors.h"
-#include "DescriptorPool.h"
 #include "Image.h"
-#include "LogicalDevice.h"
-#include "MaterialSystem.h"
 #include "Mesh.h"
-#include "PhysicalDevice.h"
-#include "Pipeline.h"
 #include "PushBuffer.h"
 #include "RenderObject.h"
-#include "RenderPass.h"
-#include "Shaders.h"
-#include "Surface.h"
-#include "Swapchain.h"
-#include "SwapchainFramebuffers.h"
 #include "Texture.h"
 #include "TextureSampler.h"
-#include "VulkanInstance.h"
-#include "VulkanProfiler.h"
 #include "Window.h"
+#include "MaterialSystem/MaterialSystem.h"
+#include "MaterialSystem/Shaders.h"
+#include "Vulkan/CommandPool.h"
+#include "Vulkan/LogicalDevice.h"
+#include "Vulkan/PhysicalDevice.h"
+#include "Vulkan/Pipeline.h"
+#include "Vulkan/RenderPass.h"
+#include "Vulkan/Surface.h"
+#include "Vulkan/Swapchain.h"
+#include "Vulkan/SwapchainFramebuffers.h"
+#include "Vulkan/VulkanInstance.h"
+#include "VulkanProfiler.h"
 
 #include "PrefabAsset.h"
 
@@ -142,7 +141,7 @@ class VulkanEngine {
 
   Renderer::DescriptorAllocator descriptor_allocator_;
   Renderer::DescriptorLayoutCache layout_cache_;
-  Renderer::DescriptorPool imgui_pool_;
+  VkDescriptorPool imgui_pool_;
 
   std::array<FrameData, kMaxFramesInFlight> frames_;
   SceneData scene_data_;

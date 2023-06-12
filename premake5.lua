@@ -98,7 +98,9 @@ project "VulkanEngine"
     }
     includedirs {
         "Libraries/include/vulkan",
-        "AssetLib/src"
+        "AssetLib/src",
+        "VulkanEngine/src",
+        "VulkanEngine/src/Renderer"
     }
     
     links {

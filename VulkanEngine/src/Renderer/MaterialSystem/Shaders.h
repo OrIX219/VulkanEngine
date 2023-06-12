@@ -7,9 +7,9 @@
 #include <unordered_map>
 #include <string>
 
-#include "CommandBuffer.h"
+#include "Vulkan/CommandBuffer.h"
 #include "Descriptors.h"
-#include "LogicalDevice.h"
+#include "Vulkan/LogicalDevice.h"
 
 namespace Renderer {
 
