@@ -10,8 +10,20 @@
     <Filter Include="Libraries\include\fmt">
       <UniqueIdentifier>{2B1B723C-9787-2D37-607B-C594CCA64F9F}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Libraries\include\fmt\src">
+      <UniqueIdentifier>{C2762D11-2E39-619B-77E9-EF27E3EA3979}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Libraries\include\imgui">
       <UniqueIdentifier>{9FB39B21-0BEB-E3B8-14F5-47DC80AB0AB2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\include\imgui\backends">
+      <UniqueIdentifier>{A9B09AF3-9501-8635-BE65-74F7AA15199F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\include\imgui\misc">
+      <UniqueIdentifier>{DAE1575C-C69C-4708-6F54-C0525BEE9198}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries\include\imgui\misc\cpp">
+      <UniqueIdentifier>{ACB8E4A6-9809-D0E8-C16D-BEAAAD1D6352}</UniqueIdentifier>
     </Filter>
     <Filter Include="Libraries\include\spirv_reflect">
       <UniqueIdentifier>{1C9A4D65-887D-5CA5-9180-8AE1FDE222F6}</UniqueIdentifier>
@@ -22,11 +34,11 @@
     <Filter Include="src">
       <UniqueIdentifier>{2DAB880B-99B4-887C-2230-9F7C8E38947C}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\Console">
+      <UniqueIdentifier>{4F9F6B3D-BB54-E432-4449-DE09B0FDDA36}</UniqueIdentifier>
+    </Filter>
     <Filter Include="src\Renderer">
       <UniqueIdentifier>{73D1DFBF-5F34-6F64-08BA-A71AF4FB3AE7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="src\Renderer\Console">
-      <UniqueIdentifier>{95AB8FAB-813A-1975-2A59-2D7016C7291B}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\Renderer\MaterialSystem">
       <UniqueIdentifier>{D6ADC3C5-42BB-F1AB-CBA1-ED9637AEBD62}</UniqueIdentifier>
@@ -36,44 +48,56 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Renderer\Buffer.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\Camera.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Console\CVAR.h">
+      <Filter>src\Console</Filter>
     </ClInclude>
     <ClInclude Include="src\DeletionQueue.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\Descriptors.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\Image.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\IndexBuffer.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\Logger.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Renderer\Mesh.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Renderer\Buffer.h">
+      <Filter>src\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="src\Renderer\PushBuffer.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Renderer\Camera.h">
+      <Filter>src\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="src\Renderer\RenderObject.h">
-      <Filter>src</Filter>
+    <ClInclude Include="src\Renderer\Descriptors.h">
+      <Filter>src\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="src\Console\CVAR.h">
-      <Filter>src\Renderer\Console</Filter>
+    <ClInclude Include="src\Renderer\Image.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\IndexBuffer.h">
+      <Filter>src\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="src\Renderer\MaterialSystem\MaterialSystem.h">
       <Filter>src\Renderer\MaterialSystem</Filter>
     </ClInclude>
     <ClInclude Include="src\Renderer\MaterialSystem\Shaders.h">
       <Filter>src\Renderer\MaterialSystem</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Mesh.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\PushBuffer.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\RenderObject.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Texture.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\TextureSampler.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Vertex.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\VertexBuffer.h">
+      <Filter>src\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="src\Renderer\Vulkan\CommandBuffer.h">
       <Filter>src\Renderer\Vulkan</Filter>
@@ -108,37 +132,31 @@
     <ClInclude Include="src\Renderer\Vulkan\VulkanInstance.h">
       <Filter>src\Renderer\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="src\Renderer\VulkanProfiler.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\Window.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\StringHash.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\Texture.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\TextureSampler.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\Vertex.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\VertexBuffer.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\VulkanEngine.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Renderer\VulkanProfiler.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Renderer\Window.h">
-      <Filter>src</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Libraries\include\fmt\format.cc">
-      <Filter>Libraries\include\fmt</Filter>
+    <ClCompile Include="..\Libraries\include\fmt\src\format.cc">
+      <Filter>Libraries\include\fmt\src</Filter>
     </ClCompile>
-    <ClCompile Include="..\Libraries\include\fmt\os.cc">
-      <Filter>Libraries\include\fmt</Filter>
+    <ClCompile Include="..\Libraries\include\fmt\src\os.cc">
+      <Filter>Libraries\include\fmt\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\backends\imgui_impl_glfw.cpp">
+      <Filter>Libraries\include\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\backends\imgui_impl_vulkan.cpp">
+      <Filter>Libraries\include\imgui\backends</Filter>
     </ClCompile>
     <ClCompile Include="..\Libraries\include\imgui\imgui.cpp">
       <Filter>Libraries\include\imgui</Filter>
@@ -149,50 +167,53 @@
     <ClCompile Include="..\Libraries\include\imgui\imgui_draw.cpp">
       <Filter>Libraries\include\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="..\Libraries\include\imgui\imgui_impl_glfw.cpp">
-      <Filter>Libraries\include\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Libraries\include\imgui\imgui_impl_vulkan.cpp">
-      <Filter>Libraries\include\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Libraries\include\imgui\imgui_stdlib.cpp">
-      <Filter>Libraries\include\imgui</Filter>
-    </ClCompile>
     <ClCompile Include="..\Libraries\include\imgui\imgui_tables.cpp">
       <Filter>Libraries\include\imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\Libraries\include\imgui\imgui_widgets.cpp">
       <Filter>Libraries\include\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="..\Libraries\include\imgui\misc\cpp\imgui_stdlib.cpp">
+      <Filter>Libraries\include\imgui\misc\cpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\Libraries\include\spirv_reflect\spirv_reflect.c">
       <Filter>Libraries\include\spirv_reflect</Filter>
     </ClCompile>
+    <ClCompile Include="src\Console\CVAR.cpp">
+      <Filter>src\Console</Filter>
+    </ClCompile>
     <ClCompile Include="src\Renderer\Camera.cpp">
-      <Filter>src</Filter>
+      <Filter>src\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\Descriptors.cpp">
-      <Filter>src</Filter>
+      <Filter>src\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\Image.cpp">
-      <Filter>src</Filter>
+      <Filter>src\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\IndexBuffer.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Renderer\Mesh.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Renderer\PushBuffer.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Console\CVAR.cpp">
-      <Filter>src\Renderer\Console</Filter>
+      <Filter>src\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\MaterialSystem\MaterialSystem.cpp">
       <Filter>src\Renderer\MaterialSystem</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\MaterialSystem\Shaders.cpp">
       <Filter>src\Renderer\MaterialSystem</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Mesh.cpp">
+      <Filter>src\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\PushBuffer.cpp">
+      <Filter>src\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\Texture.cpp">
+      <Filter>src\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\TextureSampler.cpp">
+      <Filter>src\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\VertexBuffer.cpp">
+      <Filter>src\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\Vulkan\CommandBuffer.cpp">
       <Filter>src\Renderer\Vulkan</Filter>
@@ -227,22 +248,13 @@
     <ClCompile Include="src\Renderer\Vulkan\VulkanInstance.cpp">
       <Filter>src\Renderer\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="src\Renderer\Texture.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Renderer\TextureSampler.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Renderer\VertexBuffer.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\VulkanEngine.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\Renderer\VulkanProfiler.cpp">
-      <Filter>src</Filter>
+      <Filter>src\Renderer</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\Window.cpp">
+      <Filter>src\Renderer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\VulkanEngine.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\main.cpp">

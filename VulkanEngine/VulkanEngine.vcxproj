@@ -60,7 +60,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_WIN32;DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\Libraries\include;..\Libraries\include\vulkan;..\AssetLib\src;src;src\Renderer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Libraries\include;..\Libraries\include\vulkan;..\AssetLib\src;src;src\Renderer;..\Libraries\include\imgui;..\Libraries\include\fmt\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -80,7 +80,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_WIN32;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\Libraries\include;..\Libraries\include\vulkan;..\AssetLib\src;src;src\Renderer;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Libraries\include;..\Libraries\include\vulkan;..\AssetLib\src;src;src\Renderer;..\Libraries\include\imgui;..\Libraries\include\fmt\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -100,19 +100,23 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="src\Console\CVAR.h" />
+    <ClInclude Include="src\DeletionQueue.h" />
+    <ClInclude Include="src\Logger.h" />
     <ClInclude Include="src\Renderer\Buffer.h" />
     <ClInclude Include="src\Renderer\Camera.h" />
-    <ClInclude Include="src\DeletionQueue.h" />
     <ClInclude Include="src\Renderer\Descriptors.h" />
     <ClInclude Include="src\Renderer\Image.h" />
     <ClInclude Include="src\Renderer\IndexBuffer.h" />
-    <ClInclude Include="src\Logger.h" />
+    <ClInclude Include="src\Renderer\MaterialSystem\MaterialSystem.h" />
+    <ClInclude Include="src\Renderer\MaterialSystem\Shaders.h" />
     <ClInclude Include="src\Renderer\Mesh.h" />
     <ClInclude Include="src\Renderer\PushBuffer.h" />
     <ClInclude Include="src\Renderer\RenderObject.h" />
-    <ClInclude Include="src\Console\CVAR.h" />
-    <ClInclude Include="src\Renderer\MaterialSystem\MaterialSystem.h" />
-    <ClInclude Include="src\Renderer\MaterialSystem\Shaders.h" />
+    <ClInclude Include="src\Renderer\Texture.h" />
+    <ClInclude Include="src\Renderer\TextureSampler.h" />
+    <ClInclude Include="src\Renderer\Vertex.h" />
+    <ClInclude Include="src\Renderer\VertexBuffer.h" />
     <ClInclude Include="src\Renderer\Vulkan\CommandBuffer.h" />
     <ClInclude Include="src\Renderer\Vulkan\CommandPool.h" />
     <ClInclude Include="src\Renderer\Vulkan\LogicalDevice.h" />
@@ -124,36 +128,35 @@
     <ClInclude Include="src\Renderer\Vulkan\Swapchain.h" />
     <ClInclude Include="src\Renderer\Vulkan\SwapchainFramebuffers.h" />
     <ClInclude Include="src\Renderer\Vulkan\VulkanInstance.h" />
-    <ClInclude Include="src\StringHash.h" />
-    <ClInclude Include="src\Renderer\Texture.h" />
-    <ClInclude Include="src\Renderer\TextureSampler.h" />
-    <ClInclude Include="src\Renderer\Vertex.h" />
-    <ClInclude Include="src\Renderer\VertexBuffer.h" />
-    <ClInclude Include="src\VulkanEngine.h" />
     <ClInclude Include="src\Renderer\VulkanProfiler.h" />
     <ClInclude Include="src\Renderer\Window.h" />
+    <ClInclude Include="src\StringHash.h" />
+    <ClInclude Include="src\VulkanEngine.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Libraries\include\fmt\format.cc" />
-    <ClCompile Include="..\Libraries\include\fmt\os.cc" />
+    <ClCompile Include="..\Libraries\include\fmt\src\format.cc" />
+    <ClCompile Include="..\Libraries\include\fmt\src\os.cc" />
+    <ClCompile Include="..\Libraries\include\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\Libraries\include\imgui\backends\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui_draw.cpp" />
-    <ClCompile Include="..\Libraries\include\imgui\imgui_impl_glfw.cpp" />
-    <ClCompile Include="..\Libraries\include\imgui\imgui_impl_vulkan.cpp" />
-    <ClCompile Include="..\Libraries\include\imgui\imgui_stdlib.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\Libraries\include\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\Libraries\include\imgui\misc\cpp\imgui_stdlib.cpp" />
     <ClCompile Include="..\Libraries\include\spirv_reflect\spirv_reflect.c" />
+    <ClCompile Include="src\Console\CVAR.cpp" />
     <ClCompile Include="src\Renderer\Camera.cpp" />
     <ClCompile Include="src\Renderer\Descriptors.cpp" />
     <ClCompile Include="src\Renderer\Image.cpp" />
     <ClCompile Include="src\Renderer\IndexBuffer.cpp" />
-    <ClCompile Include="src\Renderer\Mesh.cpp" />
-    <ClCompile Include="src\Renderer\PushBuffer.cpp" />
-    <ClCompile Include="src\Console\CVAR.cpp" />
     <ClCompile Include="src\Renderer\MaterialSystem\MaterialSystem.cpp" />
     <ClCompile Include="src\Renderer\MaterialSystem\Shaders.cpp" />
+    <ClCompile Include="src\Renderer\Mesh.cpp" />
+    <ClCompile Include="src\Renderer\PushBuffer.cpp" />
+    <ClCompile Include="src\Renderer\Texture.cpp" />
+    <ClCompile Include="src\Renderer\TextureSampler.cpp" />
+    <ClCompile Include="src\Renderer\VertexBuffer.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\CommandBuffer.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\CommandPool.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\LogicalDevice.cpp" />
@@ -165,12 +168,9 @@
     <ClCompile Include="src\Renderer\Vulkan\Swapchain.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\SwapchainFramebuffers.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\VulkanInstance.cpp" />
-    <ClCompile Include="src\Renderer\Texture.cpp" />
-    <ClCompile Include="src\Renderer\TextureSampler.cpp" />
-    <ClCompile Include="src\Renderer\VertexBuffer.cpp" />
-    <ClCompile Include="src\VulkanEngine.cpp" />
     <ClCompile Include="src\Renderer\VulkanProfiler.cpp" />
     <ClCompile Include="src\Renderer\Window.cpp" />
+    <ClCompile Include="src\VulkanEngine.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>

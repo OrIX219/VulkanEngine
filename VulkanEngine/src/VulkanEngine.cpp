@@ -7,7 +7,7 @@
 #include <vulkan/vk_enum_string_helper.h>
 
 #define VMA_IMPLEMENTATION
-#include <vma\vk_mem_alloc.h>
+#include <vma\include\vk_mem_alloc.h>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_LEFT_HANDED
@@ -15,9 +15,9 @@
 #include <glm/gtx/transform.hpp>
 
 #include <imgui/imgui.h>
-#include <imgui/imgui_impl_glfw.h>
-#include <imgui/imgui_impl_vulkan.h>
-#include <imgui/imgui_stdlib.h>
+#include <imgui/backends/imgui_impl_glfw.h>
+#include <imgui/backends/imgui_impl_vulkan.h>
+#include <imgui/misc/cpp/imgui_stdlib.h>
 
 #include "Console/CVAR.h"
 #include "Logger.h"

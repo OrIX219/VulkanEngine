@@ -1,7 +1,7 @@
 #include "TextureAsset.h"
 
-#include <json/json.hpp>
-#include <lz4/lz4.h>
+#include <json/single_include/nlohmann/json.hpp>
+#include <lz4/lib/lz4.h>
 
 namespace Assets {
 

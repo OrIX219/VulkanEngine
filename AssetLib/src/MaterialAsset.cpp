@@ -1,6 +1,6 @@
 #include "MaterialAsset.h"
 
-#include <json/json.hpp>
+#include <json/single_include/nlohmann/json.hpp>
 
 namespace Assets {
 

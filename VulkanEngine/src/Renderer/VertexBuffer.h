@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vma\vk_mem_alloc.h>
+#include <vma\include\vk_mem_alloc.h>
 
 #include "Buffer.h"
 #include "Vertex.h"

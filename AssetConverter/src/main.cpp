@@ -3,7 +3,7 @@
 #include <fstream>
 #include <iostream>
 
-#include <json/json.hpp>
+#include <json/single_include/nlohmann/json.hpp>
 
 #include "AssetLoader.h"
 #include "MaterialAsset.h"

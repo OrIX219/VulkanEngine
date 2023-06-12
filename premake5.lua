@@ -92,15 +92,21 @@ project "VulkanEngine"
 		"%{prj.name}/src/**.cpp",
         "%{prj.name}/Shaders/**.vert",
         "%{prj.name}/Shaders/**.frag",
-        "Libraries/include/imgui/**.cpp",
-        "Libraries/include/fmt/**.cc",
+        "Libraries/include/imgui/*.cpp",
+        "Libraries/include/imgui/misc/cpp/*.cpp",
+        "Libraries/include/imgui/backends/imgui_impl_glfw.cpp",
+        "Libraries/include/imgui/backends/imgui_impl_vulkan.cpp",
+        "Libraries/include/fmt/src/format.cc",
+        "Libraries/include/fmt/src/os.cc",
         "Libraries/include/spirv_reflect/**.c"
     }
     includedirs {
         "Libraries/include/vulkan",
         "AssetLib/src",
         "VulkanEngine/src",
-        "VulkanEngine/src/Renderer"
+        "VulkanEngine/src/Renderer",
+        "Libraries/include/imgui",
+        "Libraries/include/fmt/include"
     }
     
     links {

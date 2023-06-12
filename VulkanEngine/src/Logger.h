@@ -5,10 +5,10 @@
 #include <chrono>
 #include <iostream>
 #include <string_view>
-#include <fmt/chrono.h>
-#include <fmt/core.h>
-#include <fmt/os.h>
-#include <fmt/color.h>
+#include <fmt/include/fmt/chrono.h>
+#include <fmt/include/fmt/core.h>
+#include <fmt/include/fmt/os.h>
+#include <fmt/include/fmt/color.h>
 #include "Vulkan/VulkanInstance.h"
 
 #define LOG_FATAL(message, ...) \
