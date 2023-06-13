@@ -101,10 +101,10 @@ project "VulkanEngine"
         "Libraries/include/spirv_reflect/**.c"
     }
     includedirs {
-        "Libraries/include/vulkan",
-        "AssetLib/src",
         "VulkanEngine/src",
-        "VulkanEngine/src/Renderer",
+        "VulkanEngine/src/**",
+        "AssetLib/src",
+        "Libraries/include/vulkan",
         "Libraries/include/imgui",
         "Libraries/include/fmt/include"
     }

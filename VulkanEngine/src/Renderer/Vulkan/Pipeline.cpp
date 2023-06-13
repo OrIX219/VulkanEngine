@@ -2,7 +2,7 @@
 
 #include <fstream>
 #include "Logger.h"
-#include "MaterialSystem/Shaders.h"
+#include "Shaders.h"
 
 namespace Renderer {
 

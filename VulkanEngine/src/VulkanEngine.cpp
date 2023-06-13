@@ -161,15 +161,10 @@ void VulkanEngine::Init() {
 }
 
 void VulkanEngine::InitCVars() {
-  AutoCVar_Float CVAR_clear_r("clear_color.r",
-                              "Framebuffer clear color's red component", 0.f,
-                              CVarFlagBits::kEditFloatDrag);
-  AutoCVar_Float CVAR_clear_g("clear_color.g",
-                              "Framebuffer clear color's green component", 0.f,
-                              CVarFlagBits::kEditFloatDrag);
-  AutoCVar_Float CVAR_clear_b("clear_color.b",
-                              "Framebuffer clear color's blue component", 0.f,
-                              CVarFlagBits::kEditFloatDrag);
+  AutoCVar_Vec4 CVar_clear_color("scene.clear_color", "Background color",
+                                 {0.f, 0.f, 0.f, 1.f});
+  AutoCVar_Vec4 CVar_ambient_color("scene.ambient_color", "Global color tint",
+                                 {1.f, 1.f, 1.f, 1.f});
 
   const VkPhysicalDeviceProperties& props = physical_device_.GetProperties();
   AutoCVar_String CVar_device_type(
@@ -762,10 +757,9 @@ void VulkanEngine::Draw() {
   }
 
   VkClearValue clear_value{};
-  clear_value.color = {{*CVarSystem::Get()->GetFloatCVar("clear_color.r"),
-                        *CVarSystem::Get()->GetFloatCVar("clear_color.g"),
-                        *CVarSystem::Get()->GetFloatCVar("clear_color.b"),
-                        1.f}};
+  auto clear_color = CVarSystem::Get()->GetVec4CVar("scene.clear_color");
+  clear_value.color = {
+      {clear_color->x, clear_color->y, clear_color->z, clear_color->w}};
   VkClearValue depth_clear{};
   depth_clear.depthStencil.depth = 1.f;
 
@@ -845,8 +839,9 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
   scene_data_.camera_data.view = camera_.GetViewMat();
   scene_data_.camera_data.projection = projection;
 
-  float framed = frame_number_ / 120.f;
-  scene_data_.ambient_color = {sin(framed), 0, cos(framed), 1};
+  auto ambient_color = CVarSystem::Get()->GetVec4CVar("scene.ambient_color");
+  scene_data_.ambient_color = {ambient_color->x, ambient_color->y,
+                               ambient_color->z, ambient_color->w};
 
   uint32_t uniform_offset = frame.dynamic_data_.Push(scene_data_);
 

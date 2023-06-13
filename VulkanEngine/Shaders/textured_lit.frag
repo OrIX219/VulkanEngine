@@ -22,6 +22,6 @@ layout(set = 0, binding = 0) uniform SceneData {
 layout(set = 2, binding = 0) uniform sampler2D tex;
 
 void main() {
-	vec3 color = texture(tex, textureCoords).xyz;
+	vec3 color = texture(tex, textureCoords).xyz * sceneData.ambientColor.xyz;
 	outColor = vec4(color, 1.f);
 }

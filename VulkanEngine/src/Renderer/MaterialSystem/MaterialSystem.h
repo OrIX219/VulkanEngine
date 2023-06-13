@@ -6,9 +6,9 @@
 #include <vector>
 #include <string>
 
-#include "Vulkan/Pipeline.h"
+#include "Pipeline.h"
 #include "Mesh.h"
-#include "Vulkan/RenderPass.h"
+#include "RenderPass.h"
 
 #include "MaterialAsset.h"
 

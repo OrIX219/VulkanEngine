@@ -9,7 +9,7 @@
 
 namespace Engine {
 
-enum class CVarType : char { kInt, kFloat, kString };
+enum class CVarType : char { kInt, kFloat, kString, kVec4 };
 
 class CVarParameter {
  public:
@@ -81,10 +81,12 @@ class CVarSystemImpl : public CVarSystem {
   int32_t* GetIntCVar(StringHash name) override final;
   float* GetFloatCVar(StringHash name) override final;
   const char* GetStringCVar(StringHash name) override final;
+  Vec4* GetVec4CVar(StringHash name) override final;
 
   void SetIntCVar(StringHash name, int32_t value) override final;
-  void SetIntCVar(StringHash name, float value) override final;
-  void SetIntCVar(StringHash name, const char* value) override final;
+  void SetFloatCVar(StringHash name, float value) override final;
+  void SetStringCVar(StringHash name, const char* value) override final;
+  void SetVec4CVar(StringHash name, Vec4 value) override final;
 
   CVarParameter* CreateIntCVar(const char* name, const char* description,
                                int32_t default_value,
@@ -97,6 +99,9 @@ class CVarSystemImpl : public CVarSystem {
   CVarParameter* CreateStringCVar(const char* name, const char* description,
                                   std::string default_value,
                                   std::string current_value) override final;
+  CVarParameter* CreateVec4CVar(const char* name, const char* description,
+                                Vec4 default_value,
+                                Vec4 current_value) override final;
 
   constexpr static uint32_t kMaxIntCvars = 64;
   CVarArray<int32_t> int_cvars{kMaxIntCvars};
@@ -106,6 +111,9 @@ class CVarSystemImpl : public CVarSystem {
 
   constexpr static uint32_t kMaxStringCvars = 64;
   CVarArray<std::string> string_cvars{kMaxStringCvars};
+
+  constexpr static uint32_t kMaxVec4Cvars = 16;
+  CVarArray<Vec4> vec4_cvars{kMaxStringCvars};
 
   template <typename T>
   CVarArray<T>* GetCVarArray();
@@ -123,6 +131,11 @@ class CVarSystemImpl : public CVarSystem {
   template <>
   CVarArray<std::string>* GetCVarArray() {
     return &string_cvars;
+  }
+
+  template <>
+  CVarArray<Vec4>* GetCVarArray() {
+    return &vec4_cvars;
   }
 
   template <typename T>
@@ -177,16 +190,24 @@ const char* CVarSystemImpl::GetStringCVar(StringHash name) {
   return GetCVarCurrent<std::string>(name)->c_str();
 }
 
+CVarSystem::Vec4* CVarSystemImpl::GetVec4CVar(StringHash name) {
+  return GetCVarCurrent<Vec4>(name);
+}
+
 void CVarSystemImpl::SetIntCVar(StringHash name, int32_t value) {
   SetCVarCurrent<int32_t>(name, value);
 }
 
-void CVarSystemImpl::SetIntCVar(StringHash name, float value) {
+void CVarSystemImpl::SetFloatCVar(StringHash name, float value) {
   SetCVarCurrent<float>(name, value);
 }
 
-void CVarSystemImpl::SetIntCVar(StringHash name, const char* value) {
+void CVarSystemImpl::SetStringCVar(StringHash name, const char* value) {
   SetCVarCurrent<std::string>(name, value);
+}
+
+void CVarSystemImpl::SetVec4CVar(StringHash name, Vec4 value) {
+  SetCVarCurrent<Vec4>(name, value);
 }
 
 CVarParameter* CVarSystemImpl::CreateIntCVar(const char* name,
@@ -231,6 +252,22 @@ CVarParameter* CVarSystemImpl::CreateStringCVar(const char* name,
   param->type = CVarType::kString;
 
   GetCVarArray<std::string>()->Add(default_value, current_value, param);
+
+  AddToEditor(param);
+
+  return param;
+}
+
+CVarParameter* CVarSystemImpl::CreateVec4CVar(const char* name,
+                                              const char* description,
+                                              Vec4 default_value,
+                                              Vec4 current_value) {
+  CVarParameter* param = InitCVar(name, description);
+  if (!param) return nullptr;
+
+  param->type = CVarType::kVec4;
+
+  GetCVarArray<Vec4>()->Add(default_value, current_value, param);
 
   AddToEditor(param);
 
@@ -319,6 +356,22 @@ void AutoCVar_String::Set(std::string&& value) {
   SetCVarCurrentByIndex<CVarType>(index, value);
 }
 
+AutoCVar_Vec4::AutoCVar_Vec4(const char* name, const char* description,
+                             CVarSystem::Vec4 default_value, CVarFlags flags) {
+  CVarParameter* param = CVarSystem::Get()->CreateVec4CVar(
+      name, description, default_value, default_value);
+  param->flags = flags;
+  index = param->array_index;
+}
+
+CVarSystem::Vec4 AutoCVar_Vec4::Get() {
+  return GetCVarCurrentByIndex<CVarType>(index);
+}
+
+void AutoCVar_Vec4::Set(CVarSystem::Vec4&& value) {
+  SetCVarCurrentByIndex<CVarType>(index, value);
+}
+
 void CVarSystemImpl::AddToEditor(CVarParameter* param) {
   bool is_hidden = (param->flags & CVarFlagBits::kNoEdit);
   if (!is_hidden)
@@ -385,8 +438,7 @@ void CVarSystemImpl::DrawImguiEditor() {
   }
 }
 void Label(const char* label, float text_width) {
-  constexpr float kSlack = 50;
-  constexpr float kEditorWidth = 100;
+  constexpr float kSlack = 20;
 
   float full_width = text_width + kSlack;
 
@@ -398,8 +450,6 @@ void Label(const char* label, float text_width) {
 
   ImGui::SameLine();
   ImGui::SetCursorScreenPos(final_pos);
-
-  ImGui::SetNextItemWidth(kEditorWidth);
 }
 void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
   static const ImVec4 kYellow = {1.f, 1.f, 0.f, 1.f};
@@ -470,6 +520,23 @@ void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
             "", GetCVarArray<std::string>()->GetCurrentPtr(p->array_index));
       }
       ImGui::PopID();
+      break;
+    case CVarType::kVec4:
+      if (readonly_flag) {
+        Label(p->name.c_str(), text_width);
+        ImGui::ColorEdit4(
+            "vec4##",
+            reinterpret_cast<float*>(
+                GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)),
+            ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoInputs);
+      } else {
+        ImGui::PushID(p->name.c_str());
+        Label(p->name.c_str(), text_width);
+        ImGui::ColorEdit4(
+            "", reinterpret_cast<float*>(
+                    GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)));
+        ImGui::PopID();
+      }
       break;
     default:
       break;

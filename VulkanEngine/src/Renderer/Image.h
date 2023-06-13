@@ -3,8 +3,8 @@
 #include <vulkan/vulkan.hpp>
 #include <vma\include\vk_mem_alloc.h>
 
-#include "Vulkan/CommandPool.h"
-#include "Vulkan/LogicalDevice.h"
+#include "CommandPool.h"
+#include "LogicalDevice.h"
 
 namespace Renderer {
 

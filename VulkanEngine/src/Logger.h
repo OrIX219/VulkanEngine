@@ -9,7 +9,8 @@
 #include <fmt/include/fmt/core.h>
 #include <fmt/include/fmt/os.h>
 #include <fmt/include/fmt/color.h>
-#include "Vulkan/VulkanInstance.h"
+
+#include "VulkanInstance.h"
 
 #define LOG_FATAL(message, ...) \
   Engine::Logger::Log(Engine::LogType::kFatal, message, ##__VA_ARGS__)

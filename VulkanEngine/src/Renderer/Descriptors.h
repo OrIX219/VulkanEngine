@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Vulkan/LogicalDevice.h"
+#include "LogicalDevice.h"
 
 namespace Renderer {
 

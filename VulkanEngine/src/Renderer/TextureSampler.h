@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "Vulkan/LogicalDevice.h"
+#include "LogicalDevice.h"
 
 namespace Renderer {
 
