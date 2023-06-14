@@ -621,7 +621,7 @@ void VulkanEngine::RecreateSwapchain() {
 }
 
 std::string VulkanEngine::AssetPath(std::string_view path) {
-  return std::string{CVarSystem::Get()->GetStringCVar("assets.path")} + '/' +
+  return *CVarSystem::Get()->GetStringCVar("assets.path") + '/' +
          std::string{path};
 }
 
