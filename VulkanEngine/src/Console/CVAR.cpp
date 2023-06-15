@@ -9,7 +9,15 @@
 
 namespace Engine {
 
-enum class CVarType : char { kInt, kFloat, kString, kVec4 };
+enum class CVarType : char {
+  kInt,
+  kUInt,
+  kFloat,
+  kString,
+  kVec4,
+  kVec3,
+  kVec2
+};
 
 class CVarParameter {
  public:
@@ -113,9 +121,12 @@ class CVarSystemImpl : public CVarSystem {
   CVarArray<T>* GetCVarArray();
 
   REGISTER_CVAR_IMPL(Int, 64)
+  REGISTER_CVAR_IMPL(UInt, 64)
   REGISTER_CVAR_IMPL(Float, 64)
   REGISTER_CVAR_IMPL(String, 64)
   REGISTER_CVAR_IMPL(Vec4, 16)
+  REGISTER_CVAR_IMPL(Vec3, 32)
+  REGISTER_CVAR_IMPL(Vec2, 32)
 
   template <typename T>
   T* GetCVarCurrent(uint32_t name_hash) {
@@ -158,9 +169,12 @@ CVarParameter* CVarSystemImpl::GetCVar(StringHash name) {
 }
 
 CVAR_IMPL(Int)
+CVAR_IMPL(UInt)
 CVAR_IMPL(Float)
 CVAR_IMPL(String)
 CVAR_IMPL(Vec4)
+CVAR_IMPL(Vec3)
+CVAR_IMPL(Vec2)
 
 CVarParameter* CVarSystemImpl::InitCVar(const char* name,
                                         const char* description) {
@@ -212,9 +226,12 @@ void AutoCVar_##type::Set(CVarSystem::type&& value) {                           
 }
 
 AUTO_CVAR_IMLP(Int)
+AUTO_CVAR_IMLP(UInt)
 AUTO_CVAR_IMLP(Float)
 AUTO_CVAR_IMLP(String)
 AUTO_CVAR_IMLP(Vec4)
+AUTO_CVAR_IMLP(Vec3)
+AUTO_CVAR_IMLP(Vec2)
 
 void CVarSystemImpl::AddToEditor(CVarParameter* param) {
   bool is_hidden = (param->flags & CVarFlagBits::kNoEdit);
@@ -381,6 +398,41 @@ void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
                     GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)));
         ImGui::PopID();
       }
+      break;
+    case CVarType::kVec3:
+      if (readonly_flag) {
+        Label(p->name.c_str(), text_width);
+        ImGui::ColorEdit3(
+            "vec3##",
+            reinterpret_cast<float*>(
+                GetCVarArray<Vec3>()->GetCurrentPtr(p->array_index)),
+            ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoInputs);
+      } else {
+        ImGui::PushID(p->name.c_str());
+        Label(p->name.c_str(), text_width);
+        ImGui::ColorEdit3(
+            "", reinterpret_cast<float*>(
+                    GetCVarArray<Vec3>()->GetCurrentPtr(p->array_index)));
+        ImGui::PopID();
+      }
+      break;
+    case CVarType::kVec2:
+      ImGui::PushID(p->name.c_str());
+      if (readonly_flag) {
+        Label(p->name.c_str(), text_width);
+        ImGui::InputFloat2(
+            "",
+            reinterpret_cast<float*>(
+                GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)),
+            "%.3f", ImGuiInputTextFlags_ReadOnly);
+      } else {
+        Label(p->name.c_str(), text_width);
+        ImGui::DragFloat2(
+            "",
+            reinterpret_cast<float*>(
+                GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)));
+      }
+      ImGui::PopID();
       break;
     default:
       break;

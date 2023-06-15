@@ -18,6 +18,9 @@ class IndexBuffer {
   void SetData(CommandBuffer command_buffer,
                const std::vector<uint32_t>& indices);
 
+  void CopyTo(CommandBuffer command_buffer, IndexBuffer& dst,
+              VkDeviceSize offset = 0) const;
+
  private:
   uint32_t indices_count_;
   Buffer<false> buffer_;

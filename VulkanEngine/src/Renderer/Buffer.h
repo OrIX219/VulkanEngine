@@ -23,7 +23,7 @@ class BufferBase {
 template<bool persistently_mapped = false>
 class Buffer : public BufferBase {
  public:
-  Buffer() {}
+  Buffer() : buffer_size_(0) {}
 
   Buffer(VmaAllocator allocator, VkDeviceSize size, VkBufferUsageFlags usage,
          VmaAllocationCreateFlags alloc_flags = 0) {
@@ -80,7 +80,8 @@ class Buffer : public BufferBase {
     }
   }
 
-  void CopyTo(CommandBuffer command_buffer, BufferBase* dst, VkDeviceSize offset = 0) {
+  void CopyTo(CommandBuffer command_buffer, BufferBase* dst,
+              VkDeviceSize offset = 0) const {
     VkBufferCopy copy_region{};
     copy_region.size = buffer_size_;
     copy_region.dstOffset = offset;

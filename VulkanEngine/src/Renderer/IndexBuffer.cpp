@@ -36,4 +36,9 @@ void IndexBuffer::SetData(CommandBuffer command_buffer,
   staging_buffer_.CopyTo(command_buffer, &buffer_);
 }
 
+void IndexBuffer::CopyTo(CommandBuffer command_buffer, IndexBuffer& dst,
+                         VkDeviceSize offset) const {
+  buffer_.CopyTo(command_buffer, &dst.buffer_, offset);
+}
+
 }  // namespace Renderer

@@ -36,4 +36,9 @@ void VertexBuffer::SetData(CommandBuffer command_buffer,
   staging_buffer_.CopyTo(command_buffer, &buffer_);
 }
 
+void VertexBuffer::CopyTo(CommandBuffer command_buffer, VertexBuffer& dst,
+                          VkDeviceSize offset) const {
+  buffer_.CopyTo(command_buffer, &dst.buffer_, offset) ;
+}
+
 }  // namespace Renderer

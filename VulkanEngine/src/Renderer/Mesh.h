@@ -26,6 +26,11 @@ class Mesh {
 
   void BindBuffers(CommandBuffer command_buffer);
 
+  const VertexBuffer& GetVertexBuffer() const;
+  VertexBuffer& GetVertexBuffer();
+  const IndexBuffer& GetIndexBuffer() const;
+  IndexBuffer& GetIndexBuffer();
+
  private:
   VertexBuffer vertex_buffer_;
   IndexBuffer index_buffer_;

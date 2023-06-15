@@ -85,4 +85,13 @@ void Mesh::BindBuffers(CommandBuffer command_buffer) {
                        VK_INDEX_TYPE_UINT32);
 }
 
+const VertexBuffer& Mesh::GetVertexBuffer() const { return vertex_buffer_; }
+
+VertexBuffer& Mesh::GetVertexBuffer() { return vertex_buffer_; }
+
+const IndexBuffer& Mesh::GetIndexBuffer() const {
+  return index_buffer_; }
+
+IndexBuffer& Mesh::GetIndexBuffer() { return index_buffer_; }
+
 }  // namespace Renderer

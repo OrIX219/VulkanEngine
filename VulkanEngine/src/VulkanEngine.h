@@ -17,6 +17,7 @@
 #include "PushBuffer.h"
 #include "RenderObject.h"
 #include "RenderPass.h"
+#include "Scene.h"
 #include "Shaders.h"
 #include "Surface.h"
 #include "Swapchain.h"
@@ -34,10 +35,7 @@
 
 #include <glm\glm.hpp>
 
-namespace Engine {
-
-constexpr uint32_t kMaxFramesInFlight = 2;
-
+namespace Renderer {
 struct CameraData {
   glm::mat4 view;
   glm::mat4 projection;
@@ -55,22 +53,30 @@ struct SceneData {
 struct ObjectData {
   glm::mat4 model_matrix;
 };
+}
+
+namespace Engine {
+
+constexpr uint32_t kMaxFramesInFlight = 2;
 
 struct FrameData {
-  Renderer::CommandPool command_pool_;
+  Renderer::CommandPool command_pool;
 
-  VkSemaphore render_semaphore_, present_semaphore_;
-  VkFence render_fence_;
+  VkSemaphore render_semaphore, present_semaphore;
+  VkFence render_fence;
 
-  Renderer::PushBuffer dynamic_data_;
-  Renderer::Buffer<true> object_buffer_;
+  Renderer::PushBuffer dynamic_data;
+  Renderer::Buffer<true> object_buffer;
 
-  VkDescriptorSet global_descriptor_;
-  VkDescriptorSet object_descriptor_;
+  VkDescriptorSet global_descriptor;
+  VkDescriptorSet object_descriptor;
+
+  DeletionQueue deletion_queue;
 };
 
 class VulkanEngine {
   friend class Renderer::MaterialSystem;
+  friend class Renderer::RenderScene;
  public:
   VulkanEngine();
   ~VulkanEngine();
@@ -80,8 +86,9 @@ class VulkanEngine {
   void Cleanup();
 
   void Draw();
-  void DrawObjects(Renderer::CommandBuffer command_buffer,
-                   Renderer::RenderObject* first, size_t count);
+  void ReadyMeshDraw(Renderer::CommandBuffer command_buffer);
+  void DrawForward(Renderer::CommandBuffer command_buffer,
+                   Renderer::RenderScene::MeshPass& pass);
 
   void DrawMenu();
   void DrawToolbar();
@@ -89,6 +96,8 @@ class VulkanEngine {
 
   void MousePosCallback(double x, double y);
   void KeyCallback(int key, int action, int mods);
+
+  VmaAllocator GetAllocator();
 
  private:
   void InitCVars();
@@ -144,9 +153,12 @@ class VulkanEngine {
   VkDescriptorPool imgui_pool_;
 
   std::array<FrameData, kMaxFramesInFlight> frames_;
-  SceneData scene_data_;
+  Renderer::SceneData scene_data_;
+  Renderer::CommandPool upload_pool_;
 
   Renderer::ShaderCache shader_cache_;
+
+  Renderer::RenderScene render_scene_;
 
   std::vector<Renderer::RenderObject> renderables_;
 

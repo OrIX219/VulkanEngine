@@ -27,6 +27,8 @@ void PushBuffer::Reset() { current_offset_ = 0; }
 
 VkBuffer PushBuffer::GetBuffer() { return buffer_.GetBuffer(); }
 
+VkDeviceSize PushBuffer::GetSize() const { return buffer_.GetSize(); }
+
 uint32_t PushBuffer::PadUniformBufferSize(uint32_t original_size) {
   size_t min_ubo_alignment = align_;
   size_t aligned_size = original_size;

@@ -7,28 +7,25 @@
 
 namespace Renderer {
 
-class RenderObject {
+struct RenderObject {
  public:
-  RenderObject() : model_mat_(1.f) {}
-  RenderObject(Mesh* mesh, Material* material) : model_mat_(1.f) {
+  RenderObject() : model_mat(1.f) {}
+  RenderObject(Mesh* mesh, Material* material) : model_mat(1.f) {
     Create(mesh, material);
   }
 
   void Create(Mesh* mesh, Material* material) { 
-    mesh_ = mesh;
-    material_ = material;
+    this->mesh = mesh;
+    this->material = material;
   }
 
-  glm::mat4& ModelMatrix() { return model_mat_; }
+  Mesh* mesh;
+  Material* material;
 
-  Mesh* GetMesh() { return mesh_; }
-  Material* GetMaterial() { return material_; }
+  glm::mat4 model_mat;
 
- private:
-  Mesh* mesh_;
-  Material* material_;
-
-  glm::mat4 model_mat_;
+  bool draw_forward_pass;
+  bool draw_shadow_pass;
 };
 
 }

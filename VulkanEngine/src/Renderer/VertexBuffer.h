@@ -21,6 +21,9 @@ class VertexBuffer {
   void SetData(CommandBuffer command_buffer,
                const std::vector<Vertex>& vertices);
 
+  void CopyTo(CommandBuffer command_buffer, VertexBuffer& dst,
+              VkDeviceSize offset = 0) const;
+
  private:
   uint32_t vertices_count_;
   Buffer<false> buffer_;

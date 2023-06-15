@@ -144,6 +144,7 @@
     <ClInclude Include="src\VulkanEngine.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\Renderer\Scene.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\src\format.cc">
@@ -260,6 +261,7 @@
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\Renderer\Scene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">

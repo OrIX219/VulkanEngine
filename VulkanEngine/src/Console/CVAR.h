@@ -32,6 +32,7 @@ virtual CVarParameter* Create##type##CVar(const char* name,         \
 class CVarSystem {
  public:
   using Int = int32_t;
+  using UInt = uint32_t;
   using Float = float;
   using String = std::string;
 
@@ -39,12 +40,23 @@ class CVarSystem {
     float x, y, z, w;
   };
 
+  struct Vec3 {
+    float x, y, z;
+  };
+
+  struct Vec2 {
+    float x, y;
+  };
+
   virtual CVarParameter* GetCVar(StringHash name) = 0;
 
   REGISTER_CVAR(Int)
+  REGISTER_CVAR(UInt)
   REGISTER_CVAR(Float)
   REGISTER_CVAR(String)
   REGISTER_CVAR(Vec4)
+  REGISTER_CVAR(Vec3)
+  REGISTER_CVAR(Vec2)
 
   virtual void DrawImguiEditor() = 0;
 
@@ -69,8 +81,11 @@ struct AutoCVar_##type : AutoCVar<CVarSystem::type> {        \
 };
 
 AUTO_CVAR(Int)
+AUTO_CVAR(UInt)
 AUTO_CVAR(Float)
 AUTO_CVAR(String)
 AUTO_CVAR(Vec4)
+AUTO_CVAR(Vec3)
+AUTO_CVAR(Vec2)
 
 }  // namespace Engine

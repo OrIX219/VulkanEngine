@@ -113,6 +113,7 @@
     <ClInclude Include="src\Renderer\Mesh.h" />
     <ClInclude Include="src\Renderer\PushBuffer.h" />
     <ClInclude Include="src\Renderer\RenderObject.h" />
+    <ClInclude Include="src\Renderer\Scene.h" />
     <ClInclude Include="src\Renderer\Texture.h" />
     <ClInclude Include="src\Renderer\TextureSampler.h" />
     <ClInclude Include="src\Renderer\Vertex.h" />
@@ -154,6 +155,7 @@
     <ClCompile Include="src\Renderer\MaterialSystem\Shaders.cpp" />
     <ClCompile Include="src\Renderer\Mesh.cpp" />
     <ClCompile Include="src\Renderer\PushBuffer.cpp" />
+    <ClCompile Include="src\Renderer\Scene.cpp" />
     <ClCompile Include="src\Renderer\Texture.cpp" />
     <ClCompile Include="src\Renderer\TextureSampler.cpp" />
     <ClCompile Include="src\Renderer\VertexBuffer.cpp" />

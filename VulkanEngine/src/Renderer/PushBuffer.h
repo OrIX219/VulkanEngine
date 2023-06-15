@@ -23,6 +23,7 @@ class PushBuffer {
   void Reset();
 
   VkBuffer GetBuffer();
+  VkDeviceSize GetSize() const;
 
  private:
   uint32_t PadUniformBufferSize(uint32_t original_size);

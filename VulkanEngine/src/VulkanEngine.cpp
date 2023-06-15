@@ -126,13 +126,20 @@ void VulkanEngine::Init() {
       &Renderer::SwapchainFramebuffers::Destroy, swapchain_framebuffers_));
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    VK_CHECK(frames_[i].command_pool_.Create(
+    VK_CHECK(frames_[i].command_pool.Create(
         &device_, device_.GetQueueFamilies().graphics_family.value()));
     main_deletion_queue_.PushFunction(
-        std::bind(&Renderer::CommandPool::Destroy, frames_[i].command_pool_));
+        std::bind(&Renderer::CommandPool::Destroy, frames_[i].command_pool));
   }
 
+  VK_CHECK(upload_pool_.Create(
+      &device_, device_.GetQueueFamilies().transfer_family.value()));
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::CommandPool::Destroy, upload_pool_));
+
   shader_cache_.Init(&device_);
+
+  render_scene_.Init();
 
   InitSyncStructures();
   InitDescriptors();
@@ -153,6 +160,9 @@ void VulkanEngine::Init() {
   init_queue.SubmitBatches();
 
   InitImgui(init_pool);
+
+  render_scene_.BuildBatches();
+  //render_scene_.MergeMeshes(this);
 
   device_.WaitIdle();
   is_initialized_ = true;
@@ -294,17 +304,17 @@ void VulkanEngine::InitSyncStructures() {
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(vkCreateFence(device_.GetDevice(), &fence_info, nullptr,
-                           &frames_[i].render_fence_));
+                           &frames_[i].render_fence));
     VK_CHECK(vkCreateSemaphore(device_.GetDevice(), &semaphore_info, nullptr,
-                               &frames_[i].render_semaphore_));
+                               &frames_[i].render_semaphore));
     VK_CHECK(vkCreateSemaphore(device_.GetDevice(), &semaphore_info, nullptr,
-                               &frames_[i].present_semaphore_));
+                               &frames_[i].present_semaphore));
 
     main_deletion_queue_.PushFunction([=]() {
-      vkDestroyFence(device_.GetDevice(), frames_[i].render_fence_, nullptr);
-      vkDestroySemaphore(device_.GetDevice(), frames_[i].render_semaphore_,
+      vkDestroyFence(device_.GetDevice(), frames_[i].render_fence, nullptr);
+      vkDestroySemaphore(device_.GetDevice(), frames_[i].render_semaphore,
                          nullptr);
-      vkDestroySemaphore(device_.GetDevice(), frames_[i].present_semaphore_,
+      vkDestroySemaphore(device_.GetDevice(), frames_[i].present_semaphore,
                          nullptr);
     });
   }
@@ -316,41 +326,41 @@ void VulkanEngine::InitDescriptors() {
 
   const uint32_t kMaxObjects = 10000;
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    VK_CHECK(frames_[i].object_buffer_.Create(
-        allocator_, sizeof(ObjectData) * kMaxObjects,
+    VK_CHECK(frames_[i].object_buffer.Create(
+        allocator_, sizeof(Renderer::ObjectData) * kMaxObjects,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
     main_deletion_queue_.PushFunction(
-        std::bind(&Renderer::Buffer<true>::Destroy, frames_[i].object_buffer_));
+        std::bind(&Renderer::Buffer<true>::Destroy, frames_[i].object_buffer));
   }
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    frames_[i].dynamic_data_.Create(
+    frames_[i].dynamic_data.Create(
         allocator_, 8192,
         static_cast<uint32_t>(physical_device_.GetProperties()
                                   .limits.minUniformBufferOffsetAlignment));
     main_deletion_queue_.PushFunction(
-        std::bind(&Renderer::PushBuffer::Destroy, frames_[i].dynamic_data_));
+        std::bind(&Renderer::PushBuffer::Destroy, frames_[i].dynamic_data));
 
-    VkDescriptorBufferInfo scene_info{};
-    scene_info.buffer = frames_[i].dynamic_data_.GetBuffer();
+    /*VkDescriptorBufferInfo scene_info{};
+    scene_info.buffer = frames_[i].dynamic_data.GetBuffer();
     scene_info.offset = 0;
-    scene_info.range = sizeof(SceneData);
+    scene_info.range = sizeof(Renderer::SceneData);
 
     VkDescriptorBufferInfo object_info{};
-    object_info.buffer = frames_[i].object_buffer_.GetBuffer();
+    object_info.buffer = frames_[i].object_buffer.GetBuffer();
     object_info.offset = 0;
-    object_info.range = sizeof(ObjectData) * kMaxObjects;
+    object_info.range = sizeof(Renderer::ObjectData) * kMaxObjects;
 
     Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
         .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                     VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-        .Build(frames_[i].global_descriptor_);
+        .Build(frames_[i].global_descriptor);
 
     Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
         .BindBuffer(0, &object_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                     VK_SHADER_STAGE_VERTEX_BIT)
-        .Build(frames_[i].object_descriptor_);
+        .Build(frames_[i].object_descriptor);*/
   }
 }
 
@@ -438,6 +448,9 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
     }
   }
 
+  std::vector<Renderer::RenderObject> prefab_renderables;
+  prefab_renderables.reserve(info->node_meshes.size());
+
   for (auto& [key, value] : info->node_meshes) {
     if (!GetMesh(value.mesh_path)) {
       LoadMesh(command_buffer, value.mesh_path.c_str(),
@@ -491,6 +504,10 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
     }
 
     Renderer::RenderObject object;
+
+    object.draw_forward_pass = true;
+    object.draw_shadow_pass = true;
+
     glm::mat4 node_matrix{1.f};
 
     auto matrix_iter = node_world_mats.find(key);
@@ -499,10 +516,14 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
     }
 
     object.Create(GetMesh(value.mesh_path), material);
-    object.ModelMatrix() = node_matrix;
+    object.model_mat = node_matrix;
 
-    renderables_.push_back(object);
+    prefab_renderables.push_back(object);
   }
+
+  render_scene_.RegisterObjectBatch(
+      prefab_renderables.data(),
+      static_cast<uint32_t>(prefab_renderables.size()));
 
   return true;
 }
@@ -663,6 +684,8 @@ void VulkanEngine::KeyCallback(int key, int action, int mods) {
   }
 }
 
+VmaAllocator VulkanEngine::GetAllocator() { return allocator_; }
+
 void VulkanEngine::EnableCursor(bool enable) {
   if (enable == cursor_enabled_) return;
   if (enable) {
@@ -703,6 +726,8 @@ void VulkanEngine::Cleanup() {
 
     Renderer::MaterialSystem::Cleanup();
 
+    render_scene_.Destroy();
+
     shader_cache_.Destroy();
 
     layout_cache_.Destroy();
@@ -726,12 +751,12 @@ void VulkanEngine::Draw() {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
-  VK_CHECK(vkWaitForFences(device_.GetDevice(), 1, &frame.render_fence_,
+  VK_CHECK(vkWaitForFences(device_.GetDevice(), 1, &frame.render_fence,
                            VK_TRUE, UINT64_MAX));
 
   uint32_t image_index;
   VkResult res =
-      swapchain_.AcquireNextImage(&image_index, frame.present_semaphore_);
+      swapchain_.AcquireNextImage(&image_index, frame.present_semaphore);
 
   if (res == VK_ERROR_OUT_OF_DATE_KHR) {
     RecreateSwapchain();
@@ -740,20 +765,22 @@ void VulkanEngine::Draw() {
     VK_CHECK(res);
   }
 
-  VK_CHECK(vkResetFences(device_.GetDevice(), 1, &frame.render_fence_));
+  VK_CHECK(vkResetFences(device_.GetDevice(), 1, &frame.render_fence));
 
-  VK_CHECK(frame.command_pool_.Reset());
-  frame.dynamic_data_.Reset();
+  frame.deletion_queue.Flush();
+  VK_CHECK(frame.command_pool.Reset());
+  frame.dynamic_data.Reset();
 
   ImGui::Render();
 
-  Renderer::CommandBuffer command_buffer = frame.command_pool_.GetBuffer();
+  Renderer::CommandBuffer command_buffer = frame.command_pool.GetBuffer();
   VK_CHECK(command_buffer.Begin());
 
   while (!prefabs_to_load_.empty()) {
     LoadPrefab(command_buffer, AssetPath(prefabs_to_load_.back()).c_str(),
                glm::mat4{1.f});
     prefabs_to_load_.pop_back();
+    render_scene_.BuildBatches();
   }
 
   VkClearValue clear_value{};
@@ -769,6 +796,8 @@ void VulkanEngine::Draw() {
     Renderer::VulkanPipelineStatRecorder stats(command_buffer, &profiler_,
                                                "Total Primitives");
 
+    ReadyMeshDraw(command_buffer);
+
     render_pass_.Begin(command_buffer,
                        swapchain_framebuffers_.GetFramebuffer(image_index),
                        {{0, 0}, swapchain_.GetImageExtent()},
@@ -782,7 +811,7 @@ void VulkanEngine::Draw() {
     vkCmdSetViewport(command_buffer.GetBuffer(), 0, 1, &viewport);
     vkCmdSetScissor(command_buffer.GetBuffer(), 0, 1, &scissors);
 
-    DrawObjects(command_buffer, renderables_.data(), renderables_.size());
+    DrawForward(command_buffer, render_scene_.forward_pass);
 
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
                                     command_buffer.GetBuffer());
@@ -798,12 +827,12 @@ void VulkanEngine::Draw() {
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   submit_info.pWaitDstStageMask = &wait_stage;
   submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores = &frame.present_semaphore_;
+  submit_info.pWaitSemaphores = &frame.present_semaphore;
   submit_info.signalSemaphoreCount = 1;
-  submit_info.pSignalSemaphores = &frame.render_semaphore_;
+  submit_info.pSignalSemaphores = &frame.render_semaphore;
   command_buffer.Submit(std::move(submit_info));
 
-  VK_CHECK(device_.GetGraphicsQueue().SubmitBatches(frame.render_fence_));
+  VK_CHECK(device_.GetGraphicsQueue().SubmitBatches(frame.render_fence));
 
   VkPresentInfoKHR present_info{};
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -811,7 +840,7 @@ void VulkanEngine::Draw() {
   present_info.swapchainCount = 1;
   present_info.pSwapchains = swapchains;
   present_info.waitSemaphoreCount = 1;
-  present_info.pWaitSemaphores = &frame.render_semaphore_;
+  present_info.pWaitSemaphores = &frame.render_semaphore;
   present_info.pImageIndices = &image_index;
 
   res = device_.GetPresentQueue().Present(&present_info);
@@ -827,8 +856,50 @@ void VulkanEngine::Draw() {
   frame_number_++;
 }
 
-void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
-                               Renderer::RenderObject* first, size_t count) {
+void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
+
+  if (render_scene_.dirty_objects.size() > 0) {
+
+    // Realloc if not enough space
+    size_t copy_size =
+        render_scene_.renderables.size() * sizeof(Renderer::ObjectData);
+    if (copy_size > render_scene_.object_data_buffer.GetSize()) {
+      frame.deletion_queue.PushFunction(std::bind(
+          &Renderer::Buffer<false>::Destroy, render_scene_.object_data_buffer));
+      render_scene_.object_data_buffer.Create(
+          allocator_, copy_size,
+          VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    }
+
+    // Full reupload if too much changed
+    constexpr float kFullReuploadCoefficient = 0.1f; // For now reupload every time
+    if (render_scene_.dirty_objects.size() >=
+        render_scene_.renderables.size() * kFullReuploadCoefficient) {
+      Renderer::Buffer<true> staging_buffer;
+      staging_buffer.Create(
+          allocator_, copy_size,
+          VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+      Renderer::ObjectData* object_ssbo =
+          reinterpret_cast<Renderer::ObjectData*>(
+              staging_buffer.GetMappedMemory());
+      render_scene_.FillObjectData(object_ssbo);
+
+      frame.deletion_queue.PushFunction(
+          std::bind(&Renderer::Buffer<true>::Destroy, staging_buffer));
+
+      staging_buffer.CopyTo(command_buffer, &render_scene_.object_data_buffer);
+    }
+
+    render_scene_.ClearDirtyObjects();
+  }
+}
+
+void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
+                               Renderer::RenderScene::MeshPass& pass) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
@@ -843,60 +914,129 @@ void VulkanEngine::DrawObjects(Renderer::CommandBuffer command_buffer,
   scene_data_.ambient_color = {ambient_color->x, ambient_color->y,
                                ambient_color->z, ambient_color->w};
 
-  uint32_t uniform_offset = frame.dynamic_data_.Push(scene_data_);
+  uint32_t scene_data_offset = frame.dynamic_data.Push(scene_data_);
 
-  ObjectData* object_SSBO =
-      static_cast<ObjectData*>(frame.object_buffer_.GetMappedMemory());
+  VkDescriptorBufferInfo object_buffer_info{};
+  object_buffer_info.buffer = render_scene_.object_data_buffer.GetBuffer();
+  object_buffer_info.range = render_scene_.object_data_buffer.GetSize();
+
+  VkDescriptorBufferInfo scene_info{};
+  scene_info.buffer = frame.dynamic_data.GetBuffer();
+  scene_info.range = sizeof(Renderer::SceneData);
+
+  Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
+      .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                  VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+      .Build(frame.global_descriptor);
+
+  Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
+      .BindBuffer(0, &object_buffer_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                  VK_SHADER_STAGE_VERTEX_BIT)
+      .Build(frame.object_descriptor);
+
+  std::vector<uint32_t> dynamic_offsets;
+  dynamic_offsets.push_back(scene_data_offset);
+
+
+  /*Renderer::ObjectData* object_SSBO = static_cast<Renderer::ObjectData*>(
+      frame.object_buffer.GetMappedMemory());
   for (size_t i = 0; i < count; ++i) {
     Renderer::RenderObject& object = first[i];
-    object_SSBO[i].model_matrix = object.ModelMatrix();
+    object_SSBO[i].model_matrix = object.model_mat;
+  }*/
+
+  if (pass.batches.size() > 0) {
+    Renderer::Mesh* last_mesh = nullptr;
+    Renderer::Material* last_material = nullptr;
+    VkPipeline last_pipeline = nullptr;
+    VkDescriptorSet last_material_set = nullptr;
+
+    /*VkDeviceSize offset = 0;
+    VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.GetBuffer();
+    vkCmdBindVertexBuffers(command_buffer.GetBuffer(), 0, 1, &vertex_buffer,
+                           &offset);
+    vkCmdBindIndexBuffer(command_buffer.GetBuffer(),
+                         render_scene_.merged_index_buffer.GetBuffer(), 0,
+                         VK_INDEX_TYPE_UINT32);*/
+
+    for (size_t i = 0; i < pass.multibatches.size(); ++i) {
+      auto& multibatch = pass.multibatches[i];
+
+      Renderer::RenderScene::PassObject* object =
+          pass.Get(pass.batches[multibatch.first].object);
+
+      VkPipeline new_pipeline = object->material.shader_pass->pipeline;
+      VkPipelineLayout new_layout =
+          object->material.shader_pass->pipeline_layout;
+      VkDescriptorSet new_material_set = object->material.material_set;
+
+      Renderer::Mesh* draw_mesh = render_scene_.GetMesh(object->mesh_id)->mesh;
+
+      if (new_pipeline != last_pipeline) {
+        last_pipeline = new_pipeline;
+        vkCmdBindPipeline(command_buffer.GetBuffer(),
+                          VK_PIPELINE_BIND_POINT_GRAPHICS, new_pipeline);
+        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                                VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 0,
+                                1, &frame.global_descriptor,
+                                dynamic_offsets.size(), dynamic_offsets.data());
+        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                                VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 1,
+                                1, &frame.object_descriptor, 0, nullptr);
+      }
+
+      if (new_material_set != last_material_set) {
+        last_material_set = new_material_set;
+        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                                VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 2,
+                                1, &new_material_set, 0, nullptr);
+      }
+
+      bool merged = render_scene_.GetMesh(object->mesh_id)->is_merged;
+
+      if (merged) {
+        if (last_mesh != nullptr) {
+          VkDeviceSize offset = 0;
+          VkBuffer vertex_buffer =
+              render_scene_.merged_vertex_buffer.GetBuffer();
+          vkCmdBindVertexBuffers(command_buffer.GetBuffer(), 0, 1,
+                                 &vertex_buffer, &offset);
+          vkCmdBindIndexBuffer(command_buffer.GetBuffer(),
+                               render_scene_.merged_index_buffer.GetBuffer(), 0,
+                               VK_INDEX_TYPE_UINT32);
+          last_mesh = nullptr;
+        }
+      } else if (last_mesh != draw_mesh) {
+        VkDeviceSize offset = 0;
+        VkBuffer vertex_buffer = draw_mesh->GetVertexBuffer().GetBuffer();
+        vkCmdBindVertexBuffers(command_buffer.GetBuffer(), 0, 1, &vertex_buffer,
+                               &offset);
+        vkCmdBindIndexBuffer(command_buffer.GetBuffer(),
+                             draw_mesh->GetIndexBuffer().GetBuffer(), 0,
+                             VK_INDEX_TYPE_UINT32);
+        last_mesh = draw_mesh;
+      }
+
+      bool has_indices = draw_mesh->GetIndicesCount() > 0;
+      if (!has_indices) {
+        vkCmdDraw(command_buffer.GetBuffer(), draw_mesh->GetVerticesCount(), 1,
+                  0, pass.batches[i].object.handle);
+      } else {
+        vkCmdDrawIndexed(command_buffer.GetBuffer(),
+                         draw_mesh->GetIndicesCount(), 1, 0, 0,
+                         pass.batches[i].object.handle);
+      }
+
+      /*if (object.mesh != last_mesh) {
+        object.mesh->BindBuffers(command_buffer);
+        last_mesh = object.mesh;
+      }
+
+      vkCmdDrawIndexed(command_buffer.GetBuffer(),
+                       object.mesh->GetIndicesCount(), 1, 0, 0, i);*/
+    }
   }
 
-  Renderer::Mesh* last_mesh = nullptr;
-  Renderer::Material* last_material = nullptr;
-  VkPipeline last_pipeline = nullptr;
-  VkDescriptorSet last_material_set = nullptr;
-  for (uint32_t i = 0; i < count; ++i) {
-    Renderer::RenderObject& object = first[i];
-
-    Renderer::Mesh* new_mesh = object.GetMesh();
-    Renderer::Material* new_material = object.GetMaterial();
-    VkPipeline new_pipeline =
-        new_material->original->pass_shaders[Renderer::MeshPassType::kForward]
-            ->pipeline;
-    VkPipelineLayout new_layout =
-        new_material->original->pass_shaders[Renderer::MeshPassType::kForward]
-            ->pipeline_layout;
-    VkDescriptorSet new_material_set =
-        new_material->pass_sets[Renderer::MeshPassType::kForward];
-
-    if (new_pipeline != last_pipeline) {
-      last_pipeline = new_pipeline;
-      vkCmdBindPipeline(command_buffer.GetBuffer(),
-                        VK_PIPELINE_BIND_POINT_GRAPHICS, new_pipeline);
-      vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                              VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 0, 1,
-                              &frame.global_descriptor_, 1, &uniform_offset);
-      vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                              VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 1, 1,
-                              &frame.object_descriptor_, 0, nullptr);
-    }
-
-    if (new_material_set != last_material_set) {
-      last_material_set = new_material_set;
-      vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                              VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 2, 1,
-                              &new_material_set, 0, nullptr);
-    }
-
-    if (object.GetMesh() != last_mesh) {
-      object.GetMesh()->BindBuffers(command_buffer);
-      last_mesh = object.GetMesh();
-    }
-
-    vkCmdDrawIndexed(command_buffer.GetBuffer(),
-                     object.GetMesh()->GetIndicesCount(), 1, 0, 0, i);
-  }
 }
 
 void VulkanEngine::DrawMenu() {
