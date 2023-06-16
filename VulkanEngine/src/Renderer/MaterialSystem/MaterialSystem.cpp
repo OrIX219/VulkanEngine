@@ -78,9 +78,9 @@ void MaterialSystem::BuildDefaultTemplates() {
   FillBuilders();
 
   ShaderEffect* textured_lit =
-      BuildEffect("tri_mesh.vert.spv", "textured_lit.frag.spv");
+      BuildEffect("mesh_instanced.vert.spv", "textured_lit.frag.spv");
   ShaderEffect* default_lit =
-      BuildEffect("tri_mesh.vert.spv", "default_lit.frag.spv");
+      BuildEffect("mesh_instanced.vert.spv", "default_lit.frag.spv");
 
   ShaderPass* textured_lit_pass = BuildShader(
       &system.engine_->render_pass_, system.forward_builder_, textured_lit);

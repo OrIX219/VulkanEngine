@@ -11,7 +11,9 @@ IndexBuffer::IndexBuffer(VmaAllocator allocator, uint64_t size) {
 void IndexBuffer::Create(VmaAllocator allocator, uint64_t size) {
   buffer_.Create(
       allocator, size,
-      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                     VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
   staging_buffer_.Create(
       allocator, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);

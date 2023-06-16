@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <functional>
+#include <future>
 
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vk_enum_string_helper.h>
@@ -157,12 +158,13 @@ void VulkanEngine::Init() {
   InitScene(init_pool);
   init_queue.EndBatch();
 
-  init_queue.SubmitBatches();
-
   InitImgui(init_pool);
 
   render_scene_.BuildBatches();
-  //render_scene_.MergeMeshes(this);
+  render_scene_.MergeMeshes(this);
+
+  init_queue.SubmitBatches();
+  device_.GetTransferQueue().SubmitBatches();  
 
   device_.WaitIdle();
   is_initialized_ = true;
@@ -341,26 +343,6 @@ void VulkanEngine::InitDescriptors() {
                                   .limits.minUniformBufferOffsetAlignment));
     main_deletion_queue_.PushFunction(
         std::bind(&Renderer::PushBuffer::Destroy, frames_[i].dynamic_data));
-
-    /*VkDescriptorBufferInfo scene_info{};
-    scene_info.buffer = frames_[i].dynamic_data.GetBuffer();
-    scene_info.offset = 0;
-    scene_info.range = sizeof(Renderer::SceneData);
-
-    VkDescriptorBufferInfo object_info{};
-    object_info.buffer = frames_[i].object_buffer.GetBuffer();
-    object_info.offset = 0;
-    object_info.range = sizeof(Renderer::ObjectData) * kMaxObjects;
-
-    Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
-        .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-        .Build(frames_[i].global_descriptor);
-
-    Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
-        .BindBuffer(0, &object_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                    VK_SHADER_STAGE_VERTEX_BIT)
-        .Build(frames_[i].object_descriptor);*/
   }
 }
 
@@ -875,7 +857,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
     }
 
     // Full reupload if too much changed
-    constexpr float kFullReuploadCoefficient = 0.1f; // For now reupload every time
+    constexpr float kFullReuploadCoefficient = 0.f; // For now reupload every time
     if (render_scene_.dirty_objects.size() >=
         render_scene_.renderables.size() * kFullReuploadCoefficient) {
       Renderer::Buffer<true> staging_buffer;
@@ -892,9 +874,145 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
           std::bind(&Renderer::Buffer<true>::Destroy, staging_buffer));
 
       staging_buffer.CopyTo(command_buffer, &render_scene_.object_data_buffer);
+    } else {
+      // TODO
     }
 
+    VkBufferMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    barrier.buffer = render_scene_.object_data_buffer.GetBuffer();
+    barrier.size = render_scene_.object_data_buffer.GetSize();
+    barrier.dstQueueFamilyIndex =
+        device_.GetQueueFamilies().graphics_family.value();
+    barrier.srcQueueFamilyIndex =
+        device_.GetQueueFamilies().graphics_family.value();
+    barrier.dstAccessMask =
+        VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    upload_barriers_.push_back(barrier);
+
     render_scene_.ClearDirtyObjects();
+
+    Renderer::RenderScene::MeshPass* passes[3] = {
+        &render_scene_.forward_pass, &render_scene_.transparent_pass,
+        &render_scene_.shadow_pass};
+
+    for (size_t i = 0; i < 3; ++i) {
+      Renderer::RenderScene::MeshPass& pass = *passes[i];
+
+      uint32_t draw_indirect_size =
+          pass.indirect_batches.size() * sizeof(Renderer::GPUIndirectObject);
+      if (pass.draw_indirect_buffer.GetSize() < draw_indirect_size) {
+        frame.deletion_queue.PushFunction(std::bind(
+            &Renderer::Buffer<true>::Destroy, pass.draw_indirect_buffer));
+        pass.draw_indirect_buffer.Create(
+            allocator_, draw_indirect_size,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+      }
+
+      uint32_t compacted_instance_size = pass.batches.size() * sizeof(uint32_t);
+      if (pass.compacted_instance_buffer.GetSize() < compacted_instance_size) {
+        frame.deletion_queue.PushFunction(std::bind(
+            &Renderer::Buffer<true>::Destroy, pass.compacted_instance_buffer));
+        pass.compacted_instance_buffer.Create(
+            allocator_, compacted_instance_size,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+      }
+
+      uint32_t pass_objects_size =
+          pass.batches.size() * sizeof(Renderer::GPUInstance);
+      if (pass.pass_objects_buffer.GetSize() < pass_objects_size) {
+        frame.deletion_queue.PushFunction(std::bind(
+            &Renderer::Buffer<false>::Destroy, pass.pass_objects_buffer));
+        pass.pass_objects_buffer.Create(
+            allocator_, pass_objects_size,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+      }
+    }
+
+    std::vector<std::future<void>> async_calls;
+    async_calls.reserve(9);
+    
+    for (size_t i = 0; i < 3; ++i) {
+      Renderer::RenderScene::MeshPass* pass = passes[i];
+      
+      Renderer::RenderScene* scene = &render_scene_;
+      if (pass->needs_indirect_refresh && pass->indirect_batches.size() > 0) {
+        if (pass->clear_indirect_buffer.GetBuffer() != VK_NULL_HANDLE) {
+          frame.deletion_queue.PushFunction(std::bind(
+              &Renderer::Buffer<true>::Destroy, pass->clear_indirect_buffer));
+        }
+        pass->clear_indirect_buffer.Create(
+            allocator_,
+            sizeof(Renderer::GPUIndirectObject) * pass->indirect_batches.size(),
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+        Renderer::GPUIndirectObject* indirect =
+            reinterpret_cast<Renderer::GPUIndirectObject*>(
+                pass->clear_indirect_buffer.GetMappedMemory());
+
+        async_calls.push_back(std::async(std::launch::async, [=]() {
+          scene->FillIndirectArray(indirect, *pass);
+        }));
+
+        pass->needs_indirect_refresh = false;
+      }
+
+      if (pass->needs_instance_refresh && pass->batches.size() > 0) {
+        Renderer::Buffer<true> staging;
+        staging.Create(
+            allocator_, sizeof(Renderer::GPUInstance) * pass->batches.size(),
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+        frame.deletion_queue.PushFunction(
+            std::bind(&Renderer::Buffer<true>::Destroy, staging));
+
+        Renderer::GPUInstance* instance =
+            reinterpret_cast<Renderer::GPUInstance*>(staging.GetMappedMemory());
+
+        async_calls.push_back(std::async(std::launch::async, [=]() {
+          scene->FillInstanceArray(instance, *pass);
+        }));
+
+        staging.CopyTo(command_buffer, &pass->pass_objects_buffer);
+
+        VkBufferMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+        barrier.buffer = pass->pass_objects_buffer.GetBuffer();
+        barrier.size = pass->pass_objects_buffer.GetSize();
+        barrier.dstQueueFamilyIndex =
+            device_.GetQueueFamilies().graphics_family.value();
+        barrier.srcQueueFamilyIndex =
+            device_.GetQueueFamilies().graphics_family.value();
+        barrier.dstAccessMask =
+            VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        upload_barriers_.push_back(barrier);
+
+        pass->needs_instance_refresh = false;
+      }
+    }
+
+    for (auto& call : async_calls) call.get();
+
+    vkCmdPipelineBarrier(command_buffer.GetBuffer(),
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr,
+                         static_cast<uint32_t>(upload_barriers_.size()),
+                         upload_barriers_.data(), 0, nullptr);
+    upload_barriers_.clear();
   }
 }
 
@@ -924,6 +1042,10 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   scene_info.buffer = frame.dynamic_data.GetBuffer();
   scene_info.range = sizeof(Renderer::SceneData);
 
+  VkDescriptorBufferInfo instance_info{};
+  instance_info.buffer = pass.pass_objects_buffer.GetBuffer();
+  instance_info.range = pass.pass_objects_buffer.GetSize();
+
   Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
       .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -932,45 +1054,37 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
       .BindBuffer(0, &object_buffer_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                   VK_SHADER_STAGE_VERTEX_BIT)
+      .BindBuffer(1, &instance_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                  VK_SHADER_STAGE_VERTEX_BIT)
       .Build(frame.object_descriptor);
 
   std::vector<uint32_t> dynamic_offsets;
   dynamic_offsets.push_back(scene_data_offset);
 
-
-  /*Renderer::ObjectData* object_SSBO = static_cast<Renderer::ObjectData*>(
-      frame.object_buffer.GetMappedMemory());
-  for (size_t i = 0; i < count; ++i) {
-    Renderer::RenderObject& object = first[i];
-    object_SSBO[i].model_matrix = object.model_mat;
-  }*/
-
-  if (pass.batches.size() > 0) {
+  if (pass.indirect_batches.size() > 0) {
     Renderer::Mesh* last_mesh = nullptr;
     Renderer::Material* last_material = nullptr;
     VkPipeline last_pipeline = nullptr;
     VkDescriptorSet last_material_set = nullptr;
 
-    /*VkDeviceSize offset = 0;
+    VkDeviceSize offset = 0;
     VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.GetBuffer();
     vkCmdBindVertexBuffers(command_buffer.GetBuffer(), 0, 1, &vertex_buffer,
                            &offset);
     vkCmdBindIndexBuffer(command_buffer.GetBuffer(),
                          render_scene_.merged_index_buffer.GetBuffer(), 0,
-                         VK_INDEX_TYPE_UINT32);*/
+                         VK_INDEX_TYPE_UINT32);
 
     for (size_t i = 0; i < pass.multibatches.size(); ++i) {
       auto& multibatch = pass.multibatches[i];
+      auto& instance = pass.indirect_batches[multibatch.first];
 
-      Renderer::RenderScene::PassObject* object =
-          pass.Get(pass.batches[multibatch.first].object);
-
-      VkPipeline new_pipeline = object->material.shader_pass->pipeline;
+      VkPipeline new_pipeline = instance.material.shader_pass->pipeline;
       VkPipelineLayout new_layout =
-          object->material.shader_pass->pipeline_layout;
-      VkDescriptorSet new_material_set = object->material.material_set;
+          instance.material.shader_pass->pipeline_layout;
+      VkDescriptorSet new_material_set = instance.material.material_set;
 
-      Renderer::Mesh* draw_mesh = render_scene_.GetMesh(object->mesh_id)->mesh;
+      Renderer::Mesh* draw_mesh = render_scene_.GetMesh(instance.mesh_id)->mesh;
 
       if (new_pipeline != last_pipeline) {
         last_pipeline = new_pipeline;
@@ -992,8 +1106,7 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
                                 1, &new_material_set, 0, nullptr);
       }
 
-      bool merged = render_scene_.GetMesh(object->mesh_id)->is_merged;
-
+      bool merged = render_scene_.GetMesh(instance.mesh_id)->is_merged;
       if (merged) {
         if (last_mesh != nullptr) {
           VkDeviceSize offset = 0;
@@ -1019,21 +1132,14 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
       bool has_indices = draw_mesh->GetIndicesCount() > 0;
       if (!has_indices) {
-        vkCmdDraw(command_buffer.GetBuffer(), draw_mesh->GetVerticesCount(), 1,
-                  0, pass.batches[i].object.handle);
+        vkCmdDraw(command_buffer.GetBuffer(), draw_mesh->GetVerticesCount(),
+                  instance.count, 0, instance.first);
       } else {
-        vkCmdDrawIndexed(command_buffer.GetBuffer(),
-                         draw_mesh->GetIndicesCount(), 1, 0, 0,
-                         pass.batches[i].object.handle);
+        vkCmdDrawIndexedIndirect(
+            command_buffer.GetBuffer(), pass.clear_indirect_buffer.GetBuffer(),
+            multibatch.first * sizeof(Renderer::GPUIndirectObject),
+            multibatch.count, sizeof(Renderer::GPUIndirectObject));
       }
-
-      /*if (object.mesh != last_mesh) {
-        object.mesh->BindBuffers(command_buffer);
-        last_mesh = object.mesh;
-      }
-
-      vkCmdDrawIndexed(command_buffer.GetBuffer(),
-                       object.mesh->GetIndicesCount(), 1, 0, 0, i);*/
     }
   }
 

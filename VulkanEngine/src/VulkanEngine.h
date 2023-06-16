@@ -156,11 +156,11 @@ class VulkanEngine {
   Renderer::SceneData scene_data_;
   Renderer::CommandPool upload_pool_;
 
+  std::vector<VkBufferMemoryBarrier> upload_barriers_;
+
   Renderer::ShaderCache shader_cache_;
 
   Renderer::RenderScene render_scene_;
-
-  std::vector<Renderer::RenderObject> renderables_;
 
   std::unordered_map<std::string, Renderer::Material> materials_;
   std::unordered_map<std::string, Renderer::Mesh> meshes_;
