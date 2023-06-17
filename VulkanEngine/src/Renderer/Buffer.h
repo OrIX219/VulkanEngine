@@ -11,19 +11,21 @@ namespace Renderer {
 
 class BufferBase {
  public:
-  BufferBase() : buffer_(VK_NULL_HANDLE) {}
+  BufferBase() : buffer_(VK_NULL_HANDLE), buffer_size_(0) {}
 
   VkBuffer GetBuffer() { return buffer_; }
+  VkDeviceSize GetSize() const { return buffer_size_; }
 
  protected:
   VkBuffer buffer_;
+  VkDeviceSize buffer_size_;
   VmaAllocation allocation_;
 };
 
 template<bool persistently_mapped = false>
 class Buffer : public BufferBase {
  public:
-  Buffer() : buffer_size_(0) {}
+  Buffer() {}
 
   Buffer(VmaAllocator allocator, VkDeviceSize size, VkBufferUsageFlags usage,
          VmaAllocationCreateFlags alloc_flags = 0) {
@@ -65,8 +67,6 @@ class Buffer : public BufferBase {
     buffer_ = VK_NULL_HANDLE;
   }
 
-  VkDeviceSize GetSize() const { return buffer_size_; }
-
   void* GetMappedMemory() { return mapped_memory_; }
 
   void SetData(const void* data, size_t size, VkDeviceSize offset = 0) {
@@ -105,9 +105,6 @@ class Buffer : public BufferBase {
         command_buffer.GetBuffer(), buffer_, image->GetImage(),
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
   }
-
- protected:
-  VkDeviceSize buffer_size_;
 
  private:
   VmaAllocator allocator_;

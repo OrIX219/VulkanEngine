@@ -118,6 +118,7 @@
     <ClInclude Include="src\Renderer\TextureSampler.h" />
     <ClInclude Include="src\Renderer\Vertex.h" />
     <ClInclude Include="src\Renderer\VertexBuffer.h" />
+    <ClInclude Include="src\Renderer\Vulkan\PipelineBarriers.h" />
     <ClInclude Include="src\Renderer\Vulkan\CommandBuffer.h" />
     <ClInclude Include="src\Renderer\Vulkan\CommandPool.h" />
     <ClInclude Include="src\Renderer\Vulkan\LogicalDevice.h" />
@@ -164,6 +165,7 @@
     <ClCompile Include="src\Renderer\Vulkan\LogicalDevice.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\PhysicalDevice.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\Pipeline.cpp" />
+    <ClCompile Include="src\Renderer\Vulkan\PipelineBarriers.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\Queue.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\RenderPass.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\Surface.cpp" />

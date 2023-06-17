@@ -22,6 +22,7 @@
 
 #include "Console/CVAR.h"
 #include "Logger.h"
+#include "PipelineBarriers.h"
 
 #include "MaterialAsset.h"
 
@@ -943,19 +944,14 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
       // TODO
     }
 
-    VkBufferMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    barrier.buffer = render_scene_.object_data_buffer.GetBuffer();
-    barrier.size = render_scene_.object_data_buffer.GetSize();
-    barrier.dstQueueFamilyIndex =
-        device_.GetQueueFamilies().graphics_family.value();
-    barrier.srcQueueFamilyIndex =
-        device_.GetQueueFamilies().graphics_family.value();
-    barrier.dstAccessMask =
-        VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    Renderer::BufferMemoryBarrier barrier(
+        render_scene_.object_data_buffer,
+        device_.GetQueueFamilies().graphics_family.value());
+    barrier.SetSrcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+    barrier.SetDstAccessMask(VK_ACCESS_SHADER_WRITE_BIT |
+                             VK_ACCESS_SHADER_READ_BIT);
 
-    upload_barriers_.push_back(barrier);
+    upload_barriers_.push_back(barrier.GetBarrier());
 
     render_scene_.ClearDirtyObjects();
 
@@ -1077,19 +1073,14 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 
         staging.CopyTo(command_buffer, &pass->pass_objects_buffer);
 
-        VkBufferMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        barrier.buffer = pass->pass_objects_buffer.GetBuffer();
-        barrier.size = pass->pass_objects_buffer.GetSize();
-        barrier.dstQueueFamilyIndex =
-            device_.GetQueueFamilies().graphics_family.value();
-        barrier.srcQueueFamilyIndex =
-            device_.GetQueueFamilies().graphics_family.value();
-        barrier.dstAccessMask =
-            VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        Renderer::BufferMemoryBarrier barrier(
+            pass->pass_objects_buffer,
+            device_.GetQueueFamilies().graphics_family.value());
+        barrier.SetSrcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+        barrier.SetDstAccessMask(VK_ACCESS_SHADER_WRITE_BIT |
+                                 VK_ACCESS_SHADER_READ_BIT);
 
-        upload_barriers_.push_back(barrier);
+        upload_barriers_.push_back(barrier.GetBarrier());
 
         pass->needs_instance_refresh = false;
       }
@@ -1117,32 +1108,16 @@ void VulkanEngine::ReadyComputeData(Renderer::CommandBuffer command_buffer,
 
   pass.clear_count_buffer.CopyTo(command_buffer, &pass.count_buffer);
 
-  VkBufferMemoryBarrier barrier{};
-  barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-  barrier.buffer = pass.draw_indirect_buffer.GetBuffer();
-  barrier.size = pass.draw_indirect_buffer.GetSize();
-  barrier.dstQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier.srcQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier.dstAccessMask =
-      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  Renderer::BufferMemoryBarrier barrier(
+      pass.draw_indirect_buffer,
+      device_.GetQueueFamilies().graphics_family.value());
+  barrier.SetSrcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
+  barrier.SetDstAccessMask(VK_ACCESS_SHADER_WRITE_BIT |
+                           VK_ACCESS_SHADER_READ_BIT);
+  pre_compute_barriers_.push_back(barrier.GetBarrier());
 
-  VkBufferMemoryBarrier barrier2{};
-  barrier2.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-  barrier2.buffer = pass.count_buffer.GetBuffer();
-  barrier2.size = pass.count_buffer.GetSize();
-  barrier2.dstQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier2.srcQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier2.dstAccessMask =
-      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-  barrier2.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-  pre_compute_barriers_.push_back(barrier);
-  pre_compute_barriers_.push_back(barrier2);
+  barrier.SetBuffer(pass.count_buffer);
+  pre_compute_barriers_.push_back(barrier.GetBarrier());
 }
 
 void VulkanEngine::ExecuteCompute(Renderer::CommandBuffer command_buffer,
@@ -1191,42 +1166,18 @@ void VulkanEngine::ExecuteCompute(Renderer::CommandBuffer command_buffer,
   vkCmdDispatch(command_buffer.GetBuffer(),
                 static_cast<uint32_t>(pass.batches.size() / 256 + 1), 1, 1);
 
-  VkBufferMemoryBarrier barrier{};
-  barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-  barrier.buffer = pass.draw_indirect_buffer.GetBuffer();
-  barrier.size = pass.draw_indirect_buffer.GetSize();
-  barrier.dstQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier.srcQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-  barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+  Renderer::BufferMemoryBarrier barrier(
+      render_scene_.object_data_buffer,
+      device_.GetQueueFamilies().graphics_family.value());
+  barrier.SetSrcAccessMask(VK_ACCESS_SHADER_WRITE_BIT);
+  barrier.SetDstAccessMask(VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
+  post_compute_barriers_.push_back(barrier.GetBarrier());
 
-  VkBufferMemoryBarrier barrier2{};
-  barrier2.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-  barrier2.buffer = pass.compacted_instance_buffer.GetBuffer();
-  barrier2.size = pass.compacted_instance_buffer.GetSize();
-  barrier2.dstQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier2.srcQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier2.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-  barrier2.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+  barrier.SetBuffer(pass.compacted_instance_buffer);
+  post_compute_barriers_.push_back(barrier.GetBarrier());
 
-  VkBufferMemoryBarrier barrier3{};
-  barrier3.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-  barrier3.buffer = pass.count_buffer.GetBuffer();
-  barrier3.size = pass.count_buffer.GetSize();
-  barrier3.dstQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier3.srcQueueFamilyIndex =
-      device_.GetQueueFamilies().graphics_family.value();
-  barrier3.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-  barrier3.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-
-  post_compute_barriers_.push_back(barrier);
-  post_compute_barriers_.push_back(barrier2);
-  post_compute_barriers_.push_back(barrier3);
+  barrier.SetBuffer(pass.count_buffer);
+  post_compute_barriers_.push_back(barrier.GetBarrier());
 }
 
 void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
