@@ -22,8 +22,8 @@ struct Handle {
   uint32_t handle;
 };
 
+class Mesh;
 struct RenderObject;
-struct Mesh;
 struct ObjectData;
 
 struct GPUIndirectObject {

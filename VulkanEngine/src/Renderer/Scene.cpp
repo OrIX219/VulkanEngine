@@ -124,7 +124,7 @@ void RenderScene::FillIndirectArray(GPUIndirectObject* data, MeshPass& pass) {
     data[i].command.vertexOffset = GetMesh(batch.mesh_id)->first_vertex;
     data[i].command.indexCount = GetMesh(batch.mesh_id)->index_count;
     data[i].object_id = 0;
-    data[i].batch_id = i;
+    data[i].batch_id = static_cast<uint32_t>(i);
   }
 }
 
@@ -135,7 +135,7 @@ void RenderScene::FillInstanceArray(GPUInstance* data, MeshPass& pass) {
     for (size_t j = 0; j < batch.count; ++j) {
       data[data_idx].object_id =
           pass.Get(pass.batches[j + batch.first].object)->original.handle;
-      data[data_idx].batch_id = i;
+      data[data_idx].batch_id = static_cast<uint32_t>(i);
       ++data_idx;
     }
   }
@@ -197,7 +197,7 @@ void RenderScene::BuildIndirectBatches(MeshPass* pass,
     if (same_mesh && same_material) {
       ++back->count;
     } else {
-      new_batch.first = i;
+      new_batch.first = static_cast<uint32_t>(i);
       new_batch.count = 1;
       new_batch.mesh_id = obj->mesh_id;
       out_batches.push_back(new_batch);
@@ -395,7 +395,7 @@ void RenderScene::RefreshPass(MeshPass* pass) {
       ++new_batch.count;
     } else {
       pass->multibatches.push_back(new_batch);
-      new_batch.first = i;
+      new_batch.first = static_cast<uint32_t>(i);
       new_batch.count = 1;
     }
   }

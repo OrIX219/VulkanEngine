@@ -976,8 +976,8 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
     for (size_t i = 0; i < 3; ++i) {
       Renderer::RenderScene::MeshPass& pass = *passes[i];
 
-      uint32_t draw_indirect_size =
-          pass.indirect_batches.size() * sizeof(Renderer::GPUIndirectObject);
+      uint32_t draw_indirect_size = static_cast<uint32_t>(
+          pass.indirect_batches.size() * sizeof(Renderer::GPUIndirectObject));
       if (pass.draw_indirect_buffer.GetSize() < draw_indirect_size) {
         frame.deletion_queue.PushFunction(std::bind(
             &Renderer::Buffer<true>::Destroy, pass.draw_indirect_buffer));
@@ -989,7 +989,8 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
       }
 
-      uint32_t compacted_instance_size = pass.batches.size() * sizeof(uint32_t);
+      uint32_t compacted_instance_size =
+          static_cast<uint32_t>(pass.batches.size() * sizeof(uint32_t));
       if (pass.compacted_instance_buffer.GetSize() < compacted_instance_size) {
         frame.deletion_queue.PushFunction(std::bind(
             &Renderer::Buffer<true>::Destroy, pass.compacted_instance_buffer));
@@ -1000,8 +1001,8 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
       }
 
-      uint32_t pass_objects_size =
-          pass.batches.size() * sizeof(Renderer::GPUInstance);
+      uint32_t pass_objects_size = static_cast<uint32_t>(
+          pass.batches.size() * sizeof(Renderer::GPUInstance));
       if (pass.pass_objects_buffer.GetSize() < pass_objects_size) {
         frame.deletion_queue.PushFunction(std::bind(
             &Renderer::Buffer<false>::Destroy, pass.pass_objects_buffer));
@@ -1254,7 +1255,8 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
         vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
                                 VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 0,
                                 1, &frame.global_descriptor,
-                                dynamic_offsets.size(), dynamic_offsets.data());
+                                static_cast<uint32_t>(dynamic_offsets.size()),
+                                dynamic_offsets.data());
         vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
                                 VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 1,
                                 1, &frame.object_descriptor, 0, nullptr);
