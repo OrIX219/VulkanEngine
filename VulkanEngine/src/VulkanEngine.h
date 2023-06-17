@@ -36,13 +36,13 @@
 #include <glm\glm.hpp>
 
 namespace Renderer {
-struct CameraData {
+struct GPUCameraData {
   glm::mat4 view;
   glm::mat4 projection;
 };
 
-struct SceneData {
-  CameraData camera_data;
+struct GPUSceneData {
+  GPUCameraData camera_data;
   glm::vec4 ambient_color;
   glm::vec4 fog_color;
   glm::vec4 fog_distances;
@@ -50,7 +50,7 @@ struct SceneData {
   glm::vec4 sunlight_color;
 };
 
-struct ObjectData {
+struct GPUObjectData {
   glm::mat4 model_matrix;
 };
 }
@@ -66,7 +66,6 @@ struct FrameData {
   VkFence render_fence;
 
   Renderer::PushBuffer dynamic_data;
-  Renderer::Buffer<true> object_buffer;
 
   VkDescriptorSet global_descriptor;
   VkDescriptorSet object_descriptor;
@@ -82,7 +81,6 @@ class VulkanEngine {
   ~VulkanEngine();
 
   void Init();
-
   void Cleanup();
 
   void Draw();
@@ -160,7 +158,7 @@ class VulkanEngine {
   VkDescriptorPool imgui_pool_;
 
   std::array<FrameData, kMaxFramesInFlight> frames_;
-  Renderer::SceneData scene_data_;
+  Renderer::GPUSceneData scene_data_;
   Renderer::CommandPool upload_pool_;
 
   std::vector<VkBufferMemoryBarrier> upload_barriers_;

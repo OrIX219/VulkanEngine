@@ -24,7 +24,7 @@ struct Handle {
 
 class Mesh;
 struct RenderObject;
-struct ObjectData;
+struct GPUObjectData;
 
 struct GPUIndirectObject {
   VkDrawIndexedIndirectCommand command;
@@ -100,6 +100,8 @@ class RenderScene {
 
   struct MeshPass {
     void Destroy() {
+      clear_count_buffer.Destroy();
+      count_buffer.Destroy();
       clear_indirect_buffer.Destroy();
       compacted_instance_buffer.Destroy();
       draw_indirect_buffer.Destroy();
@@ -114,11 +116,13 @@ class RenderScene {
     std::vector<Handle<PassObject>> reusable_objects;
     std::vector<Handle<PassObject>> objects_to_delete;
 
-    Buffer<true> compacted_instance_buffer;
+    Buffer<true> clear_count_buffer;
+    Buffer<false> count_buffer;
+    Buffer<false> compacted_instance_buffer;
     Buffer<false> pass_objects_buffer;
 
-    Buffer<true> draw_indirect_buffer;
     Buffer<true> clear_indirect_buffer;
+    Buffer<false> draw_indirect_buffer;
 
     PassObject* Get(Handle<PassObject> handle);
 
@@ -139,11 +143,12 @@ class RenderScene {
                        const glm::mat4& transform);
   void UpdateObject(Handle<SceneObject> object_id);
 
-  void FillObjectData(ObjectData* data);
+  void FillObjectData(GPUObjectData* data);
   void FillIndirectArray(GPUIndirectObject* data, MeshPass& pass);
   void FillInstanceArray(GPUInstance* data, MeshPass& pass);
+  void ClearCountArray(MeshPass& pass);
 
-  void WriteObject(ObjectData* target, Handle<SceneObject> object_id);
+  void WriteObject(GPUObjectData* target, Handle<SceneObject> object_id);
 
   void ClearDirtyObjects();
 

@@ -107,7 +107,7 @@ void RenderScene::UpdateObject(Handle<SceneObject> object_id) {
   }
 }
 
-void RenderScene::FillObjectData(ObjectData* data) {
+void RenderScene::FillObjectData(GPUObjectData* data) {
   for (uint32_t i = 0; i < renderables.size(); ++i) {
     Handle<SceneObject> handle;
     handle.handle = i;
@@ -141,14 +141,19 @@ void RenderScene::FillInstanceArray(GPUInstance* data, MeshPass& pass) {
   }
 }
 
-void RenderScene::WriteObject(ObjectData* target,
+void RenderScene::ClearCountArray(MeshPass& pass) {
+  memset(pass.clear_count_buffer.GetMappedMemory(), 0,
+         pass.clear_count_buffer.GetSize());
+}
+
+void RenderScene::WriteObject(GPUObjectData* target,
                               Handle<SceneObject> object_id) {
   SceneObject* renderable = GetObject(object_id);
-  ObjectData object;
+  GPUObjectData object;
 
   object.model_matrix = renderable->transform_matrix;
 
-  memcpy(target, &object, sizeof(ObjectData));
+  memcpy(target, &object, sizeof(GPUObjectData));
 }
 
 void RenderScene::ClearDirtyObjects() {

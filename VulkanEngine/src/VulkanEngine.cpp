@@ -68,10 +68,10 @@ void VulkanEngine::Init() {
 
   VK_CHECK(surface_.Init(&instance_, &window_));
   LOG_SUCCESS("GLFW surface initialized");
-  VK_CHECK(
-      physical_device_.Init(&instance_, &surface_,
-                            {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                             VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME}));
+  VK_CHECK(physical_device_.Init(&instance_, &surface_,
+                                 {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                                  VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+                                  VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME}));
   LOG_SUCCESS("GPU found");
   VK_CHECK(device_.Init(&physical_device_));
   LOG_SUCCESS("Logical device initialized");
@@ -171,6 +171,35 @@ void VulkanEngine::Init() {
   is_initialized_ = true;
 
   init_pool.Destroy();
+}
+
+void VulkanEngine::Cleanup() {
+  if (is_initialized_) {
+    ImGui_ImplVulkan_Shutdown();
+
+    main_deletion_queue_.Flush();
+
+    Renderer::MaterialSystem::Cleanup();
+
+    render_scene_.Destroy();
+
+    shader_cache_.Destroy();
+
+    layout_cache_.Destroy();
+    descriptor_allocator_.Destroy();
+
+    vmaDestroyAllocator(allocator_);
+
+    profiler_.Destroy();
+
+    device_.Destroy();
+    surface_.Destroy();
+
+    Logger::Cleanup();
+    instance_.Destroy();
+
+    window_.Destroy();
+  }
 }
 
 void VulkanEngine::InitCVars() {
@@ -326,16 +355,6 @@ void VulkanEngine::InitSyncStructures() {
 void VulkanEngine::InitDescriptors() {
   descriptor_allocator_.Init(&device_);
   layout_cache_.Init(&device_);
-
-  const uint32_t kMaxObjects = 10000;
-  for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    VK_CHECK(frames_[i].object_buffer.Create(
-        allocator_, sizeof(Renderer::ObjectData) * kMaxObjects,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT));
-    main_deletion_queue_.PushFunction(
-        std::bind(&Renderer::Buffer<true>::Destroy, frames_[i].object_buffer));
-  }
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     frames_[i].dynamic_data.Create(
@@ -642,30 +661,6 @@ void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
-void VulkanEngine::RecreateSwapchain() {
-  VkExtent2D extent = window_.GetFramebufferSize();
-  if (extent.width == 0 || extent.height == 0) {
-    extent = window_.GetFramebufferSize();
-    window_.WaitEvents();
-  }
-
-  device_.WaitIdle();
-
-  swapchain_.Recreate();
-  depth_image_.Destroy();
-  extent = swapchain_.GetImageExtent();
-  VK_CHECK(color_image_.Create(allocator_, &device_,
-                               {extent.width, extent.height, 1}, 1,
-                               VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                               physical_device_.GetMaxSamples()));
-  depth_image_.Create(allocator_, &device_, {extent.width, extent.height, 1},
-                      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1,
-                      physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
-                      VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-  swapchain_framebuffers_.Recreate();
-}
-
 std::string VulkanEngine::AssetPath(std::string_view path) {
   return *CVarSystem::Get()->GetStringCVar("assets.path") + '/' +
          std::string{path};
@@ -743,33 +738,28 @@ void VulkanEngine::ProcessInput() {
     camera_.ProcessKeyboard(Renderer::Camera::Direction::kDown, delta_time_);
 }
 
-void VulkanEngine::Cleanup() {
-  if (is_initialized_) {
-    ImGui_ImplVulkan_Shutdown();
-
-    main_deletion_queue_.Flush();
-
-    Renderer::MaterialSystem::Cleanup();
-
-    render_scene_.Destroy();
-
-    shader_cache_.Destroy();
-
-    layout_cache_.Destroy();
-    descriptor_allocator_.Destroy();
-
-    vmaDestroyAllocator(allocator_);
-
-    profiler_.Destroy();
-
-    device_.Destroy();
-    surface_.Destroy();
-
-    Logger::Cleanup();
-    instance_.Destroy();
-
-    window_.Destroy();
+void VulkanEngine::RecreateSwapchain() {
+  VkExtent2D extent = window_.GetFramebufferSize();
+  if (extent.width == 0 || extent.height == 0) {
+    extent = window_.GetFramebufferSize();
+    window_.WaitEvents();
   }
+
+  device_.WaitIdle();
+
+  swapchain_.Recreate();
+  depth_image_.Destroy();
+  extent = swapchain_.GetImageExtent();
+  VK_CHECK(color_image_.Create(allocator_, &device_,
+                               {extent.width, extent.height, 1}, 1,
+                               VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                               physical_device_.GetMaxSamples()));
+  depth_image_.Create(allocator_, &device_, {extent.width, extent.height, 1},
+                      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 1,
+                      physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
+                      VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+  swapchain_framebuffers_.Recreate();
 }
 
 void VulkanEngine::Draw() {
@@ -830,8 +820,8 @@ void VulkanEngine::Draw() {
       ReadyMeshDraw(command_buffer);
 
       ReadyComputeData(command_buffer, render_scene_.forward_pass);
-      //ReadyComputeData(command_buffer, render_scene_.transparent_pass);
-      //ReadyComputeData(command_buffer, render_scene_.shadow_pass);
+      ReadyComputeData(command_buffer, render_scene_.transparent_pass);
+      ReadyComputeData(command_buffer, render_scene_.shadow_pass);
 
       vkCmdPipelineBarrier(command_buffer.GetBuffer(),
                            VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -845,8 +835,8 @@ void VulkanEngine::Draw() {
                                        "Compute Shaders");
 
       ExecuteCompute(command_buffer, render_scene_.forward_pass);
-      //ExecuteCompute(command_buffer, render_scene_.transparent_pass);
-      //ExecuteCompute(command_buffer, render_scene_.shadow_pass);
+      ExecuteCompute(command_buffer, render_scene_.transparent_pass);
+      ExecuteCompute(command_buffer, render_scene_.shadow_pass);
 
       vkCmdPipelineBarrier(command_buffer.GetBuffer(),
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -921,7 +911,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 
     // Realloc if not enough space
     size_t copy_size =
-        render_scene_.renderables.size() * sizeof(Renderer::ObjectData);
+        render_scene_.renderables.size() * sizeof(Renderer::GPUObjectData);
     if (copy_size > render_scene_.object_data_buffer.GetSize()) {
       frame.deletion_queue.PushFunction(std::bind(
           &Renderer::Buffer<false>::Destroy, render_scene_.object_data_buffer));
@@ -940,8 +930,8 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
           allocator_, copy_size,
           VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-      Renderer::ObjectData* object_ssbo =
-          reinterpret_cast<Renderer::ObjectData*>(
+      Renderer::GPUObjectData* object_ssbo =
+          reinterpret_cast<Renderer::GPUObjectData*>(
               staging_buffer.GetMappedMemory());
       render_scene_.FillObjectData(object_ssbo);
 
@@ -976,29 +966,38 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
     for (size_t i = 0; i < 3; ++i) {
       Renderer::RenderScene::MeshPass& pass = *passes[i];
 
+      uint32_t count_size =
+          static_cast<uint32_t>(pass.multibatches.size() * sizeof(uint32_t));
+      if (pass.count_buffer.GetSize() < count_size) {
+        frame.deletion_queue.PushFunction(std::bind(
+            &Renderer::Buffer<false>::Destroy, pass.count_buffer));
+        pass.count_buffer.Create(allocator_, count_size,
+                                 VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                     VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+      }
+
       uint32_t draw_indirect_size = static_cast<uint32_t>(
           pass.indirect_batches.size() * sizeof(Renderer::GPUIndirectObject));
       if (pass.draw_indirect_buffer.GetSize() < draw_indirect_size) {
         frame.deletion_queue.PushFunction(std::bind(
-            &Renderer::Buffer<true>::Destroy, pass.draw_indirect_buffer));
+            &Renderer::Buffer<false>::Destroy, pass.draw_indirect_buffer));
         pass.draw_indirect_buffer.Create(
             allocator_, draw_indirect_size,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+                VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
       }
 
       uint32_t compacted_instance_size =
           static_cast<uint32_t>(pass.batches.size() * sizeof(uint32_t));
       if (pass.compacted_instance_buffer.GetSize() < compacted_instance_size) {
         frame.deletion_queue.PushFunction(std::bind(
-            &Renderer::Buffer<true>::Destroy, pass.compacted_instance_buffer));
+            &Renderer::Buffer<false>::Destroy, pass.compacted_instance_buffer));
         pass.compacted_instance_buffer.Create(
             allocator_, compacted_instance_size,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
       }
 
       uint32_t pass_objects_size = static_cast<uint32_t>(
@@ -1040,6 +1039,21 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
         async_calls.push_back(std::async(std::launch::async, [=]() {
           scene->FillIndirectArray(indirect, *pass);
         }));
+
+        if (pass->clear_count_buffer.GetBuffer() != VK_NULL_HANDLE) {
+          frame.deletion_queue.PushFunction(std::bind(
+              &Renderer::Buffer<true>::Destroy, pass->clear_count_buffer));
+        }
+        pass->clear_count_buffer.Create(
+            allocator_,
+            sizeof(uint32_t) * pass->multibatches.size(),
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+        async_calls.push_back(std::async(
+            std::launch::async, [=]() { scene->ClearCountArray(*pass); }));
 
         pass->needs_indirect_refresh = false;
       }
@@ -1094,8 +1108,14 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 
 void VulkanEngine::ReadyComputeData(Renderer::CommandBuffer command_buffer,
                                     Renderer::RenderScene::MeshPass& pass) {
+  if (pass.clear_indirect_buffer.GetBuffer() == VK_NULL_HANDLE) return;
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
+
   pass.clear_indirect_buffer.CopyTo(
       command_buffer, &pass.draw_indirect_buffer);
+
+  pass.clear_count_buffer.CopyTo(command_buffer, &pass.count_buffer);
 
   VkBufferMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -1109,7 +1129,20 @@ void VulkanEngine::ReadyComputeData(Renderer::CommandBuffer command_buffer,
       VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
   barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
+  VkBufferMemoryBarrier barrier2{};
+  barrier2.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier2.buffer = pass.count_buffer.GetBuffer();
+  barrier2.size = pass.count_buffer.GetSize();
+  barrier2.dstQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier2.srcQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier2.dstAccessMask =
+      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+  barrier2.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
   pre_compute_barriers_.push_back(barrier);
+  pre_compute_barriers_.push_back(barrier2);
 }
 
 void VulkanEngine::ExecuteCompute(Renderer::CommandBuffer command_buffer,
@@ -1128,6 +1161,10 @@ void VulkanEngine::ExecuteCompute(Renderer::CommandBuffer command_buffer,
   final_info.buffer = pass.compacted_instance_buffer.GetBuffer();
   final_info.range = pass.compacted_instance_buffer.GetSize();
 
+  VkDescriptorBufferInfo count_info{};
+  count_info.buffer = pass.count_buffer.GetBuffer();
+  count_info.range = pass.count_buffer.GetSize();
+
   VkDescriptorSet compute_set;
   Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
       .BindBuffer(0, &indirect_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -1135,6 +1172,8 @@ void VulkanEngine::ExecuteCompute(Renderer::CommandBuffer command_buffer,
       .BindBuffer(1, &instance_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                   VK_SHADER_STAGE_COMPUTE_BIT)
       .BindBuffer(2, &final_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                  VK_SHADER_STAGE_COMPUTE_BIT)
+      .BindBuffer(3, &count_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                   VK_SHADER_STAGE_COMPUTE_BIT)
       .Build(compute_set);
 
@@ -1174,8 +1213,20 @@ void VulkanEngine::ExecuteCompute(Renderer::CommandBuffer command_buffer,
   barrier2.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
   barrier2.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 
+  VkBufferMemoryBarrier barrier3{};
+  barrier3.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier3.buffer = pass.count_buffer.GetBuffer();
+  barrier3.size = pass.count_buffer.GetSize();
+  barrier3.dstQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier3.srcQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier3.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+  barrier3.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
   post_compute_barriers_.push_back(barrier);
   post_compute_barriers_.push_back(barrier2);
+  post_compute_barriers_.push_back(barrier3);
 }
 
 void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
@@ -1202,7 +1253,7 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
   VkDescriptorBufferInfo scene_info{};
   scene_info.buffer = frame.dynamic_data.GetBuffer();
-  scene_info.range = sizeof(Renderer::SceneData);
+  scene_info.range = sizeof(Renderer::GPUSceneData);
 
   VkDescriptorBufferInfo instance_info{};
   instance_info.buffer = pass.compacted_instance_buffer.GetBuffer();
@@ -1298,9 +1349,10 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
         vkCmdDraw(command_buffer.GetBuffer(), draw_mesh->GetVerticesCount(),
                   instance.count, 0, instance.first);
       } else {
-        vkCmdDrawIndexedIndirect(
+        vkCmdDrawIndexedIndirectCount(
             command_buffer.GetBuffer(), pass.draw_indirect_buffer.GetBuffer(),
             multibatch.first * sizeof(Renderer::GPUIndirectObject),
+            pass.count_buffer.GetBuffer(), multibatch.first * sizeof(uint32_t),
             multibatch.count, sizeof(Renderer::GPUIndirectObject));
       }
     }

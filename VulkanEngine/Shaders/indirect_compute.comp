@@ -17,7 +17,7 @@ struct DrawCommand {
 };
 
 layout(set = 0, binding = 0)  buffer InstanceBuffer {
-	DrawCommand Draws[];
+	DrawCommand draws[];
 } drawBuffer;
 
 struct GPUInstance {
@@ -26,20 +26,26 @@ struct GPUInstance {
 };
 
 layout(set = 0, binding = 1) readonly buffer InstanceBuffer2 {
-	GPUInstance Instances[];
+	GPUInstance instances[];
 } instanceBuffer;
 
 layout(set = 0, binding = 2)  buffer InstanceBuffer3 {
-	uint IDs[];
+	uint ids[];
 } finalInstanceBuffer;
+
+layout(set = 0, binding = 3) buffer CountBuffer {
+	uint counts[];
+} finalCountBuffer;
 
 void main() {
 	uint gid = gl_GlobalInvocationID.x;
 	if (gid < drawCount) {
-		uint objectId = instanceBuffer.Instances[gid].objectID;
-		uint batchIndex = instanceBuffer.Instances[gid].batchID;
-		uint countIndex = atomicAdd(drawBuffer.Draws[batchIndex].instanceCount, 1);
-		uint instanceIndex = drawBuffer.Draws[batchIndex].firstInstance + countIndex;
-		finalInstanceBuffer.IDs[instanceIndex] = objectId;
+		uint objectId = instanceBuffer.instances[gid].objectID;
+		uint batchIndex = instanceBuffer.instances[gid].batchID;
+		if (drawBuffer.draws[batchIndex].instanceCount == 0)
+			atomicAdd(finalCountBuffer.counts[batchIndex], 1);
+		uint countIndex = atomicAdd(drawBuffer.draws[batchIndex].instanceCount, 1);
+		uint instanceIndex = drawBuffer.draws[batchIndex].firstInstance + countIndex;
+		finalInstanceBuffer.ids[instanceIndex] = objectId;
 	}
 }
