@@ -370,7 +370,7 @@ void RenderScene::RefreshPass(MeshPass* pass) {
     pass->batches = std::move(new_batches);
   }
 
-  pass->multibatches.clear();
+  pass->indirect_batches.clear();
 
   BuildIndirectBatches(pass, pass->indirect_batches, pass->batches);
 

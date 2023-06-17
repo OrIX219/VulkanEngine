@@ -1084,7 +1084,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 
     vkCmdPipelineBarrier(command_buffer.GetBuffer(),
                          VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0, nullptr,
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
                          static_cast<uint32_t>(upload_barriers_.size()),
                          upload_barriers_.data(), 0, nullptr);
     upload_barriers_.clear();
@@ -1303,7 +1303,6 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
       }
     }
   }
-
 }
 
 void VulkanEngine::DrawMenu() {
