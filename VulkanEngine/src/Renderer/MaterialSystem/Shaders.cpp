@@ -58,6 +58,15 @@ uint32_t HashDescriptorLayoutInfo(VkDescriptorSetLayoutCreateInfo* info) {
   return fnv1a_32(str.c_str(), str.length());
 }
 
+void ShaderEffect::Destroy() {
+  vkDestroyPipelineLayout(device_->GetDevice(), built_layout, nullptr);
+  for (size_t i = 0; i < 4; ++i) {
+    if (set_layouts[i] != VK_NULL_HANDLE)
+      vkDestroyDescriptorSetLayout(device_->GetDevice(), set_layouts[i],
+                                   nullptr);
+  }
+}
+
 void ShaderEffect::AddStage(ShaderModule* module, VkShaderStageFlagBits stage) {
   stages_.push_back({module, stage});
 }
@@ -70,6 +79,8 @@ struct DescriptorSetLayoutData {
 void ShaderEffect::ReflectLayout(LogicalDevice* device,
                                  ReflectionOverrides* overrides,
                                  size_t override_count) {
+  device_ = device;
+
   std::vector<DescriptorSetLayoutData> layouts;
   std::vector<VkPushConstantRange> constant_ranges;
 

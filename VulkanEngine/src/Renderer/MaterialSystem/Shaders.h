@@ -30,6 +30,8 @@ class ShaderEffect {
     VkDescriptorType overriden_type;
   };
 
+  void Destroy();
+
   void AddStage(ShaderModule* module, VkShaderStageFlagBits stage);
 
   void ReflectLayout(LogicalDevice* device, ReflectionOverrides* overrides,
@@ -55,6 +57,8 @@ class ShaderEffect {
   };
 
   std::vector<ShaderStage> stages_;
+
+  LogicalDevice* device_;
 };
 
 class ShaderDescriptorBinder {

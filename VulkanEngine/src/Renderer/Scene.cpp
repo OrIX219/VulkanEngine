@@ -119,7 +119,7 @@ void RenderScene::FillIndirectArray(GPUIndirectObject* data, MeshPass& pass) {
   for (size_t i = 0; i < pass.indirect_batches.size(); ++i) {
     const IndirectBatch& batch = pass.indirect_batches[i];
     data[i].command.firstInstance = batch.first;
-    data[i].command.instanceCount = 1;
+    data[i].command.instanceCount = 0; // Gets incremented in compute shader
     data[i].command.firstIndex = GetMesh(batch.mesh_id)->first_index;
     data[i].command.vertexOffset = GetMesh(batch.mesh_id)->first_vertex;
     data[i].command.indexCount = GetMesh(batch.mesh_id)->index_count;

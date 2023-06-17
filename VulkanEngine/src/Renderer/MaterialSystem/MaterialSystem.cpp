@@ -59,15 +59,8 @@ ShaderEffect* MaterialSystem::BuildEffect(std::string_view vertex_shader,
   effect->ReflectLayout(&system.engine_->device_, overrides.data(),
                         overrides.size());
 
-  system.engine_->main_deletion_queue_.PushFunction([=]() {
-    vkDestroyPipelineLayout(system.engine_->device_.GetDevice(),
-                            effect->built_layout, nullptr);
-    for (size_t i = 0; i < 4; ++i) {
-      if (effect->set_layouts[i] != VK_NULL_HANDLE)
-        vkDestroyDescriptorSetLayout(system.engine_->device_.GetDevice(),
-                                     effect->set_layouts[i], nullptr);
-    }
-  });
+  system.engine_->main_deletion_queue_.PushFunction(
+      std::bind(&ShaderEffect::Destroy, effect));
 
   return effect;
 }

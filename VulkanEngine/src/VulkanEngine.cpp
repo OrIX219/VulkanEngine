@@ -144,6 +144,7 @@ void VulkanEngine::Init() {
 
   InitSyncStructures();
   InitDescriptors();
+  InitPipelines();
   LOG_SUCCESS("Descriptors initialized");
   Renderer::MaterialSystem::Init(this);
   LOG_SUCCESS("Material System initialized");
@@ -160,8 +161,8 @@ void VulkanEngine::Init() {
 
   InitImgui(init_pool);
 
-  render_scene_.BuildBatches();
   render_scene_.MergeMeshes(this);
+  render_scene_.BuildBatches();
 
   init_queue.SubmitBatches();
   device_.GetTransferQueue().SubmitBatches();  
@@ -344,6 +345,48 @@ void VulkanEngine::InitDescriptors() {
     main_deletion_queue_.PushFunction(
         std::bind(&Renderer::PushBuffer::Destroy, frames_[i].dynamic_data));
   }
+}
+
+void VulkanEngine::InitPipelines() {
+  LoadComputeShader("Shaders/indirect_compute.comp.spv", compute_pipeline_,
+                    compute_layout_);
+}
+
+bool VulkanEngine::LoadComputeShader(const char* path, VkPipeline& pipeline,
+                                     VkPipelineLayout& layout) {
+  Renderer::ShaderModule compute_module;
+  if (!Renderer::LoadShaderModule(&device_, path, &compute_module)) {
+    LOG_ERROR("Failed to load compute shader from '{}'", path);
+    return false;
+  }
+
+  Renderer::ShaderEffect* effect = new Renderer::ShaderEffect();
+  effect->AddStage(&compute_module, VK_SHADER_STAGE_COMPUTE_BIT);
+  effect->ReflectLayout(&device_, nullptr, 0);
+
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::ShaderEffect::Destroy, effect));
+
+  Renderer::ComputePipelineBuilder builder =
+      Renderer::ComputePipelineBuilder::Begin(&device_);
+  builder.SetLayout(effect->built_layout);
+  VkPipelineShaderStageCreateInfo stage{};
+  stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stage.module = compute_module.module;
+  stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+  stage.pName = "main";
+  builder.SetShaderStage(stage);
+
+  pipeline = builder.Build();
+  layout = effect->built_layout;
+
+  vkDestroyShaderModule(device_.GetDevice(), compute_module.module, nullptr);
+
+  main_deletion_queue_.PushFunction([=]() {
+    vkDestroyPipeline(device_.GetDevice(), pipeline, nullptr);
+  });
+
+  return true;
 }
 
 bool VulkanEngine::LoadMesh(Renderer::CommandBuffer command_buffer,
@@ -778,7 +821,39 @@ void VulkanEngine::Draw() {
     Renderer::VulkanPipelineStatRecorder stats(command_buffer, &profiler_,
                                                "Total Primitives");
 
-    ReadyMeshDraw(command_buffer);
+    pre_compute_barriers_.clear();
+    post_compute_barriers_.clear();
+
+    {
+      Renderer::VulkanScopeTimer timer2(command_buffer, &profiler_,
+                                       "Ready Frame");
+      ReadyMeshDraw(command_buffer);
+
+      ReadyComputeData(command_buffer, render_scene_.forward_pass);
+      //ReadyComputeData(command_buffer, render_scene_.transparent_pass);
+      //ReadyComputeData(command_buffer, render_scene_.shadow_pass);
+
+      vkCmdPipelineBarrier(command_buffer.GetBuffer(),
+                           VK_PIPELINE_STAGE_TRANSFER_BIT,
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
+                           static_cast<uint32_t>(pre_compute_barriers_.size()),
+                           pre_compute_barriers_.data(), 0, nullptr);
+    }
+
+    {
+      Renderer::VulkanScopeTimer timer2(command_buffer, &profiler_,
+                                       "Compute Shaders");
+
+      ExecuteCompute(command_buffer, render_scene_.forward_pass);
+      //ExecuteCompute(command_buffer, render_scene_.transparent_pass);
+      //ExecuteCompute(command_buffer, render_scene_.shadow_pass);
+
+      vkCmdPipelineBarrier(command_buffer.GetBuffer(),
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr,
+                           static_cast<uint32_t>(post_compute_barriers_.size()),
+                           post_compute_barriers_.data(), 0, nullptr);
+    }
 
     render_pass_.Begin(command_buffer,
                        swapchain_framebuffers_.GetFramebuffer(image_index),
@@ -952,7 +1027,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
         pass->clear_indirect_buffer.Create(
             allocator_,
             sizeof(Renderer::GPUIndirectObject) * pass->indirect_batches.size(),
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
@@ -1016,6 +1091,92 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
   }
 }
 
+void VulkanEngine::ReadyComputeData(Renderer::CommandBuffer command_buffer,
+                                    Renderer::RenderScene::MeshPass& pass) {
+  pass.clear_indirect_buffer.CopyTo(
+      command_buffer, &pass.draw_indirect_buffer);
+
+  VkBufferMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier.buffer = pass.draw_indirect_buffer.GetBuffer();
+  barrier.size = pass.draw_indirect_buffer.GetSize();
+  barrier.dstQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier.srcQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier.dstAccessMask =
+      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+  pre_compute_barriers_.push_back(barrier);
+}
+
+void VulkanEngine::ExecuteCompute(Renderer::CommandBuffer command_buffer,
+                                  Renderer::RenderScene::MeshPass& pass) {
+  if (pass.indirect_batches.size() == 0) return;
+
+  VkDescriptorBufferInfo indirect_info{};
+  indirect_info.buffer = pass.draw_indirect_buffer.GetBuffer();
+  indirect_info.range = pass.draw_indirect_buffer.GetSize();
+
+  VkDescriptorBufferInfo instance_info{};
+  instance_info.buffer = pass.pass_objects_buffer.GetBuffer();
+  instance_info.range = pass.pass_objects_buffer.GetSize();
+
+  VkDescriptorBufferInfo final_info{};
+  final_info.buffer = pass.compacted_instance_buffer.GetBuffer();
+  final_info.range = pass.compacted_instance_buffer.GetSize();
+
+  VkDescriptorSet compute_set;
+  Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
+      .BindBuffer(0, &indirect_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                  VK_SHADER_STAGE_COMPUTE_BIT)
+      .BindBuffer(1, &instance_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                  VK_SHADER_STAGE_COMPUTE_BIT)
+      .BindBuffer(2, &final_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                  VK_SHADER_STAGE_COMPUTE_BIT)
+      .Build(compute_set);
+
+  vkCmdBindPipeline(command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE,
+                    compute_pipeline_);
+
+  uint32_t draw_count = static_cast<uint32_t>(pass.batches.size());
+  vkCmdPushConstants(command_buffer.GetBuffer(), compute_layout_,
+                     VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t),
+                     &draw_count);
+
+  vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                          VK_PIPELINE_BIND_POINT_COMPUTE, compute_layout_, 0, 1,
+                          &compute_set, 0, nullptr);
+  vkCmdDispatch(command_buffer.GetBuffer(),
+                static_cast<uint32_t>(pass.batches.size() / 256 + 1), 1, 1);
+
+  VkBufferMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier.buffer = pass.draw_indirect_buffer.GetBuffer();
+  barrier.size = pass.draw_indirect_buffer.GetSize();
+  barrier.dstQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier.srcQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+  barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+  VkBufferMemoryBarrier barrier2{};
+  barrier2.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+  barrier2.buffer = pass.compacted_instance_buffer.GetBuffer();
+  barrier2.size = pass.compacted_instance_buffer.GetSize();
+  barrier2.dstQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier2.srcQueueFamilyIndex =
+      device_.GetQueueFamilies().graphics_family.value();
+  barrier2.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+  barrier2.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+  post_compute_barriers_.push_back(barrier);
+  post_compute_barriers_.push_back(barrier2);
+}
+
 void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
                                Renderer::RenderScene::MeshPass& pass) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
@@ -1043,8 +1204,8 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   scene_info.range = sizeof(Renderer::SceneData);
 
   VkDescriptorBufferInfo instance_info{};
-  instance_info.buffer = pass.pass_objects_buffer.GetBuffer();
-  instance_info.range = pass.pass_objects_buffer.GetSize();
+  instance_info.buffer = pass.compacted_instance_buffer.GetBuffer();
+  instance_info.range = pass.compacted_instance_buffer.GetSize();
 
   Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
       .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
@@ -1136,7 +1297,7 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
                   instance.count, 0, instance.first);
       } else {
         vkCmdDrawIndexedIndirect(
-            command_buffer.GetBuffer(), pass.clear_indirect_buffer.GetBuffer(),
+            command_buffer.GetBuffer(), pass.draw_indirect_buffer.GetBuffer(),
             multibatch.first * sizeof(Renderer::GPUIndirectObject),
             multibatch.count, sizeof(Renderer::GPUIndirectObject));
       }

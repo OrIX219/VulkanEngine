@@ -104,4 +104,24 @@ class PipelineBuilder {
   LogicalDevice* device_;
 };
 
+class ComputePipelineBuilder {
+ public:
+  ComputePipelineBuilder();
+  ~ComputePipelineBuilder();
+
+  static ComputePipelineBuilder Begin(LogicalDevice* device);
+
+  ComputePipelineBuilder& SetShaderStage(
+      const VkPipelineShaderStageCreateInfo& stage);
+  ComputePipelineBuilder& SetLayout(VkPipelineLayout layout);
+
+  VkPipeline Build();
+
+ private:
+  VkPipelineShaderStageCreateInfo shader_stage_;
+  VkPipelineLayout pipeline_layout_;
+
+  LogicalDevice* device_;
+};
+
 }

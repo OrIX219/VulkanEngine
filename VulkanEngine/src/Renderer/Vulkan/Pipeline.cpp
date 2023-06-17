@@ -284,4 +284,47 @@ PipelineBuilder& PipelineBuilder::SetDefaults() {
   return *this;
 }
 
+ComputePipelineBuilder::ComputePipelineBuilder()
+    : shader_stage_{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
+      pipeline_layout_{} {}
+
+ComputePipelineBuilder::~ComputePipelineBuilder() {}
+
+ComputePipelineBuilder ComputePipelineBuilder::Begin(LogicalDevice* device) {
+  ComputePipelineBuilder builder;
+  builder.device_ = device;
+  return builder;
+}
+
+ComputePipelineBuilder& ComputePipelineBuilder::SetShaderStage(
+    const VkPipelineShaderStageCreateInfo& stage) {
+  shader_stage_ = stage;
+
+  return *this;
+}
+
+ComputePipelineBuilder& ComputePipelineBuilder::SetLayout(
+    VkPipelineLayout layout) {
+  pipeline_layout_ = layout;
+
+  return *this;
+}
+
+VkPipeline ComputePipelineBuilder::Build() {
+  VkComputePipelineCreateInfo pipeline_info{};
+  pipeline_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  pipeline_info.stage = shader_stage_;
+  pipeline_info.layout = pipeline_layout_;
+
+  VkPipeline pipeline;
+  if (vkCreateComputePipelines(device_->GetDevice(), VK_NULL_HANDLE, 1,
+                               &pipeline_info, nullptr,
+                               &pipeline) != VK_SUCCESS) {
+    LOG_ERROR("Failed to create compute pipeline!");
+    return VK_NULL_HANDLE;
+  } else {
+    return pipeline;
+  }
+}
+
 }  // namespace Renderer

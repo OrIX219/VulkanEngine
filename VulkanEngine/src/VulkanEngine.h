@@ -87,6 +87,10 @@ class VulkanEngine {
 
   void Draw();
   void ReadyMeshDraw(Renderer::CommandBuffer command_buffer);
+  void ReadyComputeData(Renderer::CommandBuffer command_buffer,
+                        Renderer::RenderScene::MeshPass& pass);
+  void ExecuteCompute(Renderer::CommandBuffer command_buffer,
+                      Renderer::RenderScene::MeshPass& pass);
   void DrawForward(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderScene::MeshPass& pass);
 
@@ -104,6 +108,9 @@ class VulkanEngine {
   void InitRenderPasses();
   void InitSyncStructures();
   void InitDescriptors();
+  void InitPipelines();
+  bool LoadComputeShader(const char* path, VkPipeline& pipeline,
+                         VkPipelineLayout& layout);
   bool LoadMesh(Renderer::CommandBuffer command_buffer, const char* name,
                 const char* path);
   bool LoadTexture(Renderer::CommandBuffer command_buffer, const char* name,
@@ -157,6 +164,11 @@ class VulkanEngine {
   Renderer::CommandPool upload_pool_;
 
   std::vector<VkBufferMemoryBarrier> upload_barriers_;
+  std::vector<VkBufferMemoryBarrier> pre_compute_barriers_;
+  std::vector<VkBufferMemoryBarrier> post_compute_barriers_;
+
+  VkPipeline compute_pipeline_;
+  VkPipelineLayout compute_layout_;
 
   Renderer::ShaderCache shader_cache_;
 

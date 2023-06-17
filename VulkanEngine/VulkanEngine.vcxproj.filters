@@ -87,6 +87,9 @@
     <ClInclude Include="src\Renderer\RenderObject.h">
       <Filter>src\Renderer</Filter>
     </ClInclude>
+    <ClInclude Include="src\Renderer\Scene.h">
+      <Filter>src\Renderer</Filter>
+    </ClInclude>
     <ClInclude Include="src\Renderer\Texture.h">
       <Filter>src\Renderer</Filter>
     </ClInclude>
@@ -144,7 +147,6 @@
     <ClInclude Include="src\VulkanEngine.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Renderer\Scene.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\src\format.cc">
@@ -207,6 +209,9 @@
     <ClCompile Include="src\Renderer\PushBuffer.cpp">
       <Filter>src\Renderer</Filter>
     </ClCompile>
+    <ClCompile Include="src\Renderer\Scene.cpp">
+      <Filter>src\Renderer</Filter>
+    </ClCompile>
     <ClCompile Include="src\Renderer\Texture.cpp">
       <Filter>src\Renderer</Filter>
     </ClCompile>
@@ -261,10 +266,12 @@
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Renderer\Scene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\mesh_instanced.vert">
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\textured_lit.frag">
@@ -273,6 +280,6 @@
     <None Include="Shaders\tri_mesh.vert">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\mesh_instanced.vert" />
+    <None Include="Shaders\indirect_compute.comp" />
   </ItemGroup>
 </Project>

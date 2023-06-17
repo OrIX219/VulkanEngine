@@ -30,17 +30,12 @@ layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer {
 	ObjectData objects[];
 } objectBuffer;
 
-struct GPUInstance {
-	uint objectID;
-	uint batchID;
-};
-
 layout(set = 1, binding = 1) readonly buffer InstanceBuffer {
-	GPUInstance instances[];
+	uint ids[];
 } instanceBuffer;
 
 void main() {
-	uint index = instanceBuffer.instances[gl_InstanceIndex].objectID;
+	uint index = instanceBuffer.ids[gl_InstanceIndex];
 	mat4 modelMatrix = objectBuffer.objects[index].model;
 	mat4 transformMatrix = sceneData.cameraData.projection * sceneData.cameraData.view * modelMatrix;
 	gl_Position = transformMatrix * vec4(pos, 1.f);

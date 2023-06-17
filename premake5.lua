@@ -122,7 +122,7 @@ project "VulkanEngine"
             "_WIN32"
         }
 		postbuildcommands {
-			("for %%f in (%{prj.location}Shaders\\*.vert %{prj.location}Shaders\\*.frag) do " .. vulkan_sdk .. "/Bin/glslangValidator.exe -V -o %%f.spv %%f")
+			("for %%f in (%{prj.location}Shaders\\*.vert %{prj.location}Shaders\\*.frag %{prj.location}Shaders\\*.comp) do " .. vulkan_sdk .. "/Bin/glslangValidator.exe -V -o %%f.spv %%f")
 		}
         
     filter "configurations:Debug"
