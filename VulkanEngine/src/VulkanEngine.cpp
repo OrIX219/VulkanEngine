@@ -939,7 +939,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
       frame.deletion_queue.PushFunction(
           std::bind(&Renderer::Buffer<true>::Destroy, staging_buffer));
 
-      staging_buffer.CopyTo(command_buffer, &render_scene_.object_data_buffer);
+      staging_buffer.CopyTo(command_buffer, render_scene_.object_data_buffer);
     } else {
       // TODO
     }
@@ -1013,8 +1013,8 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
     
     for (size_t i = 0; i < 3; ++i) {
       Renderer::RenderScene::MeshPass* pass = passes[i];
-      
       Renderer::RenderScene* scene = &render_scene_;
+
       if (pass->needs_indirect_refresh && pass->indirect_batches.size() > 0) {
         if (pass->clear_indirect_buffer.GetBuffer() != VK_NULL_HANDLE) {
           frame.deletion_queue.PushFunction(std::bind(
@@ -1071,7 +1071,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
           scene->FillInstanceArray(instance, *pass);
         }));
 
-        staging.CopyTo(command_buffer, &pass->pass_objects_buffer);
+        staging.CopyTo(command_buffer, pass->pass_objects_buffer);
 
         Renderer::BufferMemoryBarrier barrier(
             pass->pass_objects_buffer,
@@ -1104,9 +1104,9 @@ void VulkanEngine::ReadyComputeData(Renderer::CommandBuffer command_buffer,
   FrameData& frame = frames_[frame_index];
 
   pass.clear_indirect_buffer.CopyTo(
-      command_buffer, &pass.draw_indirect_buffer);
+      command_buffer, pass.draw_indirect_buffer);
 
-  pass.clear_count_buffer.CopyTo(command_buffer, &pass.count_buffer);
+  pass.clear_count_buffer.CopyTo(command_buffer, pass.count_buffer);
 
   Renderer::BufferMemoryBarrier barrier(
       pass.draw_indirect_buffer,
@@ -1124,21 +1124,16 @@ void VulkanEngine::ExecuteCompute(Renderer::CommandBuffer command_buffer,
                                   Renderer::RenderScene::MeshPass& pass) {
   if (pass.indirect_batches.size() == 0) return;
 
-  VkDescriptorBufferInfo indirect_info{};
-  indirect_info.buffer = pass.draw_indirect_buffer.GetBuffer();
-  indirect_info.range = pass.draw_indirect_buffer.GetSize();
+  VkDescriptorBufferInfo indirect_info =
+      pass.draw_indirect_buffer.GetDescriptorInfo();
 
-  VkDescriptorBufferInfo instance_info{};
-  instance_info.buffer = pass.pass_objects_buffer.GetBuffer();
-  instance_info.range = pass.pass_objects_buffer.GetSize();
+  VkDescriptorBufferInfo instance_info =
+      pass.pass_objects_buffer.GetDescriptorInfo();
 
-  VkDescriptorBufferInfo final_info{};
-  final_info.buffer = pass.compacted_instance_buffer.GetBuffer();
-  final_info.range = pass.compacted_instance_buffer.GetSize();
+  VkDescriptorBufferInfo final_info =
+      pass.compacted_instance_buffer.GetDescriptorInfo();
 
-  VkDescriptorBufferInfo count_info{};
-  count_info.buffer = pass.count_buffer.GetBuffer();
-  count_info.range = pass.count_buffer.GetSize();
+  VkDescriptorBufferInfo count_info = pass.count_buffer.GetDescriptorInfo();
 
   VkDescriptorSet compute_set;
   Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
@@ -1198,17 +1193,13 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
   uint32_t scene_data_offset = frame.dynamic_data.Push(scene_data_);
 
-  VkDescriptorBufferInfo object_buffer_info{};
-  object_buffer_info.buffer = render_scene_.object_data_buffer.GetBuffer();
-  object_buffer_info.range = render_scene_.object_data_buffer.GetSize();
+  VkDescriptorBufferInfo object_buffer_info =
+      render_scene_.object_data_buffer.GetDescriptorInfo();
 
-  VkDescriptorBufferInfo scene_info{};
-  scene_info.buffer = frame.dynamic_data.GetBuffer();
-  scene_info.range = sizeof(Renderer::GPUSceneData);
+  VkDescriptorBufferInfo scene_info = frame.dynamic_data.GetDescriptorInfo();
 
-  VkDescriptorBufferInfo instance_info{};
-  instance_info.buffer = pass.compacted_instance_buffer.GetBuffer();
-  instance_info.range = pass.compacted_instance_buffer.GetSize();
+  VkDescriptorBufferInfo instance_info =
+      pass.compacted_instance_buffer.GetDescriptorInfo();
 
   Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
       .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,

@@ -25,6 +25,10 @@ class PushBuffer {
   VkBuffer GetBuffer();
   VkDeviceSize GetSize() const;
 
+  VkDescriptorBufferInfo GetDescriptorInfo() const {
+    return buffer_.GetDescriptorInfo();
+  }
+
  private:
   uint32_t PadUniformBufferSize(uint32_t original_size);
 

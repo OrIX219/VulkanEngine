@@ -57,7 +57,7 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
                           VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-  staging_buffer_.CopyToImage(command_buffer, &image_);
+  staging_buffer_.CopyToImage(command_buffer, image_);
 
   GenerateMipmaps(command_buffer);
 
