@@ -179,6 +179,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag" />
+    <None Include="Shaders\depth_reduce.comp" />
     <None Include="Shaders\indirect_compute.comp" />
     <None Include="Shaders\mesh_instanced.vert" />
     <None Include="Shaders\textured_lit.frag" />

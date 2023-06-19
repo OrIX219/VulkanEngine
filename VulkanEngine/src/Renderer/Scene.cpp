@@ -30,6 +30,7 @@ void RenderScene::Destroy() {
 
 Handle<SceneObject> RenderScene::RegisterObject(RenderObject* object) {
   SceneObject new_object;
+  new_object.bounds = object->bounds;
   new_object.transform_matrix = object->model_mat;
   new_object.material_id = GetMaterialHandle(object->material);
   new_object.mesh_id = GetMeshHandle(object->mesh);
@@ -118,11 +119,12 @@ void RenderScene::FillObjectData(GPUObjectData* data) {
 void RenderScene::FillIndirectArray(GPUIndirectObject* data, MeshPass& pass) {
   for (size_t i = 0; i < pass.indirect_batches.size(); ++i) {
     const IndirectBatch& batch = pass.indirect_batches[i];
+    DrawMesh* mesh = GetMesh(batch.mesh_id);
     data[i].command.firstInstance = batch.first;
     data[i].command.instanceCount = 0; // Gets incremented in compute shader
-    data[i].command.firstIndex = GetMesh(batch.mesh_id)->first_index;
-    data[i].command.vertexOffset = GetMesh(batch.mesh_id)->first_vertex;
-    data[i].command.indexCount = GetMesh(batch.mesh_id)->index_count;
+    data[i].command.firstIndex = mesh->first_index;
+    data[i].command.vertexOffset = mesh->first_vertex;
+    data[i].command.indexCount = mesh->index_count;
     data[i].object_id = 0;
     data[i].batch_id = static_cast<uint32_t>(i);
   }
@@ -152,6 +154,10 @@ void RenderScene::WriteObject(GPUObjectData* target,
   GPUObjectData object;
 
   object.model_matrix = renderable->transform_matrix;
+  object.origin_radius =
+      glm::vec4(renderable->bounds.origin, renderable->bounds.radius);
+  object.extents = glm::vec4(renderable->bounds.extents,
+                             renderable->bounds.valid ? 1.f : 0.f);
 
   memcpy(target, &object, sizeof(GPUObjectData));
 }

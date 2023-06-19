@@ -34,8 +34,19 @@ class Image {
   VkFormat GetFormat() const;
   uint32_t GetMipLevels() const;
 
-  void TransitionLayout(CommandBuffer command_buffer, VkFormat format,
-                        VkImageLayout old_layout, VkImageLayout new_layout);
+  static uint32_t CalculateMipLevels(uint32_t width, uint32_t height) {
+    return static_cast<uint32_t>(
+               std::floor(std::log2(std::max(width, height)))) +
+           1;
+  }
+
+  void TransitionLayout(
+      CommandBuffer command_buffer, VkAccessFlags src_access,
+      VkAccessFlags dst_access, VkImageLayout old_layout,
+      VkImageLayout new_layout, VkPipelineStageFlags src_stage,
+      VkPipelineStageFlags dst_stage,
+      VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
+      VkDependencyFlags dependency = 0);
 
   static VkFormat FindSupportedFormat(PhysicalDevice* physical_device,
                                       const std::vector<VkFormat>& candidates,

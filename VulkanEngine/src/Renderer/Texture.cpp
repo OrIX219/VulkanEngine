@@ -46,16 +46,17 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
 
   VkExtent3D extent{static_cast<uint32_t>(texture_info.pixel_size[0]),
                     static_cast<uint32_t>(texture_info.pixel_size[1]), 1};
-  uint32_t mip_levels = CalculateMipLevels(extent.width, extent.height);
+  uint32_t mip_levels = Image::CalculateMipLevels(extent.width, extent.height);
   image_.Create(allocator, device, extent,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                     VK_IMAGE_USAGE_SAMPLED_BIT,
                 mip_levels);
 
-  image_.TransitionLayout(command_buffer, image_.GetFormat(),
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  image_.TransitionLayout(
+      command_buffer, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
+      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
   staging_buffer_.CopyToImage(command_buffer, image_);
 
@@ -72,11 +73,6 @@ void Texture::Destroy() {
 VkImage Texture::GetImage() { return image_.GetImage(); }
 
 VkImageView Texture::GetView() { return image_.GetView(); }
-
-uint32_t Texture::CalculateMipLevels(uint32_t width, uint32_t height) {
-  return static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) +
-         1;
-}
 
 void Texture::GenerateMipmaps(CommandBuffer command_buffer) {
   VkImageMemoryBarrier barrier{};

@@ -19,7 +19,7 @@ class TextureSampler {
   ~TextureSampler();
 
   void Create(LogicalDevice* device, float min_lod = 0.f,
-              float max_lod = VK_LOD_CLAMP_NONE);
+              float max_lod = VK_LOD_CLAMP_NONE, const void* next = nullptr);
   void Destroy();
 
   VkSampler GetSampler();
@@ -33,6 +33,7 @@ class TextureSampler {
   TextureSampler& SetMinFilter(VkFilter filter);
   TextureSampler& SetAddressMode(AddressMode address_mode);
   TextureSampler& SetAnisotropyEnable(bool enable);
+  TextureSampler& SetMipmapMode(VkSamplerMipmapMode mode);
 
   TextureSampler& SetDefaults();
 
@@ -43,6 +44,7 @@ class TextureSampler {
   VkFilter min_filter_;
   AddressMode address_mode_;
   bool enable_anisotropy_;
+  VkSamplerMipmapMode mipmap_mode_;
 
   LogicalDevice* device_;
 };

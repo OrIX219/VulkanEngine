@@ -51,6 +51,8 @@ struct SceneObject {
   PerPassData<int32_t> pass_indices;
 
   glm::mat4 transform_matrix;
+
+  RenderBounds bounds;
 };
 
 struct GPUInstance {

@@ -1,4 +1,5 @@
 #include "TextureSampler.h"
+#include "Logger.h"
 
 namespace Renderer {
 TextureSampler::TextureSampler() : sampler_(VK_NULL_HANDLE) {}
@@ -15,8 +16,8 @@ TextureSampler::TextureSampler(LogicalDevice* device)
 
 TextureSampler::~TextureSampler() {}
 
-void TextureSampler::Create(LogicalDevice* device, float min_lod,
-                            float max_lod) {
+void TextureSampler::Create(LogicalDevice* device, float min_lod, float max_lod,
+                            const void* next) {
   device_ = device;
 
   VkSamplerCreateInfo sampler_info{};
@@ -35,14 +36,15 @@ void TextureSampler::Create(LogicalDevice* device, float min_lod,
   sampler_info.unnormalizedCoordinates = VK_FALSE;
   sampler_info.compareEnable = VK_FALSE;
   sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
-  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  sampler_info.mipmapMode = mipmap_mode_;
   sampler_info.mipLodBias = 0.f;
   sampler_info.minLod = min_lod;
   sampler_info.maxLod = max_lod;
+  sampler_info.pNext = next;
 
   if (vkCreateSampler(device_->GetDevice(), &sampler_info, nullptr,
                       &sampler_) != VK_SUCCESS)
-    throw std::runtime_error("Failed to create texture sampler!");
+    LOG_FATAL("Failed to create texure sampler!");
 }
 
 void TextureSampler::Destroy() {
@@ -81,12 +83,19 @@ TextureSampler& TextureSampler::SetAnisotropyEnable(bool enable) {
   return *this;
 }
 
+TextureSampler& TextureSampler::SetMipmapMode(VkSamplerMipmapMode mode) {
+  mipmap_mode_ = mode;
+
+  return *this;
+}
+
 TextureSampler& TextureSampler::SetDefaults() {
-  SetMagFilter(VK_FILTER_NEAREST)
+  SetMagFilter(VK_FILTER_LINEAR)
       .SetMinFilter(VK_FILTER_LINEAR)
       .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_REPEAT,
                        VK_SAMPLER_ADDRESS_MODE_REPEAT,
                        VK_SAMPLER_ADDRESS_MODE_REPEAT})
+      .SetMipmapMode(VK_SAMPLER_MIPMAP_MODE_LINEAR)
       .SetAnisotropyEnable(false);
 
   return *this;

@@ -157,8 +157,12 @@ bool PhysicalDevice::IsDeviceSuitable(VkPhysicalDevice device) {
   VkPhysicalDeviceFeatures supported_features;
   vkGetPhysicalDeviceFeatures(device, &supported_features);
 
+  bool features_support = supported_features.samplerAnisotropy &&
+                          supported_features.sampleRateShading &&
+                          supported_features.pipelineStatisticsQuery;
+
   return indicies.IsComplete() && extensions_supported && swap_chain_adequate &&
-         supported_features.samplerAnisotropy;
+         features_support;
 }
 
 }  // namespace Renderer

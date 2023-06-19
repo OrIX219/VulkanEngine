@@ -17,6 +17,19 @@ glm::mat4 Camera::GetViewMat() const {
   return glm::lookAt(pos_, pos_ + front_, up_);
 }
 
+glm::mat4 Camera::GetProjMat(bool reverse) const {
+  glm::mat4 projection;
+  if (reverse) {
+    projection =
+        glm::perspective(glm::radians(90.f), 1600.f / 900.f, 1000.f, 0.1f);
+  } else {
+    projection =
+        glm::perspective(glm::radians(90.f), 1600.f / 900.f, 0.1f, 1000.f);
+  }
+  projection[1][1] *= -1;
+  return projection;
+}
+
 void Camera::ProcessKeyboard(Direction direction, float delta_time) {
   float velocity = speed_ * delta_time;
   switch (direction) {

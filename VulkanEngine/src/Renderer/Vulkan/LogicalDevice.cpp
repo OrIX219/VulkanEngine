@@ -40,10 +40,16 @@ VkResult LogicalDevice::Init(PhysicalDevice* physical_device) {
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
   shader_draw_params.shaderDrawParameters = VK_TRUE;
   device_features.pNext = &shader_draw_params;
+  VkPhysicalDeviceVulkan12Features device_features2{};
+  device_features2.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  device_features2.samplerFilterMinmax = VK_TRUE;
+  device_features2.drawIndirectCount = VK_TRUE;
+  device_features2.pNext = &device_features;
 
   VkDeviceCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  create_info.pNext = &device_features;
+  create_info.pNext = &device_features2;
   create_info.queueCreateInfoCount =
       static_cast<uint32_t>(queue_create_infos.size());
   create_info.pQueueCreateInfos = queue_create_infos.data();

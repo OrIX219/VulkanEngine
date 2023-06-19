@@ -52,7 +52,31 @@ struct GPUSceneData {
 
 struct GPUObjectData {
   glm::mat4 model_matrix;
+  glm::vec4 origin_radius;
+  glm::vec4 extents;
 };
+
+struct CullParams {
+  glm::mat4 view_mat;
+  glm::mat4 proj_mat;
+  bool occlusion_cull;
+  bool frustum_cull;
+  float draw_dist;
+};
+
+struct DrawCullData {
+  glm::mat4 view;
+  float P00, P11, z_near, z_far;
+  float frustum[4];
+  float pyramid_width, pyramid_height;
+
+  uint32_t draw_count;
+
+  int culling_enabled;
+  int occlusion_enabled;
+  int dist_cull;
+};
+
 }
 
 namespace Engine {
@@ -61,6 +85,7 @@ constexpr uint32_t kMaxFramesInFlight = 2;
 
 struct FrameData {
   Renderer::CommandPool command_pool;
+  Renderer::DescriptorAllocator dynamic_descriptor_allocator;
 
   VkSemaphore render_semaphore, present_semaphore;
   VkFence render_fence;
@@ -85,12 +110,14 @@ class VulkanEngine {
 
   void Draw();
   void ReadyMeshDraw(Renderer::CommandBuffer command_buffer);
-  void ReadyComputeData(Renderer::CommandBuffer command_buffer,
+  void ReadyCullData(Renderer::CommandBuffer command_buffer,
                         Renderer::RenderScene::MeshPass& pass);
-  void ExecuteCompute(Renderer::CommandBuffer command_buffer,
-                      Renderer::RenderScene::MeshPass& pass);
+  void ExecuteCull(Renderer::CommandBuffer command_buffer,
+                   Renderer::RenderScene::MeshPass& pass,
+                   const Renderer::CullParams& params);
   void DrawForward(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderScene::MeshPass& pass);
+  void ReduceDepth(Renderer::CommandBuffer command_buffer);
 
   void DrawMenu();
   void DrawToolbar();
@@ -107,6 +134,7 @@ class VulkanEngine {
   void InitSyncStructures();
   void InitDescriptors();
   void InitPipelines();
+  void InitDepthPyramid(Renderer::CommandPool& init_pool);
   bool LoadComputeShader(const char* path, VkPipeline& pipeline,
                          VkPipelineLayout& layout);
   bool LoadMesh(Renderer::CommandBuffer command_buffer, const char* name,
@@ -150,6 +178,12 @@ class VulkanEngine {
   Renderer::Swapchain swapchain_;
   Renderer::Image color_image_;
   Renderer::Image depth_image_;
+
+  Renderer::Image depth_pyramid_;
+  uint32_t depth_pyramid_width_;
+  uint32_t depth_pyramid_height_;
+  uint32_t depth_pyramid_levels_;
+
   Renderer::RenderPass render_pass_;
   Renderer::SwapchainFramebuffers swapchain_framebuffers_;
 
@@ -162,11 +196,13 @@ class VulkanEngine {
   Renderer::CommandPool upload_pool_;
 
   std::vector<VkBufferMemoryBarrier> upload_barriers_;
-  std::vector<VkBufferMemoryBarrier> pre_compute_barriers_;
-  std::vector<VkBufferMemoryBarrier> post_compute_barriers_;
+  std::vector<VkBufferMemoryBarrier> pre_cull_barriers_;
+  std::vector<VkBufferMemoryBarrier> post_cull_barriers_;
 
-  VkPipeline compute_pipeline_;
-  VkPipelineLayout compute_layout_;
+  VkPipeline cull_pipeline_;
+  VkPipelineLayout cull_layout_;
+  VkPipeline depth_reduce_pipeline_;
+  VkPipelineLayout depth_reduce_layout_;
 
   Renderer::ShaderCache shader_cache_;
 
@@ -180,6 +216,8 @@ class VulkanEngine {
   std::deque<std::string> prefabs_to_load_;
 
   Renderer::TextureSampler texture_sampler_;
+  Renderer::TextureSampler depth_sampler_;
+  VkImageView depth_pyramid_mips_[16] = {};
 };
 
 }  // namespace Engine

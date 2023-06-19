@@ -62,45 +62,30 @@ VkFormat Image::GetFormat() const { return image_format_; }
 
 uint32_t Image::GetMipLevels() const { return mip_levels_; }
 
-void Image::TransitionLayout(CommandBuffer command_buffer, VkFormat format,
-                             VkImageLayout old_layout, VkImageLayout new_layout) {
+void Image::TransitionLayout(CommandBuffer command_buffer,
+                             VkAccessFlags src_access, VkAccessFlags dst_access,
+                             VkImageLayout old_layout, VkImageLayout new_layout,
+                             VkPipelineStageFlags src_stage,
+                             VkPipelineStageFlags dst_stage,
+                             VkImageAspectFlags aspect_flags,
+                             VkDependencyFlags dependency) {
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.srcAccessMask = src_access;
+  barrier.dstAccessMask = dst_access;
   barrier.oldLayout = old_layout;
   barrier.newLayout = new_layout;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.image = image_;
-  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.aspectMask = aspect_flags;
   barrier.subresourceRange.baseMipLevel = 0;
-  barrier.subresourceRange.levelCount = mip_levels_;
+  barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
   barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = 1;
+  barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-  VkPipelineStageFlags source_stage;
-  VkPipelineStageFlags destination_stage;
-
-  if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
-      new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-    barrier.srcAccessMask = 0;
-    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-    source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-             new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  } else {
-    return;
-  }
-
-  vkCmdPipelineBarrier(command_buffer.GetBuffer(), source_stage,
-                       destination_stage, 0, 0, nullptr, 0, nullptr, 1,
-                       &barrier);
+  vkCmdPipelineBarrier(command_buffer.GetBuffer(), src_stage, dst_stage,
+                       dependency, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 VkResult Image::CreateImageView(VkImageAspectFlags aspect_flags) {

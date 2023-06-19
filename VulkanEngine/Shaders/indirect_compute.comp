@@ -2,9 +2,32 @@
 
 layout(local_size_x = 256) in;
 
-layout(push_constant) uniform constants {
+struct DrawCullData {
+	mat4 view;
+	float P00, P11, znear, zfar;
+	float frustum[4];
+	float pyramidWidth, pyramidHeight;
+
 	uint drawCount;
+
+	int cullingEnabled;
+	int occlusionEnabled;
+	int distCull;
 };
+
+layout(push_constant) uniform constants {
+	DrawCullData cullData;
+};
+
+struct ObjectData {
+	mat4 model;
+	vec4 bounds;
+	vec4 extents;
+};
+
+layout(std140, set = 0, binding = 0) readonly buffer ObjectBuffer {
+	ObjectData objects[];
+} objectBuffer;
 
 struct DrawCommand {
 	uint indexCount;
@@ -16,7 +39,7 @@ struct DrawCommand {
 	uint batchID;
 };
 
-layout(set = 0, binding = 0)  buffer InstanceBuffer {
+layout(set = 0, binding = 1)  buffer InstanceBuffer {
 	DrawCommand draws[];
 } drawBuffer;
 
@@ -25,27 +48,94 @@ struct GPUInstance {
 	uint batchID;
 };
 
-layout(set = 0, binding = 1) readonly buffer InstanceBuffer2 {
+layout(set = 0, binding = 2) readonly buffer InstanceBuffer2 {
 	GPUInstance instances[];
 } instanceBuffer;
 
-layout(set = 0, binding = 2)  buffer InstanceBuffer3 {
+layout(set = 0, binding = 3)  buffer InstanceBuffer3 {
 	uint ids[];
 } finalInstanceBuffer;
 
-layout(set = 0, binding = 3) buffer CountBuffer {
+layout(set = 0, binding = 4) uniform sampler2D depthPyramid;
+
+layout(set = 0, binding = 5) uniform CameraBuffer {
+	mat4 view;
+	mat4 proj;
+} cameraData;
+
+layout(set = 0, binding = 6) buffer CountBuffer {
 	uint counts[];
 } finalCountBuffer;
 
+bool projectSphere(vec3 C, float r, float znear, float P00, float P11, out vec4 aabb) {
+	if (C.z < r + znear) return false;
+
+	vec2 cx = -C.xz;
+	vec2 vx = vec2(sqrt(dot(cx, cx) - r * r), r);
+	vec2 minx = mat2(vx.x, vx.y, -vx.y, vx.x) * cx;
+	vec2 maxx = mat2(vx.x, -vx.y, vx.y, vx.x) * cx;
+
+	vec2 cy = -C.yz;
+	vec2 vy = vec2(sqrt(dot(cy, cy) - r * r), r);
+	vec2 miny = mat2(vy.x, vy.y, -vy.y, vy.x) * cy;
+	vec2 maxy = mat2(vy.x, -vy.y, vy.y, vy.x) * cy;
+
+	aabb = vec4(minx.x / minx.y * P00, miny.x / miny.y * P11, maxx.x / maxx.y * P00, maxy.x / maxy.y * P11);
+	aabb = aabb.xwzy * vec4(0.5f, -0.5f, 0.5f, -0.5f) + vec4(0.5f);
+
+	return true;
+}
+
+bool isVisible(uint objectIndex) {
+	if (cullData.cullingEnabled == 0) return true;
+	uint index = objectIndex;
+
+	vec4 sphereBounds = objectBuffer.objects[index].bounds;
+
+	vec3 center = sphereBounds.xyz;
+	center = (cullData.view * vec4(center, 1.f)).xyz;
+	float radius = sphereBounds.w;
+
+	bool visible = true;
+
+	visible = visible && center.z * cullData.frustum[1] - abs(center.x) * cullData.frustum[0] > -radius;
+	visible = visible && center.z * cullData.frustum[3] - abs(center.y) * cullData.frustum[2] > -radius;
+
+	if (cullData.distCull != 0) {
+		visible = visible && -center.z + radius > cullData.znear && -center.z - radius < cullData.zfar;
+	}
+
+	center.y *= -1;
+
+	if (visible && cullData.occlusionEnabled != 0) {
+		vec4 aabb;
+		if (projectSphere(center, radius, cullData.znear, cullData.P00, cullData.P11, aabb)) {
+			float width = (aabb.z - aabb.x) * cullData.pyramidWidth;
+			float height = (aabb.w - aabb.y) * cullData.pyramidHeight;
+
+			float level = floor(log2(max(width, height)));
+
+			float depth = textureLod(depthPyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
+			float depthSphere = cullData.znear / (center.z - radius);
+
+			visible = visible && depthSphere >= depth;
+		}
+	}
+
+	return visible;
+}
+
 void main() {
 	uint gid = gl_GlobalInvocationID.x;
-	if (gid < drawCount) {
+	if (gid < cullData.drawCount) {
 		uint objectId = instanceBuffer.instances[gid].objectID;
-		uint batchIndex = instanceBuffer.instances[gid].batchID;
-		if (drawBuffer.draws[batchIndex].instanceCount == 0)
-			atomicAdd(finalCountBuffer.counts[batchIndex], 1);
-		uint countIndex = atomicAdd(drawBuffer.draws[batchIndex].instanceCount, 1);
-		uint instanceIndex = drawBuffer.draws[batchIndex].firstInstance + countIndex;
-		finalInstanceBuffer.ids[instanceIndex] = objectId;
+		if (isVisible(objectId)) {
+			uint batchIndex = instanceBuffer.instances[gid].batchID;
+			if (drawBuffer.draws[batchIndex].instanceCount == 0)
+				atomicAdd(finalCountBuffer.counts[batchIndex], 1);
+			uint countIndex = atomicAdd(drawBuffer.draws[batchIndex].instanceCount, 1);
+			uint instanceIndex = drawBuffer.draws[batchIndex].firstInstance + countIndex;
+			finalInstanceBuffer.ids[instanceIndex] = objectId;
+		}
 	}
 }

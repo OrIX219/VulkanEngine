@@ -11,6 +11,7 @@ class Camera {
   Camera();
 
   glm::mat4 GetViewMat() const;
+  glm::mat4 GetProjMat(bool reverse = false) const;
 
   void ProcessKeyboard(Direction direction, float delta_time);
   void ProcessMouse(float delta_x, float delta_y);

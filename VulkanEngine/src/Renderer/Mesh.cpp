@@ -72,6 +72,17 @@ bool Mesh::LoadFromAsset(VmaAllocator allocator, CommandBuffer command_buffer,
                      reinterpret_cast<char*>(vertices.data()),
                      reinterpret_cast<char*>(indices.data()));
 
+  bounds_.extents.x = mesh_info.bounds.extents[0];
+  bounds_.extents.y = mesh_info.bounds.extents[1];
+  bounds_.extents.z = mesh_info.bounds.extents[2];
+
+  bounds_.origin.x = mesh_info.bounds.origin[0];
+  bounds_.origin.y = mesh_info.bounds.origin[1];
+  bounds_.origin.z = mesh_info.bounds.origin[2];
+
+  bounds_.radius = mesh_info.bounds.radius;
+  bounds_.valid = true;
+
   Create(allocator, command_buffer, vertices, indices);
   return true;
 }
@@ -93,5 +104,9 @@ const IndexBuffer& Mesh::GetIndexBuffer() const {
   return index_buffer_; }
 
 IndexBuffer& Mesh::GetIndexBuffer() { return index_buffer_; }
+
+const RenderBounds& Mesh::GetBounds() const { return bounds_; }
+
+RenderBounds& Mesh::GetBounds() { return bounds_; }
 
 }  // namespace Renderer
