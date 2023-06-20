@@ -1,5 +1,6 @@
 #include "Camera.h"
 
+#define GLM_FORCE_LEFT_HANDED
 #include <glm/gtx/transform.hpp>
 
 namespace Renderer {

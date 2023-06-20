@@ -35,9 +35,12 @@ VkResult SwapchainFramebuffers::Create(Swapchain* swapchain,
   VkExtent2D swap_chain_extent = swapchain_->GetImageExtent();
   for (size_t i = 0; i < image_views.size(); ++i) {
     std::vector<VkImageView> attachments;
-    if (color_image_) attachments.push_back(color_image_->GetView());
+    if (color_image_)
+      attachments.push_back(color_image_->GetView());
+    else
+      attachments.push_back(image_views[i]);
     if (depth_image_) attachments.push_back(depth_image_->GetView());
-    attachments.push_back(image_views[i]);
+    if (color_image_) attachments.push_back(image_views[i]);
 
     VkFramebufferCreateInfo framebuffer_info{};
     framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

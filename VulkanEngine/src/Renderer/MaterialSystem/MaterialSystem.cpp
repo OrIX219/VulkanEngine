@@ -209,16 +209,14 @@ void MaterialSystem::FillBuilders() {
       .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
                      VK_FRONT_FACE_COUNTER_CLOCKWISE)
       .SetDepthStencil()
-      .SetMultisampling(system.engine_->physical_device_.GetMaxSamples(),
-                        VK_TRUE);
+      .SetMultisampling(system.engine_->samples_, VK_TRUE);
   system.shadow_builder_ = PipelineBuilder::Begin(&system.engine_->device_);
   system.shadow_builder_.SetDefaults()
       .SetVertexInputDescription(Vertex::GetDescription())
       .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
                      VK_FRONT_FACE_COUNTER_CLOCKWISE)
       .SetDepthStencil()
-      .SetMultisampling(system.engine_->physical_device_.GetMaxSamples(),
-                        VK_TRUE);
+      .SetMultisampling(system.engine_->samples_, VK_TRUE);
 }
 
 MaterialSystem& MaterialSystem::Get() {

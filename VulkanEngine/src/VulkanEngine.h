@@ -130,7 +130,7 @@ class VulkanEngine {
 
  private:
   void InitCVars();
-  void InitRenderPasses();
+  void InitRenderPasses(VkSampleCountFlagBits samples);
   void InitSyncStructures();
   void InitDescriptors();
   void InitPipelines();
@@ -175,6 +175,7 @@ class VulkanEngine {
   VmaAllocator allocator_;
   DeletionQueue main_deletion_queue_;
 
+  VkSampleCountFlagBits samples_;
   Renderer::Swapchain swapchain_;
   Renderer::Image color_image_;
   Renderer::Image depth_image_;

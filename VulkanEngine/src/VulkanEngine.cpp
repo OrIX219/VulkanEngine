@@ -48,7 +48,8 @@ VulkanEngine::VulkanEngine()
       delta_time_(0),
       last_time_(0),
       cursor_enabled_(false),
-      menu_opened_(false) {}
+      menu_opened_(false),
+      samples_(VK_SAMPLE_COUNT_1_BIT) {}
 
 VulkanEngine::~VulkanEngine() {}
 
@@ -107,24 +108,26 @@ void VulkanEngine::Init() {
                                {extent.width, extent.height, 1},
                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                               1, physical_device_.GetMaxSamples()));
+                               1, samples_));
   LOG_SUCCESS("Color image created");
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Image::Destroy, color_image_));
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      1, physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
+      1, samples_, VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT));
   LOG_SUCCESS("Depth image created");
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Image::Destroy, depth_image_));
 
-  InitRenderPasses();
+  InitRenderPasses(samples_);
   LOG_SUCCESS("Render passes initialized");
 
+  Renderer::Image* color_image_ptr =
+      (samples_ != VK_SAMPLE_COUNT_1_BIT ? &color_image_ : nullptr);
   VK_CHECK(swapchain_framebuffers_.Create(&swapchain_, &render_pass_,
-                                          &color_image_, &depth_image_));
+                                          color_image_ptr, &depth_image_));
   LOG_SUCCESS("Swapchain framebuffers created");
   main_deletion_queue_.PushFunction(std::bind(
       &Renderer::SwapchainFramebuffers::Destroy, swapchain_framebuffers_));
@@ -186,6 +189,8 @@ void VulkanEngine::Cleanup() {
     ImGui_ImplVulkan_Shutdown();
 
     main_deletion_queue_.Flush();
+    for (FrameData& frame : frames_)
+      frame.dynamic_descriptor_allocator.Destroy();
 
     Renderer::MaterialSystem::Cleanup();
 
@@ -293,35 +298,42 @@ void VulkanEngine::InitCVars() {
                                   "asset_export", CVarFlagBits::kAdvanced);
 }
 
-void VulkanEngine::InitRenderPasses() {
+void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
   Renderer::RenderPassBuilder render_pass_builder(&device_);
 
   Renderer::RenderPassAttachment color_attachment, depth_attachment,
       color_attachment_resolve;
   color_attachment
       .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
-                     VK_ATTACHMENT_STORE_OP_DONT_CARE)
-      .SetSamples(physical_device_.GetMaxSamples())
+                     VK_ATTACHMENT_STORE_OP_STORE)
+      .SetSamples(samples)
       .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
       .SetFormat(swapchain_.GetImageFormat());
   depth_attachment
       .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
-                     VK_ATTACHMENT_STORE_OP_DONT_CARE)
-      .SetSamples(physical_device_.GetMaxSamples())
+                     VK_ATTACHMENT_STORE_OP_STORE)
+      .SetSamples(samples)
       .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                   VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
       .SetFormat(VK_FORMAT_D32_SFLOAT);
   color_attachment_resolve.SetDefaults().SetFormat(swapchain_.GetImageFormat());
 
-  render_pass_builder.AddAttachment(&color_attachment)
-      .AddAttachment(&depth_attachment)
-      .AddAttachment(&color_attachment_resolve);
-
   Renderer::RenderPassSubpass subpass;
-  subpass.AddColorAttachmentRef(0)
-      .SetDepthStencilAttachmentRef(1)
-      .AddResolveAttachmentRef(2);
+  if (samples_ != VK_SAMPLE_COUNT_1_BIT) {
+    render_pass_builder.AddAttachment(&color_attachment)
+        .AddAttachment(&depth_attachment)
+        .AddAttachment(&color_attachment_resolve);
+    subpass.AddColorAttachmentRef(0)
+        .SetDepthStencilAttachmentRef(1)
+        .AddResolveAttachmentRef(2);
+  } else {
+    render_pass_builder.AddAttachment(&color_attachment_resolve)
+        .AddAttachment(&depth_attachment);
+    subpass.AddColorAttachmentRef(0)
+        .SetDepthStencilAttachmentRef(1);
+  }
+
 
   render_pass_builder.AddSubpass(&subpass);
   render_pass_builder
@@ -390,10 +402,21 @@ void VulkanEngine::InitPipelines() {
                     depth_reduce_layout_);
 }
 
+uint32_t PrevPowOf2(uint32_t x) {
+  if (x == 0) return 0;
+  --x;
+  x |= (x >> 1);
+  x |= (x >> 2);
+  x |= (x >> 4);
+  x |= (x >> 8);
+  x |= (x >> 16);
+  return x - (x >> 1);
+}
+
 void VulkanEngine::InitDepthPyramid(Renderer::CommandPool& init_pool) {
   VkExtent2D extent = swapchain_.GetImageExtent();
-  depth_pyramid_width_ = ceil(log2(extent.width) - 1);
-  depth_pyramid_height_ = ceil(log2(extent.height) - 1);
+  depth_pyramid_width_ = PrevPowOf2(extent.width);
+  depth_pyramid_height_ = PrevPowOf2(extent.height);
   depth_pyramid_levels_ = Renderer::Image::CalculateMipLevels(
       depth_pyramid_width_, depth_pyramid_height_);
 
@@ -426,7 +449,7 @@ void VulkanEngine::InitDepthPyramid(Renderer::CommandPool& init_pool) {
 
   VkSamplerReductionModeCreateInfo reduction_info{};
   reduction_info.sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO;
-  reduction_info.reductionMode = VK_SAMPLER_REDUCTION_MODE_MIN;
+  reduction_info.reductionMode = VK_SAMPLER_REDUCTION_MODE_MAX;
   
   depth_sampler_.SetDefaults()
       .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
@@ -680,6 +703,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   // LoadPrefab(command_buffer, AssetPath("star.pfb").c_str(), glm::mat4{1.f});
   LoadPrefab(command_buffer, AssetPath("star_untextured.pfb").c_str());
   LoadPrefab(command_buffer, AssetPath("two_stars.pfb").c_str());
+  //LoadPrefab(command_buffer, AssetPath("wall.pfb").c_str());
 
   command_buffer.End();
   command_buffer.AddToBatch();
@@ -725,7 +749,7 @@ void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   init_info.DescriptorPool = imgui_pool_;
   init_info.MinImageCount = 3;
   init_info.ImageCount = 3;
-  init_info.MSAASamples = physical_device_.GetMaxSamples();
+  init_info.MSAASamples = samples_;
 
   ImGui_ImplVulkan_Init(&init_info, render_pass_.GetRenderPass());
 
@@ -830,14 +854,14 @@ void VulkanEngine::RecreateSwapchain() {
   depth_image_.Destroy();
   extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(allocator_, &device_,
-                               {extent.width, extent.height, 1}, 1,
+                               {extent.width, extent.height, 1},
                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                               physical_device_.GetMaxSamples()));
+                               1, samples_));
   depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      1, physical_device_.GetMaxSamples(), VK_FORMAT_D32_SFLOAT,
+      1, samples_, VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
   swapchain_framebuffers_.Recreate();
 }
@@ -865,6 +889,7 @@ void VulkanEngine::Draw() {
   frame.deletion_queue.Flush();
   VK_CHECK(frame.command_pool.Reset());
   frame.dynamic_data.Reset();
+  frame.dynamic_descriptor_allocator.ResetPools();
 
   ImGui::Render();
 
@@ -953,7 +978,7 @@ void VulkanEngine::Draw() {
 
     render_pass_.End(command_buffer);
 
-    //ReduceDepth(command_buffer);
+    ReduceDepth(command_buffer);
   }
 
   VK_CHECK(command_buffer.End());
