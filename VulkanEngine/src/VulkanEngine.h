@@ -134,6 +134,7 @@ class VulkanEngine {
   void InitSyncStructures();
   void InitDescriptors();
   void InitPipelines();
+  void InitSamplers();
   void InitDepthPyramid(Renderer::CommandPool& init_pool);
   bool LoadComputeShader(const char* path, VkPipeline& pipeline,
                          VkPipelineLayout& layout);
@@ -146,7 +147,7 @@ class VulkanEngine {
   void InitScene(Renderer::CommandPool& init_pool);
   void InitImgui(Renderer::CommandPool& init_pool);
 
-  void RecreateSwapchain();
+  void RecreateSwapchain(Renderer::CommandPool& command_pool);
 
   std::string AssetPath(std::string_view path);
   Renderer::Mesh* GetMesh(const std::string& name);
@@ -193,6 +194,7 @@ class VulkanEngine {
   VkDescriptorPool imgui_pool_;
 
   std::array<FrameData, kMaxFramesInFlight> frames_;
+  VkFence window_resize_fence_;
   Renderer::GPUSceneData scene_data_;
   Renderer::CommandPool upload_pool_;
 
@@ -218,6 +220,7 @@ class VulkanEngine {
 
   Renderer::TextureSampler texture_sampler_;
   Renderer::TextureSampler depth_sampler_;
+  Renderer::TextureSampler depth_reduction_sampler_;
   VkImageView depth_pyramid_mips_[16] = {};
 };
 

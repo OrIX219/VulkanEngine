@@ -94,7 +94,7 @@ bool isVisible(uint objectIndex) {
 
 	vec3 center = sphereBounds.xyz;
 	center = (cullData.view * vec4(center, 1.f)).xyz;
-	float radius = sphereBounds.w * 1.5;
+	float radius = sphereBounds.w;
 
 	bool visible = true;
 
@@ -110,8 +110,8 @@ bool isVisible(uint objectIndex) {
 	if (visible && cullData.occlusionEnabled != 0) {
 		vec4 aabb;
 		if (projectSphere(center, radius, cullData.znear, cullData.P00, cullData.P11, aabb)) {
-			float width = (aabb.z - aabb.x) * cullData.pyramidWidth;
-			float height = (aabb.w - aabb.y) * cullData.pyramidHeight;
+			float width = abs(aabb.z - aabb.x) * cullData.pyramidWidth;
+			float height = abs(aabb.w - aabb.y) * cullData.pyramidHeight;
 
 			float level = floor(log2(max(width, height)));
 

@@ -100,8 +100,6 @@ void VulkanEngine::Init() {
 
   VK_CHECK(swapchain_.Create(&device_, &surface_));
   LOG_SUCCESS("Swapchain created");
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Swapchain::Destroy, swapchain_));
 
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(allocator_, &device_,
@@ -110,16 +108,12 @@ void VulkanEngine::Init() {
                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                                1, samples_));
   LOG_SUCCESS("Color image created");
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Image::Destroy, color_image_));
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       1, samples_, VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT));
   LOG_SUCCESS("Depth image created");
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Image::Destroy, depth_image_));
 
   InitRenderPasses(samples_);
   LOG_SUCCESS("Render passes initialized");
@@ -129,8 +123,6 @@ void VulkanEngine::Init() {
   VK_CHECK(swapchain_framebuffers_.Create(&swapchain_, &render_pass_,
                                           color_image_ptr, &depth_image_));
   LOG_SUCCESS("Swapchain framebuffers created");
-  main_deletion_queue_.PushFunction(std::bind(
-      &Renderer::SwapchainFramebuffers::Destroy, swapchain_framebuffers_));
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(frames_[i].command_pool.Create(
@@ -155,16 +147,13 @@ void VulkanEngine::Init() {
   InitSyncStructures();
   InitDescriptors();
   InitPipelines();
+  InitSamplers();
   InitDepthPyramid(init_pool);
   LOG_SUCCESS("Descriptors initialized");
   Renderer::MaterialSystem::Init(this);
   LOG_SUCCESS("Material System initialized");
 
   Renderer::Queue& init_queue = device_.GetQueue(init_pool.GetQueueFamily());
-
-  texture_sampler_.SetDefaults().Create(&device_);
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::TextureSampler::Destroy, texture_sampler_));
 
   init_queue.BeginBatch();
   InitScene(init_pool);
@@ -193,6 +182,12 @@ void VulkanEngine::Cleanup() {
       frame.dynamic_descriptor_allocator.Destroy();
 
     Renderer::MaterialSystem::Cleanup();
+
+    swapchain_framebuffers_.Destroy();
+    depth_pyramid_.Destroy();
+    depth_image_.Destroy();
+    color_image_.Destroy();
+    swapchain_.Destroy();
 
     render_scene_.Destroy();
 
@@ -363,6 +358,11 @@ void VulkanEngine::InitSyncStructures() {
   VkSemaphoreCreateInfo semaphore_info{};
   semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
+  VK_CHECK(vkCreateFence(device_.GetDevice(), &fence_info, nullptr,
+                         &window_resize_fence_));
+  main_deletion_queue_.PushFunction([=]() {
+    vkDestroyFence(device_.GetDevice(), window_resize_fence_, nullptr);
+  });
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(vkCreateFence(device_.GetDevice(), &fence_info, nullptr,
                            &frames_[i].render_fence));
@@ -402,6 +402,34 @@ void VulkanEngine::InitPipelines() {
                     depth_reduce_layout_);
 }
 
+void VulkanEngine::InitSamplers() {
+  texture_sampler_.SetDefaults().Create(&device_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::TextureSampler::Destroy, texture_sampler_));
+
+  VkSamplerReductionModeCreateInfo reduction_info{};
+  reduction_info.sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO;
+  reduction_info.reductionMode = VK_SAMPLER_REDUCTION_MODE_MAX;
+
+  depth_reduction_sampler_.SetDefaults()
+      .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE})
+      .SetMipmapMode(VK_SAMPLER_MIPMAP_MODE_NEAREST)
+      .Create(&device_, 0.f, 16.f, &reduction_info);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::TextureSampler::Destroy, depth_reduction_sampler_));
+
+  depth_sampler_.SetDefaults()
+      .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE})
+      .SetMipmapMode(VK_SAMPLER_MIPMAP_MODE_NEAREST)
+      .Create(&device_, 0.f, 16.f, &reduction_info);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::TextureSampler::Destroy, depth_sampler_));
+}
+
 uint32_t PrevPowOf2(uint32_t x) {
   if (x == 0) return 0;
   --x;
@@ -426,8 +454,6 @@ void VulkanEngine::InitDepthPyramid(Renderer::CommandPool& init_pool) {
       VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT |
           VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
       depth_pyramid_levels_, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R32_SFLOAT);
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Image::Destroy, depth_pyramid_));
 
   for (int32_t i = 0; i < depth_pyramid_levels_; ++i) {
     VkImageViewCreateInfo level_info{};
@@ -446,19 +472,6 @@ void VulkanEngine::InitDepthPyramid(Renderer::CommandPool& init_pool) {
     main_deletion_queue_.PushFunction(
         [=]() { vkDestroyImageView(device_.GetDevice(), view, nullptr); });
   }
-
-  VkSamplerReductionModeCreateInfo reduction_info{};
-  reduction_info.sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO;
-  reduction_info.reductionMode = VK_SAMPLER_REDUCTION_MODE_MAX;
-  
-  depth_sampler_.SetDefaults()
-      .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE})
-      .SetMipmapMode(VK_SAMPLER_MIPMAP_MODE_NEAREST)
-      .Create(&device_, 0.f, 16.f, &reduction_info);
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::TextureSampler::Destroy, depth_sampler_));
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin(true);
@@ -841,7 +854,7 @@ void VulkanEngine::ProcessInput() {
     camera_.ProcessKeyboard(Renderer::Camera::Direction::kDown, delta_time_);
 }
 
-void VulkanEngine::RecreateSwapchain() {
+void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
   VkExtent2D extent = window_.GetFramebufferSize();
   if (extent.width == 0 || extent.height == 0) {
     extent = window_.GetFramebufferSize();
@@ -851,26 +864,31 @@ void VulkanEngine::RecreateSwapchain() {
   device_.WaitIdle();
 
   swapchain_.Recreate();
-  depth_image_.Destroy();
   extent = swapchain_.GetImageExtent();
+  color_image_.Destroy();
   VK_CHECK(color_image_.Create(allocator_, &device_,
                                {extent.width, extent.height, 1},
                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                                1, samples_));
+  depth_image_.Destroy();
   depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       1, samples_, VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
   swapchain_framebuffers_.Recreate();
+  depth_pyramid_.Destroy();
+  InitDepthPyramid(command_pool);
 }
 
 void VulkanEngine::Draw() {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
-  VK_CHECK(vkWaitForFences(device_.GetDevice(), 1, &frame.render_fence,
+  std::array<VkFence, 2> fences = {frame.render_fence, window_resize_fence_};
+  VK_CHECK(vkWaitForFences(device_.GetDevice(),
+                           static_cast<uint32_t>(fences.size()), fences.data(),
                            VK_TRUE, UINT64_MAX));
 
   uint32_t image_index;
@@ -878,7 +896,7 @@ void VulkanEngine::Draw() {
       swapchain_.AcquireNextImage(&image_index, frame.present_semaphore);
 
   if (res == VK_ERROR_OUT_OF_DATE_KHR) {
-    RecreateSwapchain();
+    RecreateSwapchain(frame.command_pool);
     return;
   } else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
     VK_CHECK(res);
@@ -978,7 +996,8 @@ void VulkanEngine::Draw() {
 
     render_pass_.End(command_buffer);
 
-    ReduceDepth(command_buffer);
+    if (forward_cull.occlusion_cull)
+      ReduceDepth(command_buffer);
   }
 
   VK_CHECK(command_buffer.End());
@@ -1010,7 +1029,9 @@ void VulkanEngine::Draw() {
   if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR ||
       window_.GetResized()) {
     window_.SetResized(false);
-    RecreateSwapchain();
+    RecreateSwapchain(frame.command_pool);
+    VK_CHECK(vkResetFences(device_.GetDevice(), 1, &window_resize_fence_));
+    VK_CHECK(device_.GetGraphicsQueue().SubmitBatches(window_resize_fence_));
   } else if (res != VK_SUCCESS) {
     VK_CHECK(res);
   }
@@ -1264,7 +1285,8 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
   depth_pyramid.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
   VkDescriptorSet compute_set;
-  Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
+  Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                     &frame.dynamic_descriptor_allocator)
       .BindBuffer(0, &object_buffer_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                   VK_SHADER_STAGE_COMPUTE_BIT)
       .BindBuffer(1, &indirect_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -1356,12 +1378,14 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   VkDescriptorBufferInfo instance_info =
       pass.compacted_instance_buffer.GetDescriptorInfo();
 
-  Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
+  Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                     &frame.dynamic_descriptor_allocator)
       .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
       .Build(frame.global_descriptor);
 
-  Renderer::DescriptorBuilder::Begin(&layout_cache_, &descriptor_allocator_)
+  Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                     &frame.dynamic_descriptor_allocator)
       .BindBuffer(0, &object_buffer_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                   VK_SHADER_STAGE_VERTEX_BIT)
       .BindBuffer(1, &instance_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -1484,12 +1508,12 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
 
   for (int32_t i = 0; i < depth_pyramid_levels_; ++i) {
     VkDescriptorImageInfo dst;
-    dst.sampler = depth_sampler_.GetSampler();
+    dst.sampler = depth_reduction_sampler_.GetSampler();
     dst.imageView = depth_pyramid_mips_[i];
     dst.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkDescriptorImageInfo src;
-    src.sampler = depth_sampler_.GetSampler();
+    src.sampler = depth_reduction_sampler_.GetSampler();
     if (i == 0) {
       src.imageView = depth_image_.GetView();
       src.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
