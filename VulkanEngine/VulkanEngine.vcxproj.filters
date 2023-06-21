@@ -117,6 +117,9 @@
     <ClInclude Include="src\Renderer\Vulkan\Pipeline.h">
       <Filter>src\Renderer\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="src\Renderer\Vulkan\PipelineBarriers.h">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="src\Renderer\Vulkan\Queue.h">
       <Filter>src\Renderer\Vulkan</Filter>
     </ClInclude>
@@ -147,7 +150,6 @@
     <ClInclude Include="src\VulkanEngine.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\Renderer\Vulkan\PipelineBarriers.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\src\format.cc">
@@ -237,6 +239,9 @@
     <ClCompile Include="src\Renderer\Vulkan\Pipeline.cpp">
       <Filter>src\Renderer\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="src\Renderer\Vulkan\PipelineBarriers.cpp">
+      <Filter>src\Renderer\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="src\Renderer\Vulkan\Queue.cpp">
       <Filter>src\Renderer\Vulkan</Filter>
     </ClCompile>
@@ -267,7 +272,6 @@
     <ClCompile Include="src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\Renderer\Vulkan\PipelineBarriers.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">
@@ -282,7 +286,5 @@
     <None Include="Shaders\tri_mesh.vert">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\indirect_compute.comp" />
-    <None Include="Shaders\depth_reduce.comp" />
   </ItemGroup>
 </Project>

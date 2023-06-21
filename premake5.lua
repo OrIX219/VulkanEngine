@@ -106,7 +106,8 @@ project "VulkanEngine"
         "AssetLib/src",
         "Libraries/include/vulkan",
         "Libraries/include/imgui",
-        "Libraries/include/fmt/include"
+        "Libraries/include/fmt/include",
+        "Libraries/include/glfw/include"
     }
     
     links {

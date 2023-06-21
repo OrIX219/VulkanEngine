@@ -23,3 +23,6 @@
 [submodule "Libraries\\include\\fmt"]
 	path = Libraries/include/fmt
 	url = https://github.com/fmtlib/fmt
+[submodule "Libraries\\include\\glfw"]
+	path = Libraries/include/glfw
+	url = https://github.com/glfw/glfw

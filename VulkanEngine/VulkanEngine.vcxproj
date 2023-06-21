@@ -60,7 +60,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_WIN32;DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\Libraries\include;src;src\Console;src\Renderer;src\Renderer\MaterialSystem;src\Renderer\Vulkan;..\AssetLib\src;..\Libraries\include\vulkan;..\Libraries\include\imgui;..\Libraries\include\fmt\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Libraries\include;src;src\Console;src\Renderer;src\Renderer\MaterialSystem;src\Renderer\Vulkan;..\AssetLib\src;..\Libraries\include\vulkan;..\Libraries\include\imgui;..\Libraries\include\fmt\include;..\Libraries\include\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -80,7 +80,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_WIN32;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\Libraries\include;src;src\Console;src\Renderer;src\Renderer\MaterialSystem;src\Renderer\Vulkan;..\AssetLib\src;..\Libraries\include\vulkan;..\Libraries\include\imgui;..\Libraries\include\fmt\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Libraries\include;src;src\Console;src\Renderer;src\Renderer\MaterialSystem;src\Renderer\Vulkan;..\AssetLib\src;..\Libraries\include\vulkan;..\Libraries\include\imgui;..\Libraries\include\fmt\include;..\Libraries\include\glfw\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -118,12 +118,12 @@
     <ClInclude Include="src\Renderer\TextureSampler.h" />
     <ClInclude Include="src\Renderer\Vertex.h" />
     <ClInclude Include="src\Renderer\VertexBuffer.h" />
-    <ClInclude Include="src\Renderer\Vulkan\PipelineBarriers.h" />
     <ClInclude Include="src\Renderer\Vulkan\CommandBuffer.h" />
     <ClInclude Include="src\Renderer\Vulkan\CommandPool.h" />
     <ClInclude Include="src\Renderer\Vulkan\LogicalDevice.h" />
     <ClInclude Include="src\Renderer\Vulkan\PhysicalDevice.h" />
     <ClInclude Include="src\Renderer\Vulkan\Pipeline.h" />
+    <ClInclude Include="src\Renderer\Vulkan\PipelineBarriers.h" />
     <ClInclude Include="src\Renderer\Vulkan\Queue.h" />
     <ClInclude Include="src\Renderer\Vulkan\RenderPass.h" />
     <ClInclude Include="src\Renderer\Vulkan\Surface.h" />
@@ -179,8 +179,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag" />
-    <None Include="Shaders\depth_reduce.comp" />
-    <None Include="Shaders\indirect_compute.comp" />
     <None Include="Shaders\mesh_instanced.vert" />
     <None Include="Shaders\textured_lit.frag" />
     <None Include="Shaders\tri_mesh.vert" />

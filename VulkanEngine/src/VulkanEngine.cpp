@@ -219,7 +219,7 @@ void VulkanEngine::InitCVars() {
   AutoCVar_Int CVar_cull_enable("culling.enable", "Enable culling", 1,
                                 CVarFlagBits::kEditCheckbox);
   AutoCVar_Int CVar_cull_occlusion_enable("culling.occlusion_culling",
-                                          "Enable occlusion culling", 0,
+                                          "Enable occlusion culling", 1,
                                           CVarFlagBits::kEditCheckbox);
   AutoCVar_Float CVar_cull_dist("culling.distance",
                                 "Cull objects further than this", 1000.f,
