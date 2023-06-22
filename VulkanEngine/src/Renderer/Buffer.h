@@ -74,7 +74,10 @@ class Buffer : public BufferBase {
     buffer_ = VK_NULL_HANDLE;
   }
 
-  void* GetMappedMemory() { return mapped_memory_; }
+  template<typename T = void>
+  T* GetMappedMemory() {
+    return reinterpret_cast<T*>(mapped_memory_);
+  }
 
   void SetData(const void* data, size_t size, VkDeviceSize offset = 0) {
     char* addr = static_cast<char*>(mapped_memory_) + offset;

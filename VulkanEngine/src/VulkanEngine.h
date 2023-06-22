@@ -202,8 +202,12 @@ class VulkanEngine {
   std::vector<VkBufferMemoryBarrier> pre_cull_barriers_;
   std::vector<VkBufferMemoryBarrier> post_cull_barriers_;
 
+  VkPipeline sparse_upload_pipeline_;
+  VkPipelineLayout sparse_upload_layout_;
+
   VkPipeline cull_pipeline_;
   VkPipelineLayout cull_layout_;
+
   VkPipeline depth_reduce_pipeline_;
   VkPipelineLayout depth_reduce_layout_;
 

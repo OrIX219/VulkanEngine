@@ -180,6 +180,7 @@
   <ItemGroup>
     <None Include="Shaders\default_lit.frag" />
     <None Include="Shaders\mesh_instanced.vert" />
+    <None Include="Shaders\sparse_upload.comp" />
     <None Include="Shaders\textured_lit.frag" />
     <None Include="Shaders\tri_mesh.vert" />
   </ItemGroup>

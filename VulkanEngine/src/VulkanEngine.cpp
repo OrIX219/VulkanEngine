@@ -400,6 +400,8 @@ void VulkanEngine::InitPipelines() {
                     cull_layout_);
   LoadComputeShader("Shaders/depth_reduce.comp.spv", depth_reduce_pipeline_,
                     depth_reduce_layout_);
+  LoadComputeShader("Shaders/sparse_upload.comp.spv", sparse_upload_pipeline_,
+                    sparse_upload_layout_);
 }
 
 void VulkanEngine::InitSamplers() {
@@ -1058,17 +1060,15 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
     }
 
     // Full reupload if too much changed
-    constexpr float kFullReuploadCoefficient = 0.f; // For now reupload every time
+    constexpr float kFullReuploadCoefficient = 0.8f;
     if (render_scene_.dirty_objects.size() >=
         render_scene_.renderables.size() * kFullReuploadCoefficient) {
-      Renderer::Buffer<true> staging_buffer;
-      staging_buffer.Create(
+      Renderer::Buffer<true> staging_buffer(
           allocator_, copy_size,
           VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
           VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
       Renderer::GPUObjectData* object_ssbo =
-          reinterpret_cast<Renderer::GPUObjectData*>(
-              staging_buffer.GetMappedMemory());
+          staging_buffer.GetMappedMemory<Renderer::GPUObjectData>();
       render_scene_.FillObjectData(object_ssbo);
 
       frame.deletion_queue.PushFunction(
@@ -1076,7 +1076,70 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 
       staging_buffer.CopyTo(command_buffer, render_scene_.object_data_buffer);
     } else {
-      // TODO
+      uint64_t buffer_size =
+          sizeof(Renderer::GPUObjectData) * render_scene_.dirty_objects.size();
+      uint64_t word_size = sizeof(Renderer::GPUObjectData) / sizeof(uint32_t);
+      uint64_t upload_size =
+          render_scene_.dirty_objects.size() * word_size * sizeof(uint32_t);
+
+      Renderer::Buffer<true> new_buffer(
+          allocator_, buffer_size,
+          VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+      Renderer::Buffer<true> target_buffer(
+          allocator_, upload_size,
+          VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+          VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+      frame.deletion_queue.PushFunction(
+          std::bind(&Renderer::Buffer<true>::Destroy, new_buffer));
+      frame.deletion_queue.PushFunction(
+          std::bind(&Renderer::Buffer<true>::Destroy, target_buffer));
+
+      uint32_t* target_data = target_buffer.GetMappedMemory<uint32_t>();
+      Renderer::GPUObjectData* object_data =
+          new_buffer.GetMappedMemory<Renderer::GPUObjectData>();
+
+      uint32_t sidx = 0;
+      for (size_t i = 0; i < render_scene_.dirty_objects.size(); ++i) {
+        render_scene_.WriteObject(object_data + i,
+                                  render_scene_.dirty_objects[i]);
+        uint32_t dst_offset = static_cast<uint32_t>(
+            word_size * render_scene_.dirty_objects[i].handle);
+        for (size_t j = 0; j < word_size; ++j) {
+          target_data[sidx] = dst_offset + j;
+          ++sidx;
+        }
+      }
+      uint32_t launch_count = sidx;
+
+      VkDescriptorBufferInfo index_data = target_buffer.GetDescriptorInfo();
+      VkDescriptorBufferInfo source_data = new_buffer.GetDescriptorInfo();
+      VkDescriptorBufferInfo target_info =
+          render_scene_.object_data_buffer.GetDescriptorInfo();
+
+      VkDescriptorSet upload_set;
+      Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                         &frame.dynamic_descriptor_allocator)
+          .BindBuffer(0, &index_data, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                      VK_SHADER_STAGE_COMPUTE_BIT)
+          .BindBuffer(1, &source_data, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                      VK_SHADER_STAGE_COMPUTE_BIT)
+          .BindBuffer(2, &target_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                      VK_SHADER_STAGE_COMPUTE_BIT)
+          .Build(upload_set);
+
+      vkCmdBindPipeline(command_buffer.GetBuffer(),
+                        VK_PIPELINE_BIND_POINT_COMPUTE,
+                        sparse_upload_pipeline_);
+
+      vkCmdPushConstants(command_buffer.GetBuffer(), sparse_upload_layout_,
+                         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t),
+                         &launch_count);
+      vkCmdBindDescriptorSets(
+          command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE,
+          sparse_upload_layout_, 0, 1, &upload_set, 0, nullptr);
+
+      vkCmdDispatch(command_buffer.GetBuffer(), launch_count / 256 + 1, 1, 1);
     }
 
     Renderer::BufferMemoryBarrier barrier(
@@ -1164,8 +1227,8 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
         Renderer::GPUIndirectObject* indirect =
-            reinterpret_cast<Renderer::GPUIndirectObject*>(
-                pass->clear_indirect_buffer.GetMappedMemory());
+            pass->clear_indirect_buffer
+                .GetMappedMemory<Renderer::GPUIndirectObject>();
 
         async_calls.push_back(std::async(std::launch::async, [=]() {
           scene->FillIndirectArray(indirect, *pass);
@@ -1200,7 +1263,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
             std::bind(&Renderer::Buffer<true>::Destroy, staging));
 
         Renderer::GPUInstance* instance =
-            reinterpret_cast<Renderer::GPUInstance*>(staging.GetMappedMemory());
+            staging.GetMappedMemory<Renderer::GPUInstance>();
 
         async_calls.push_back(std::async(std::launch::async, [=]() {
           scene->FillInstanceArray(instance, *pass);

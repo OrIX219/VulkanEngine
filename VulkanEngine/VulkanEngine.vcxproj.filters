@@ -286,5 +286,6 @@
     <None Include="Shaders\tri_mesh.vert">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\sparse_upload.comp" />
   </ItemGroup>
 </Project>

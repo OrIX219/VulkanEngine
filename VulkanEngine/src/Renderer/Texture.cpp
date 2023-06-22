@@ -42,7 +42,7 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
   
   Assets::UnpackTexture(&texture_info, file.binary_blob.data(),
                         file.binary_blob.size(),
-                        static_cast<char*>(staging_buffer_.GetMappedMemory()));
+                        staging_buffer_.GetMappedMemory<char>());
 
   VkExtent3D extent{static_cast<uint32_t>(texture_info.pixel_size[0]),
                     static_cast<uint32_t>(texture_info.pixel_size[1]), 1};
