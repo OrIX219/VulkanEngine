@@ -709,16 +709,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   textured_info.textures.push_back(white_texture);
   Renderer::MaterialSystem::BuildMaterial("textured", textured_info);
 
-  glm::mat4 room_root = glm::translate(glm::mat4{1.f}, glm::vec3(0, 0, -5));
-  room_root =
-      glm::rotate(room_root, glm::radians(-45.f), glm::vec3(0.f, 1.f, 0.f));
-  room_root =
-      glm::rotate(room_root, glm::radians(-45.f), glm::vec3(0.f, 0.f, 1.f));
-  LoadPrefab(command_buffer, AssetPath("viking_room.pfb").c_str(), room_root);
-  // LoadPrefab(command_buffer, AssetPath("star.pfb").c_str(), glm::mat4{1.f});
-  LoadPrefab(command_buffer, AssetPath("star_untextured.pfb").c_str());
-  LoadPrefab(command_buffer, AssetPath("two_stars.pfb").c_str());
-  //LoadPrefab(command_buffer, AssetPath("wall.pfb").c_str());
+  LoadPrefab(command_buffer, AssetPath("Test.pfb").c_str());
 
   command_buffer.End();
   command_buffer.AddToBatch();
@@ -1048,6 +1039,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
   if (render_scene_.dirty_objects.size() > 0) {
 
     // Realloc if not enough space
+    bool full_reupload = false;
     size_t copy_size =
         render_scene_.renderables.size() * sizeof(Renderer::GPUObjectData);
     if (copy_size > render_scene_.object_data_buffer.GetSize()) {
@@ -1057,12 +1049,15 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
           allocator_, copy_size,
           VK_BUFFER_USAGE_TRANSFER_DST_BIT |
               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+      full_reupload = true;
     }
 
     // Full reupload if too much changed
     constexpr float kFullReuploadCoefficient = 0.8f;
-    if (render_scene_.dirty_objects.size() >=
-        render_scene_.renderables.size() * kFullReuploadCoefficient) {
+    full_reupload = full_reupload || render_scene_.dirty_objects.size() >=
+                                         render_scene_.renderables.size() *
+                                             kFullReuploadCoefficient;
+    if (full_reupload) {
       Renderer::Buffer<true> staging_buffer(
           allocator_, copy_size,
           VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,

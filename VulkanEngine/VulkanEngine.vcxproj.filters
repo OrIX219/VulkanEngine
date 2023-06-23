@@ -287,5 +287,7 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\sparse_upload.comp" />
+    <None Include="Shaders\indirect_compute.comp" />
+    <None Include="Shaders\depth_reduce.comp" />
   </ItemGroup>
 </Project>

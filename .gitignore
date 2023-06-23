@@ -2,3 +2,4 @@
 bin
 obj
 VulkanEngine/imgui.ini
+VulkanEngine/asset_export
