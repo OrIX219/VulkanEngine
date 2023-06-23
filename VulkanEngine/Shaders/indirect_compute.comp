@@ -21,6 +21,7 @@ layout(push_constant) uniform constants {
 
 struct ObjectData {
 	mat4 model;
+	mat4 normalMat;
 	vec4 bounds;
 	vec4 extents;
 };
@@ -58,12 +59,7 @@ layout(set = 0, binding = 3)  buffer InstanceBuffer3 {
 
 layout(set = 0, binding = 4) uniform sampler2D depthPyramid;
 
-layout(set = 0, binding = 5) uniform CameraBuffer {
-	mat4 view;
-	mat4 proj;
-} cameraData;
-
-layout(set = 0, binding = 6) buffer CountBuffer {
+layout(set = 0, binding = 5) buffer CountBuffer {
 	uint counts[];
 } finalCountBuffer;
 

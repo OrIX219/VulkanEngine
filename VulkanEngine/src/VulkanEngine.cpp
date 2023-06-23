@@ -213,8 +213,14 @@ void VulkanEngine::Cleanup() {
 void VulkanEngine::InitCVars() {
   AutoCVar_Vec4 CVar_clear_color("scene.clear_color", "Background color",
                                  {0.f, 0.f, 0.f, 1.f});
-  AutoCVar_Vec4 CVar_ambient_color("scene.ambient_color", "Global color tint",
-                                 {1.f, 1.f, 1.f, 1.f});
+  AutoCVar_Vec4 CVar_ambient_light("scene.ambient_light",
+                                   "Ambient light color (xyz) and power (w)",
+                                   {1.f, 1.f, 1.f, 0.1f});
+  AutoCVar_Vec4 CVar_sunlight_dir("scene.sunlight_dir", "Sunlight direction",
+                                  {1.f, 1.f, 1.f, 1.f});
+  AutoCVar_Vec4 CVar_sunlight_color("scene.sunlight_color",
+                                    "Sunlight color (xyz) and power (w)",
+                                    {1.f, 1.f, 1.f, 1.f});
 
   AutoCVar_Int CVar_cull_enable("culling.enable", "Enable culling", 1,
                                 CVarFlagBits::kEditCheckbox);
@@ -1323,9 +1329,6 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
   VkDescriptorBufferInfo object_buffer_info =
       render_scene_.object_data_buffer.GetDescriptorInfo();
 
-  VkDescriptorBufferInfo dynamic_info = frame.dynamic_data.GetDescriptorInfo();
-  dynamic_info.range = sizeof(Renderer::GPUCameraData);
-
   VkDescriptorBufferInfo indirect_info =
       pass.draw_indirect_buffer.GetDescriptorInfo();
 
@@ -1355,9 +1358,7 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
                   VK_SHADER_STAGE_COMPUTE_BIT)
       .BindImage(4, &depth_pyramid, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                  VK_SHADER_STAGE_COMPUTE_BIT)
-      .BindBuffer(5, &dynamic_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                  VK_SHADER_STAGE_COMPUTE_BIT)
-      .BindBuffer(6, &count_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .BindBuffer(5, &count_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                   VK_SHADER_STAGE_COMPUTE_BIT)
       .Build(compute_set);
 
@@ -1423,9 +1424,16 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
   scene_data_.camera_data.view = camera_.GetViewMat();
   scene_data_.camera_data.projection = camera_.GetProjMat();
-  auto ambient_color = CVarSystem::Get()->GetVec4CVar("scene.ambient_color");
+  scene_data_.camera_data.pos = camera_.GetPosition();
+  auto ambient_color = CVarSystem::Get()->GetVec4CVar("scene.ambient_light");
   scene_data_.ambient_color = {ambient_color->x, ambient_color->y,
                                ambient_color->z, ambient_color->w};
+  auto sunlight_dir = CVarSystem::Get()->GetVec4CVar("scene.sunlight_dir");
+  scene_data_.sunlight_direction = {sunlight_dir->x, sunlight_dir->y,
+                                    sunlight_dir->z, sunlight_dir->w};
+  auto sunlight_color = CVarSystem::Get()->GetVec4CVar("scene.sunlight_color");
+  scene_data_.sunlight_color = {sunlight_color->x, sunlight_color->y,
+                                sunlight_color->z, sunlight_color->w};
   uint32_t scene_data_offset = frame.dynamic_data.Push(scene_data_);
 
   VkDescriptorBufferInfo object_buffer_info =

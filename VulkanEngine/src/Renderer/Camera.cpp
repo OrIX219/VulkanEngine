@@ -14,11 +14,11 @@ Camera::Camera()
       yaw_{-90.f},
       pitch_{0.f} {}
 
-glm::mat4 Camera::GetViewMat() const {
+const glm::mat4& Camera::GetViewMat() const {
   return glm::lookAt(pos_, pos_ + front_, up_);
 }
 
-glm::mat4 Camera::GetProjMat(bool reverse) const {
+const glm::mat4& Camera::GetProjMat(bool reverse) const {
   glm::mat4 projection;
   if (reverse) {
     projection =
@@ -30,6 +30,8 @@ glm::mat4 Camera::GetProjMat(bool reverse) const {
   projection[1][1] *= -1;
   return projection;
 }
+
+const glm::vec3& Camera::GetPosition() const { return pos_; }
 
 void Camera::ProcessKeyboard(Direction direction, float delta_time) {
   float velocity = speed_ * delta_time;

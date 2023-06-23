@@ -154,6 +154,7 @@ void RenderScene::WriteObject(GPUObjectData* target,
   GPUObjectData object;
 
   object.model_matrix = renderable->transform_matrix;
+  object.normal_matrix = glm::transpose(glm::inverse(object.model_matrix));
   object.origin_radius =
       glm::vec4(renderable->bounds.origin, renderable->bounds.radius);
   object.extents = glm::vec4(renderable->bounds.extents,

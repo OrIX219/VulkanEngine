@@ -39,6 +39,7 @@ namespace Renderer {
 struct GPUCameraData {
   glm::mat4 view;
   glm::mat4 projection;
+  alignas(16) glm::vec3 pos;
 };
 
 struct GPUSceneData {
@@ -52,6 +53,7 @@ struct GPUSceneData {
 
 struct GPUObjectData {
   glm::mat4 model_matrix;
+  glm::mat4 normal_matrix;
   glm::vec4 origin_radius;
   glm::vec4 extents;
 };
