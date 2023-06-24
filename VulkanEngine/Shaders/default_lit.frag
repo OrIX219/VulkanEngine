@@ -24,7 +24,7 @@ layout(set = 0, binding = 0) uniform SceneData {
 void main() {
 	vec3 ambient = sceneData.ambientColor.xyz * sceneData.ambientColor.w;
 
-	vec3 lightDir = normalize(-sceneData.sunlightDirection.xyz);
+	vec3 lightDir = normalize(sceneData.sunlightDirection.xyz);
 	float diff = max(0.0, dot(inNormal, lightDir));
 	vec3 diffuse = diff * sceneData.sunlightColor.xyz * sceneData.sunlightColor.w;
 

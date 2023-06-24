@@ -40,7 +40,8 @@ void MaterialSystem::Init(Engine::VulkanEngine* engine) {
 void MaterialSystem::Cleanup() {}
 
 ShaderEffect* MaterialSystem::BuildEffect(std::string_view vertex_shader,
-                                          std::string_view fragment_shader) {
+                                          std::string_view fragment_shader,
+                                          std::string_view geometry_shader) {
   MaterialSystem& system = Get();
 
   std::array<ShaderEffect::ReflectionOverrides, 1> overrides = {
@@ -55,6 +56,10 @@ ShaderEffect* MaterialSystem::BuildEffect(std::string_view vertex_shader,
     effect->AddStage(system.engine_->shader_cache_.GetShader(
                          "Shaders/" + std::string{fragment_shader}),
                      VK_SHADER_STAGE_FRAGMENT_BIT);
+  if (geometry_shader.size() > 2)
+    effect->AddStage(system.engine_->shader_cache_.GetShader(
+                         "Shaders/" + std::string{geometry_shader}),
+                     VK_SHADER_STAGE_GEOMETRY_BIT);
 
   effect->ReflectLayout(&system.engine_->device_, overrides.data(),
                         overrides.size());
@@ -74,11 +79,15 @@ void MaterialSystem::BuildDefaultTemplates() {
       BuildEffect("mesh_instanced.vert.spv", "textured_lit.frag.spv");
   ShaderEffect* default_lit =
       BuildEffect("mesh_instanced.vert.spv", "default_lit.frag.spv");
+  ShaderEffect* normals = BuildEffect(
+      "normals.vert.spv", "normals.frag.spv", "normals.geom.spv");
 
   ShaderPass* textured_lit_pass = BuildShader(
       &system.engine_->render_pass_, system.forward_builder_, textured_lit);
   ShaderPass* default_lit_pass = BuildShader(
       &system.engine_->render_pass_, system.forward_builder_, default_lit);
+  ShaderPass* normals_pass = BuildShader(&system.engine_->render_pass_,
+                                         system.forward_builder_, normals);
 
   {
     EffectTemplate default_textured;
@@ -128,6 +137,17 @@ void MaterialSystem::BuildDefaultTemplates() {
     default_colored.transparency = Assets::TransparencyMode::kOpaque;
 
     system.template_cache_["colored_opaque"] = default_colored;
+  }
+  {
+    EffectTemplate normals_template;
+    normals_template.pass_shaders[MeshPassType::kForward] = normals_pass;
+    normals_template.pass_shaders[MeshPassType::kTransparency] = nullptr;
+    normals_template.pass_shaders[MeshPassType::kDirectionalShadow] =
+        nullptr;
+
+    normals_template.transparency = Assets::TransparencyMode::kOpaque;
+
+    system.template_cache_["normals"] = normals_template;
   }
 }
 

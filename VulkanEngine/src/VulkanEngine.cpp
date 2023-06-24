@@ -144,14 +144,15 @@ void VulkanEngine::Init() {
 
   render_scene_.Init();
 
+  Renderer::MaterialSystem::Init(this);
+  LOG_SUCCESS("Material System initialized");
+  
   InitSyncStructures();
   InitDescriptors();
   InitPipelines();
   InitSamplers();
   InitDepthPyramid(init_pool);
   LOG_SUCCESS("Descriptors initialized");
-  Renderer::MaterialSystem::Init(this);
-  LOG_SUCCESS("Material System initialized");
 
   Renderer::Queue& init_queue = device_.GetQueue(init_pool.GetQueueFamily());
 
@@ -211,6 +212,9 @@ void VulkanEngine::Cleanup() {
 }
 
 void VulkanEngine::InitCVars() {
+  AutoCVar_Int CVar_show_normals("show_normals", "Render vertex normals", 0,
+                                 CVarFlagBits::kEditCheckbox);
+
   AutoCVar_Vec4 CVar_clear_color("scene.clear_color", "Background color",
                                  {0.f, 0.f, 0.f, 1.f});
   AutoCVar_Vec4 CVar_ambient_light("scene.ambient_light",
@@ -408,6 +412,12 @@ void VulkanEngine::InitPipelines() {
                     depth_reduce_layout_);
   LoadComputeShader("Shaders/sparse_upload.comp.spv", sparse_upload_pipeline_,
                     sparse_upload_layout_);
+
+  Renderer::MaterialData normals;
+  normals.base_template = "normals";
+  Renderer::Material* material =
+      Renderer::MaterialSystem::BuildMaterial("normals", normals);
+  if (!material) LOG_FATAL("Failed to build normals material");
 }
 
 void VulkanEngine::InitSamplers() {
@@ -1541,6 +1551,51 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
             multibatch.first * sizeof(Renderer::GPUIndirectObject),
             pass.count_buffer.GetBuffer(), multibatch.first * sizeof(uint32_t),
             multibatch.count, sizeof(Renderer::GPUIndirectObject));
+      }
+
+      bool show_normals = *CVarSystem::Get()->GetIntCVar("show_normals");
+      if (show_normals) {
+        Renderer::Material* material =
+            Renderer::MaterialSystem::GetMaterial("normals");
+        VkPipeline pipeline =
+            material->original->pass_shaders[Renderer::MeshPassType::kForward]
+                ->pipeline;
+        VkPipelineLayout layout =
+            material->original->pass_shaders[Renderer::MeshPassType::kForward]
+                ->pipeline_layout;
+
+        last_pipeline = pipeline;
+
+        VkDescriptorSet normals_global_set;
+        Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                           &frame.dynamic_descriptor_allocator)
+            .BindBuffer(
+                0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT)
+            .Build(normals_global_set);
+
+        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                                VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1,
+                                &normals_global_set,
+                                static_cast<uint32_t>(dynamic_offsets.size()),
+                                dynamic_offsets.data());
+        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                                VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 1, 1,
+                                &frame.object_descriptor, 0, nullptr);
+
+        vkCmdBindPipeline(command_buffer.GetBuffer(),
+                          VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        if (!has_indices) {
+          vkCmdDraw(command_buffer.GetBuffer(), draw_mesh->GetVerticesCount(),
+                    instance.count, 0, instance.first);
+        } else {
+          vkCmdDrawIndexedIndirectCount(
+              command_buffer.GetBuffer(), pass.draw_indirect_buffer.GetBuffer(),
+              multibatch.first * sizeof(Renderer::GPUIndirectObject),
+              pass.count_buffer.GetBuffer(),
+              multibatch.first * sizeof(uint32_t), multibatch.count,
+              sizeof(Renderer::GPUIndirectObject));
+        }
       }
     }
   }

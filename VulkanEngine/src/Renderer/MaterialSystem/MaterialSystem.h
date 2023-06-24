@@ -93,7 +93,8 @@ class MaterialSystem {
 
  private:
   static ShaderEffect* BuildEffect(std::string_view vertex_shader,
-                                   std::string_view fragment_shader);
+                                   std::string_view fragment_shader,
+                                   std::string_view geometry_shader = {});
 
   struct MaterialInfoHash {
     size_t operator()(const MaterialData& data) const { return data.hash(); }

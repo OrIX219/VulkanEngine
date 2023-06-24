@@ -72,7 +72,7 @@
       <AdditionalLibraryDirectories>..\Libraries\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>for %%f in ($(ProjectDir)Shaders\*.vert $(ProjectDir)Shaders\*.frag $(ProjectDir)Shaders\*.comp) do D:/VulkanSDK/Bin/glslangValidator.exe -V -o %%f.spv %%f</Command>
+      <Command>for %%f in ($(ProjectDir)Shaders\*.vert $(ProjectDir)Shaders\*.frag $(ProjectDir)Shaders\*.comp $(ProjectDir)Shaders\*.geom) do D:/VulkanSDK/Bin/glslangValidator.exe -V -o %%f.spv %%f</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -96,7 +96,7 @@
       <AdditionalLibraryDirectories>..\Libraries\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>for %%f in ($(ProjectDir)Shaders\*.vert $(ProjectDir)Shaders\*.frag $(ProjectDir)Shaders\*.comp) do D:/VulkanSDK/Bin/glslangValidator.exe -V -o %%f.spv %%f</Command>
+      <Command>for %%f in ($(ProjectDir)Shaders\*.vert $(ProjectDir)Shaders\*.frag $(ProjectDir)Shaders\*.comp $(ProjectDir)Shaders\*.geom) do D:/VulkanSDK/Bin/glslangValidator.exe -V -o %%f.spv %%f</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -182,6 +182,9 @@
     <None Include="Shaders\depth_reduce.comp" />
     <None Include="Shaders\indirect_compute.comp" />
     <None Include="Shaders\mesh_instanced.vert" />
+    <None Include="Shaders\normals.frag" />
+    <None Include="Shaders\normals.geom" />
+    <None Include="Shaders\normals.vert" />
     <None Include="Shaders\sparse_upload.comp" />
     <None Include="Shaders\textured_lit.frag" />
     <None Include="Shaders\tri_mesh.vert" />
