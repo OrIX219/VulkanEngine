@@ -16,7 +16,7 @@ class RenderPass {
   ~RenderPass();
 
   VkResult CreateDefault(LogicalDevice* device, VkFormat image_format);
-  VkResult Create(LogicalDevice* device, VkRenderPassCreateInfo* create_info);
+  VkResult Create(LogicalDevice* device, VkRenderPassCreateInfo2* create_info);
   void Destroy();
 
   VkRenderPass GetRenderPass() const;
@@ -34,7 +34,7 @@ class RenderPass {
 };
 
 struct RenderPassAttachment {
-  VkAttachmentDescription description;
+  VkAttachmentDescription2 description;
 
   RenderPassAttachment();
 
@@ -52,9 +52,12 @@ struct RenderPassAttachment {
 };
 
 struct RenderPassSubpass {
-  std::vector<VkAttachmentReference> color_attachments;
-  std::vector<VkAttachmentReference> resolve_attachments;
-  std::optional<VkAttachmentReference> depth_stencil_attachment;
+  std::vector<VkAttachmentReference2> color_attachments;
+  std::vector<VkAttachmentReference2> resolve_attachments;
+  std::optional<VkAttachmentReference2> depth_stencil_attachment;
+  std::optional<VkAttachmentReference2> depth_stencil_resolve_attachment;
+  VkSubpassDescriptionDepthStencilResolve depth_stencil_resolve{};
+
 
   RenderPassSubpass& AddColorAttachmentRef(uint32_t attachment_index,
       VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -64,6 +67,10 @@ struct RenderPassSubpass {
       VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
   RenderPassSubpass& SetDepthStencilAttachmentRef(uint32_t attachment_index,
+      VkImageLayout layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+  RenderPassSubpass& SetDepthStencilResolveAttachmentRef(
+      uint32_t attachment_index,
       VkImageLayout layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 };
 
@@ -85,9 +92,9 @@ class RenderPassBuilder {
                                    VkAccessFlags dst_access_mask);
 
  private:
-  std::vector<VkAttachmentDescription> attachments_;
-  std::vector<VkSubpassDescription> subpasses_;
-  std::vector<VkSubpassDependency> subpass_dependencies_;
+  std::vector<VkAttachmentDescription2> attachments_;
+  std::vector<VkSubpassDescription2> subpasses_;
+  std::vector<VkSubpassDependency2> subpass_dependencies_;
 
   LogicalDevice* device_;
 };

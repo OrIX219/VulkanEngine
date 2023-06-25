@@ -77,11 +77,11 @@ VkResult RenderPass::CreateDefault(LogicalDevice* device,
 }
 
 VkResult RenderPass::Create(LogicalDevice* device,
-                            VkRenderPassCreateInfo* create_info) {
+                            VkRenderPassCreateInfo2* create_info) {
   device_ = device;
 
-  return vkCreateRenderPass(device_->GetDevice(), create_info, nullptr,
-                            &render_pass_);
+  return vkCreateRenderPass2(device_->GetDevice(), create_info, nullptr,
+                             &render_pass_);
 }
 
 void RenderPass::Destroy() {
@@ -110,7 +110,8 @@ void RenderPass::End(CommandBuffer command_buffer) {
   vkCmdEndRenderPass(command_buffer.GetBuffer());
 }
 
-RenderPassAttachment::RenderPassAttachment() : description{0} {}
+RenderPassAttachment::RenderPassAttachment()
+    : description{VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2} {}
 
 RenderPassAttachment& RenderPassAttachment::SetFormat(VkFormat format) {
   description.format = format;
@@ -144,7 +145,7 @@ RenderPassAttachment& RenderPassAttachment::SetDefaults() {
 
 RenderPassSubpass& RenderPassSubpass::AddColorAttachmentRef(
     uint32_t attachment_index, VkImageLayout layout) {
-  VkAttachmentReference attachment{};
+  VkAttachmentReference2 attachment{VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
   attachment.attachment = attachment_index;
   attachment.layout = layout;
   color_attachments.push_back(attachment);
@@ -154,7 +155,7 @@ RenderPassSubpass& RenderPassSubpass::AddColorAttachmentRef(
 
 RenderPassSubpass& RenderPassSubpass::AddResolveAttachmentRef(
     uint32_t attachment_index, VkImageLayout layout) {
-  VkAttachmentReference attachment{};
+  VkAttachmentReference2 attachment{VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
   attachment.attachment = attachment_index;
   attachment.layout = layout;
   resolve_attachments.push_back(attachment);
@@ -164,14 +165,34 @@ RenderPassSubpass& RenderPassSubpass::AddResolveAttachmentRef(
 
 RenderPassSubpass& RenderPassSubpass::SetDepthStencilAttachmentRef(
     uint32_t attachment_index, VkImageLayout layout) {
-  depth_stencil_attachment = {attachment_index, layout};
+  VkAttachmentReference2 attachment{VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
+  attachment.attachment = attachment_index;
+  attachment.layout = layout;
+  depth_stencil_attachment = attachment;
   
   return *this;
 }
 
+RenderPassSubpass& RenderPassSubpass::SetDepthStencilResolveAttachmentRef(
+    uint32_t attachment_index, VkImageLayout layout) {
+  VkAttachmentReference2 attachment{VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2};
+  attachment.attachment = attachment_index;
+  attachment.layout = layout;
+  depth_stencil_resolve_attachment = attachment;
+
+  depth_stencil_resolve.sType =
+      VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE;
+  depth_stencil_resolve.depthResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
+  depth_stencil_resolve.stencilResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
+  depth_stencil_resolve.pDepthStencilResolveAttachment =
+      &depth_stencil_resolve_attachment.value();
+
+  return *this;
+}
+
 RenderPass RenderPassBuilder::Build() {
-  VkRenderPassCreateInfo render_pass_info{};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  VkRenderPassCreateInfo2 render_pass_info{};
+  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2;
   render_pass_info.attachmentCount = static_cast<uint32_t>(attachments_.size());
   render_pass_info.pAttachments = attachments_.data();
   render_pass_info.subpassCount = static_cast<uint32_t>(subpasses_.size());
@@ -202,7 +223,7 @@ RenderPassBuilder& RenderPassBuilder::AddAttachment(
 
 RenderPassBuilder& RenderPassBuilder::AddSubpass(
     RenderPassSubpass* subpass, VkPipelineBindPoint bind_point) {
-  VkSubpassDescription subpass_info{};
+  VkSubpassDescription2 subpass_info{VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2};
   subpass_info.pipelineBindPoint = bind_point;
   subpass_info.colorAttachmentCount =
       static_cast<uint32_t>(subpass->color_attachments.size());
@@ -211,6 +232,9 @@ RenderPassBuilder& RenderPassBuilder::AddSubpass(
     subpass_info.pResolveAttachments = subpass->resolve_attachments.data();
   if (subpass->depth_stencil_attachment.has_value())
     subpass_info.pDepthStencilAttachment = &subpass->depth_stencil_attachment.value();
+  if (subpass->depth_stencil_resolve_attachment.has_value())
+    subpass_info.pNext = &subpass->depth_stencil_resolve;
+
   subpasses_.push_back(subpass_info);
 
   return *this;
@@ -220,7 +244,7 @@ RenderPassBuilder& RenderPassBuilder::AddDependency(
     uint32_t src_subpass, uint32_t dst_subpass,
     VkPipelineStageFlags src_stage_mask, VkAccessFlags src_access_mask,
     VkPipelineStageFlags dst_stage_mask, VkAccessFlags dst_access_mask) {
-  VkSubpassDependency dependency{};
+  VkSubpassDependency2 dependency{VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2};
   dependency.srcSubpass = src_subpass;
   dependency.dstSubpass = dst_subpass;
   dependency.srcStageMask = src_stage_mask;

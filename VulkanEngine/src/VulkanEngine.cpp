@@ -77,6 +77,7 @@ void VulkanEngine::Init() {
                              VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
                              VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME}));
   LOG_SUCCESS("GPU found");
+  samples_ = physical_device_.GetMaxSamples();
   VK_CHECK(device_.Init(&physical_device_));
   LOG_SUCCESS("Logical device initialized");
 
@@ -107,12 +108,25 @@ void VulkanEngine::Init() {
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
       samples_));
   LOG_SUCCESS("Color image created");
+  VK_CHECK(color_resolve_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
+      VK_SAMPLE_COUNT_1_BIT));
+  LOG_SUCCESS("Color resolve image created");
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
-      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      1, samples_, VK_FORMAT_D32_SFLOAT,
-      VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT));
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+          VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+      1, samples_, VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_ASPECT_DEPTH_BIT));
   LOG_SUCCESS("Depth image created");
+  VK_CHECK(depth_resolve_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      1, VK_SAMPLE_COUNT_1_BIT,
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_ASPECT_DEPTH_BIT));
+  LOG_SUCCESS("Depth resolve image created");
 
   InitRenderPasses(samples_);
   LOG_SUCCESS("Render passes initialized");
@@ -183,7 +197,9 @@ void VulkanEngine::Cleanup() {
     for (size_t i = 0; i < kMaxFramesInFlight; ++i)
       swapchain_framebuffers_[i].Destroy();
     depth_pyramid_.Destroy();
+    depth_resolve_image_.Destroy();
     depth_image_.Destroy();
+    color_resolve_image_.Destroy();
     color_image_.Destroy();
     swapchain_.Destroy();
 
@@ -303,11 +319,19 @@ void VulkanEngine::InitCVars() {
 void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
   Renderer::RenderPassBuilder render_pass_builder(&device_);
   {
-    Renderer::RenderPassAttachment color_attachment, depth_attachment;
+    Renderer::RenderPassAttachment color_attachment, color_resolve_attachment,
+        depth_attachment, depth_resolve_attachment;
     color_attachment
         .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
                        VK_ATTACHMENT_STORE_OP_STORE)
         .SetSamples(samples)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+        .SetFormat(swapchain_.GetImageFormat());
+    color_resolve_attachment
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetSamples(VK_SAMPLE_COUNT_1_BIT)
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
         .SetFormat(swapchain_.GetImageFormat());
@@ -318,11 +342,22 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         .SetFormat(VK_FORMAT_D32_SFLOAT);
+    depth_resolve_attachment.SetDefaults()
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        .SetFormat(VK_FORMAT_D32_SFLOAT);
 
     Renderer::RenderPassSubpass subpass;
     render_pass_builder.AddAttachment(&color_attachment)
-        .AddAttachment(&depth_attachment);
-    subpass.AddColorAttachmentRef(0).SetDepthStencilAttachmentRef(1);
+        .AddAttachment(&depth_attachment)
+        .AddAttachment(&color_resolve_attachment)
+        .AddAttachment(&depth_resolve_attachment);
+    subpass.AddColorAttachmentRef(0)
+        .SetDepthStencilAttachmentRef(1)
+        .AddResolveAttachmentRef(2)
+        .SetDepthStencilResolveAttachmentRef(3);
 
     render_pass_builder.AddSubpass(&subpass);
     render_pass_builder
@@ -346,7 +381,10 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
   render_pass_builder.Clear();
   {
     Renderer::RenderPassAttachment color_attachment;
-    color_attachment.SetDefaults().SetFormat(swapchain_.GetImageFormat());
+    color_attachment.SetDefaults()
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetFormat(swapchain_.GetImageFormat());
 
     Renderer::RenderPassSubpass subpass;
     render_pass_builder.AddAttachment(&color_attachment);
@@ -367,8 +405,9 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
 
 void VulkanEngine::InitFramebuffers() {
   VkExtent2D extent = swapchain_.GetImageExtent();
-  std::vector<VkImageView> attachments = {color_image_.GetView(),
-                                          depth_image_.GetView()};
+  std::vector<VkImageView> attachments = {
+      color_image_.GetView(), depth_image_.GetView(),
+      color_resolve_image_.GetView(), depth_resolve_image_.GetView()};
 
   VK_CHECK(forward_framebuffer_.Create(&device_, &forward_pass_, extent,
                                        attachments));
@@ -922,15 +961,31 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
       samples_));
 
+  color_resolve_image_.Destroy();
+  VK_CHECK(color_resolve_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
+      VK_SAMPLE_COUNT_1_BIT));
+
   depth_image_.Destroy();
-  depth_image_.Create(
+  VK_CHECK(depth_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+          VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+      1, samples_, VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_ASPECT_DEPTH_BIT));
+
+  depth_resolve_image_.Destroy();
+  VK_CHECK(depth_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      1, samples_, VK_FORMAT_D32_SFLOAT,
-      VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+      1, VK_SAMPLE_COUNT_1_BIT,
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_ASPECT_DEPTH_BIT));
 
-  std::vector<VkImageView> attachments = {color_image_.GetView(),
-                                          depth_image_.GetView()};
+  std::vector<VkImageView> attachments = {
+      color_image_.GetView(), depth_image_.GetView(),
+      color_resolve_image_.GetView(), depth_resolve_image_.GetView()};
   VK_CHECK(forward_framebuffer_.Resize(extent, attachments));
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(swapchain_framebuffers_[i].Resize(extent,
@@ -1459,6 +1514,8 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
+  Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Forward Draw");
+
   VkClearValue clear_value{};
   auto clear_color = CVarSystem::Get()->GetVec4CVar("scene.clear_color");
   clear_value.color = {
@@ -1468,7 +1525,7 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
   forward_pass_.Begin(command_buffer, forward_framebuffer_.GetFramebuffer(),
                       {{0, 0}, swapchain_.GetImageExtent()},
-                      {clear_value, depth_clear, clear_value});
+                      {clear_value, depth_clear, clear_value, depth_clear});
 
   VkExtent2D extent = swapchain_.GetImageExtent();
   VkViewport viewport{0.f, 0.f, (float)extent.width, (float)extent.height,
@@ -1666,7 +1723,7 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
 
   Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Depth Reduce");
 
-  depth_image_.TransitionLayout(
+  depth_resolve_image_.TransitionLayout(
       command_buffer, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
       VK_ACCESS_SHADER_READ_BIT,
       VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
@@ -1687,7 +1744,7 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
     VkDescriptorImageInfo src;
     src.sampler = depth_reduction_sampler_.GetSampler();
     if (i == 0) {
-      src.imageView = depth_image_.GetView();
+      src.imageView = depth_resolve_image_.GetView();
       src.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     } else {
       src.imageView = depth_pyramid_mips_[i - 1];
@@ -1728,7 +1785,7 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
         VK_DEPENDENCY_BY_REGION_BIT);
   }
 
-  depth_image_.TransitionLayout(
+  depth_resolve_image_.TransitionLayout(
       command_buffer, VK_ACCESS_SHADER_READ_BIT,
       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
@@ -1743,6 +1800,8 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                                          uint32_t index) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
+
+  Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Copy to Swapchain");
 
   VkClearValue clear_value = {{{0.f, 0.f, 0.f, 1.f}}};
   copy_pass_.Begin(
@@ -1763,7 +1822,7 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
 
   VkDescriptorImageInfo source_image;
   source_image.sampler = smooth_sampler_.GetSampler();
-  source_image.imageView = color_image_.GetView();
+  source_image.imageView = color_resolve_image_.GetView();
   source_image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
   VkDescriptorSet blit_set;

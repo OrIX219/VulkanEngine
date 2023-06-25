@@ -185,6 +185,8 @@ class VulkanEngine {
   Renderer::Swapchain swapchain_;
   Renderer::Image color_image_;
   Renderer::Image depth_image_;
+  Renderer::Image color_resolve_image_;
+  Renderer::Image depth_resolve_image_;
 
   Renderer::Image depth_pyramid_;
   uint32_t depth_pyramid_width_;
