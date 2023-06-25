@@ -128,7 +128,7 @@
     <ClInclude Include="src\Renderer\Vulkan\RenderPass.h" />
     <ClInclude Include="src\Renderer\Vulkan\Surface.h" />
     <ClInclude Include="src\Renderer\Vulkan\Swapchain.h" />
-    <ClInclude Include="src\Renderer\Vulkan\SwapchainFramebuffers.h" />
+    <ClInclude Include="src\Renderer\Vulkan\Framebuffer.h" />
     <ClInclude Include="src\Renderer\Vulkan\VulkanInstance.h" />
     <ClInclude Include="src\Renderer\VulkanProfiler.h" />
     <ClInclude Include="src\Renderer\Window.h" />
@@ -170,7 +170,7 @@
     <ClCompile Include="src\Renderer\Vulkan\RenderPass.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\Surface.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\Swapchain.cpp" />
-    <ClCompile Include="src\Renderer\Vulkan\SwapchainFramebuffers.cpp" />
+    <ClCompile Include="src\Renderer\Vulkan\Framebuffer.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\VulkanInstance.cpp" />
     <ClCompile Include="src\Renderer\VulkanProfiler.cpp" />
     <ClCompile Include="src\Renderer\Window.cpp" />

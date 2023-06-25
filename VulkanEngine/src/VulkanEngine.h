@@ -8,6 +8,7 @@
 #include "CommandPool.h"
 #include "DeletionQueue.h"
 #include "Descriptors.h"
+#include "Framebuffer.h"
 #include "Image.h"
 #include "LogicalDevice.h"
 #include "MaterialSystem.h"
@@ -21,7 +22,6 @@
 #include "Shaders.h"
 #include "Surface.h"
 #include "Swapchain.h"
-#include "SwapchainFramebuffers.h"
 #include "Texture.h"
 #include "TextureSampler.h"
 #include "VulkanInstance.h"
@@ -133,6 +133,7 @@ class VulkanEngine {
  private:
   void InitCVars();
   void InitRenderPasses(VkSampleCountFlagBits samples);
+  void InitFramebuffers();
   void InitSyncStructures();
   void InitDescriptors();
   void InitPipelines();
@@ -189,7 +190,7 @@ class VulkanEngine {
   uint32_t depth_pyramid_levels_;
 
   Renderer::RenderPass render_pass_;
-  Renderer::SwapchainFramebuffers swapchain_framebuffers_;
+  std::array<Renderer::Framebuffer, kMaxFramesInFlight> swapchain_framebuffers_;
 
   Renderer::DescriptorAllocator descriptor_allocator_;
   Renderer::DescriptorLayoutCache layout_cache_;

@@ -1,0 +1,54 @@
+#include "Framebuffer.h"
+
+namespace Renderer {
+
+Framebuffer::Framebuffer() {}
+
+Framebuffer::~Framebuffer() {}
+
+VkFramebuffer Framebuffer::GetFramebuffer() const { return framebuffer_; }
+
+VkResult Framebuffer::Resize(VkExtent2D extent) {
+  extent_ = extent;
+  Destroy();
+  return Create();
+}
+
+VkResult Framebuffer::Resize(VkExtent2D extent,
+                             const std::vector<VkImageView>& attachments) {
+  attachments_ = attachments;
+  extent_ = extent;
+  Destroy();
+  return Create();
+}
+
+VkResult Framebuffer::Create() {
+  VkFramebufferCreateInfo framebuffer_info{};
+  framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+  framebuffer_info.renderPass = render_pass_->GetRenderPass();
+  framebuffer_info.attachmentCount =
+      static_cast<uint32_t>(attachments_.size());
+  framebuffer_info.pAttachments = attachments_.data();
+  framebuffer_info.width = extent_.width;
+  framebuffer_info.height = extent_.height;
+  framebuffer_info.layers = 1;
+
+  return vkCreateFramebuffer(device_->GetDevice(), &framebuffer_info, nullptr,
+                             &framebuffer_);
+}
+
+VkResult Framebuffer::Create(LogicalDevice* device, RenderPass* render_pass,
+                             VkExtent2D extent,
+                             const std::vector<VkImageView>& attachments) {
+  device_ = device;
+  render_pass_ = render_pass;
+  extent_ = extent;
+  attachments_ = attachments;
+  return Create();
+}
+
+void Framebuffer::Destroy() {
+  vkDestroyFramebuffer(device_->GetDevice(), framebuffer_, nullptr);
+}
+
+}  // namespace Renderer

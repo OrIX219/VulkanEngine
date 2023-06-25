@@ -117,12 +117,8 @@ void VulkanEngine::Init() {
 
   InitRenderPasses(samples_);
   LOG_SUCCESS("Render passes initialized");
-
-  Renderer::Image* color_image_ptr =
-      (samples_ != VK_SAMPLE_COUNT_1_BIT ? &color_image_ : nullptr);
-  VK_CHECK(swapchain_framebuffers_.Create(&swapchain_, &render_pass_,
-                                          color_image_ptr, &depth_image_));
-  LOG_SUCCESS("Swapchain framebuffers created");
+  InitFramebuffers();
+  LOG_SUCCESS("Framebuffers initialized");
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(frames_[i].command_pool.Create(
@@ -184,7 +180,8 @@ void VulkanEngine::Cleanup() {
 
     Renderer::MaterialSystem::Cleanup();
 
-    swapchain_framebuffers_.Destroy();
+    for (size_t i = 0; i < kMaxFramesInFlight; ++i)
+      swapchain_framebuffers_[i].Destroy();
     depth_pyramid_.Destroy();
     depth_image_.Destroy();
     color_image_.Destroy();
@@ -358,6 +355,17 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
 
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::RenderPass::Destroy, render_pass_));
+}
+
+void VulkanEngine::InitFramebuffers() {
+  std::vector<VkImageView> attachments = {VK_NULL_HANDLE,
+                                          depth_image_.GetView()};
+  VkExtent2D extent = swapchain_.GetImageExtent();
+  for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
+    attachments[0] = swapchain_.GetImageView(i);
+    VK_CHECK(swapchain_framebuffers_[i].Create(&device_, &render_pass_, extent,
+                                               attachments));
+  }
 }
 
 void VulkanEngine::InitSyncStructures() {
@@ -873,6 +881,7 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
   device_.WaitIdle();
 
   swapchain_.Recreate();
+
   extent = swapchain_.GetImageExtent();
   color_image_.Destroy();
   VK_CHECK(color_image_.Create(allocator_, &device_,
@@ -880,13 +889,21 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
                                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
                                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                                1, samples_));
+
   depth_image_.Destroy();
   depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       1, samples_, VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
-  swapchain_framebuffers_.Recreate();
+
+  std::vector<VkImageView> attachments = {VK_NULL_HANDLE,
+                                          depth_image_.GetView()};
+  for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
+    attachments[0] = swapchain_.GetImageView(i);
+    swapchain_framebuffers_[i].Resize(swapchain_.GetImageExtent(), attachments);
+  }
+
   depth_pyramid_.Destroy();
   InitDepthPyramid(command_pool);
 }
@@ -986,7 +1003,7 @@ void VulkanEngine::Draw() {
     }
 
     render_pass_.Begin(command_buffer,
-                       swapchain_framebuffers_.GetFramebuffer(image_index),
+                       swapchain_framebuffers_[image_index].GetFramebuffer(),
                        {{0, 0}, swapchain_.GetImageExtent()},
                        {clear_value, depth_clear, clear_value});
 
