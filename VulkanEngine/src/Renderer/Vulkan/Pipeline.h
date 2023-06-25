@@ -40,7 +40,7 @@ class PipelineBuilder {
 
   static PipelineBuilder Begin(LogicalDevice* device);
 
-  Pipeline Build(RenderPass* render_pass);
+  Pipeline Build(RenderPass& render_pass);
 
   PipelineBuilder& SetShaders(class ShaderEffect* effect); 
   PipelineBuilder& SetVertexInputDescription(

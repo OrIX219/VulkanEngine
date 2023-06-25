@@ -185,6 +185,12 @@ RenderPass RenderPassBuilder::Build() {
   return render_pass;
 }
 
+void RenderPassBuilder::Clear() {
+  attachments_.clear();
+  subpasses_.clear();
+  subpass_dependencies_.clear();
+}
+
 RenderPassBuilder::RenderPassBuilder(LogicalDevice* device) : device_(device) {}
 
 RenderPassBuilder& RenderPassBuilder::AddAttachment(

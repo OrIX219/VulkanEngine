@@ -292,5 +292,7 @@
     <None Include="Shaders\indirect_compute.comp" />
     <None Include="Shaders\normals.vert" />
     <None Include="Shaders\normals.frag" />
+    <None Include="Shaders\blit.vert" />
+    <None Include="Shaders\blit.frag" />
   </ItemGroup>
 </Project>

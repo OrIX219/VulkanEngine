@@ -79,7 +79,7 @@ class MaterialSystem {
 
   static void BuildDefaultTemplates();
 
-  static ShaderPass* BuildShader(RenderPass* render_pass,
+  static ShaderPass* BuildShader(RenderPass& render_pass,
                                  PipelineBuilder& builder,
                                  ShaderEffect* effect);
 

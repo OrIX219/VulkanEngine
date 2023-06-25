@@ -83,10 +83,10 @@ void MaterialSystem::BuildDefaultTemplates() {
       "normals.vert.spv", "normals.frag.spv", "normals.geom.spv");
 
   ShaderPass* textured_lit_pass = BuildShader(
-      &system.engine_->render_pass_, system.forward_builder_, textured_lit);
+      system.engine_->forward_pass_, system.forward_builder_, textured_lit);
   ShaderPass* default_lit_pass = BuildShader(
-      &system.engine_->render_pass_, system.forward_builder_, default_lit);
-  ShaderPass* normals_pass = BuildShader(&system.engine_->render_pass_,
+      system.engine_->forward_pass_, system.forward_builder_, default_lit);
+  ShaderPass* normals_pass = BuildShader(system.engine_->forward_pass_,
                                          system.forward_builder_, normals);
 
   {
@@ -113,7 +113,7 @@ void MaterialSystem::BuildDefaultTemplates() {
         .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_NONE);
 
     ShaderPass* transparent_lit_pass = BuildShader(
-        &system.engine_->render_pass_, transparend_forward, textured_lit);
+        system.engine_->forward_pass_, transparend_forward, textured_lit);
 
     EffectTemplate default_textured_transparent;
     default_textured_transparent.pass_shaders[MeshPassType::kForward] = nullptr;
@@ -151,7 +151,7 @@ void MaterialSystem::BuildDefaultTemplates() {
   }
 }
 
-ShaderPass* MaterialSystem::BuildShader(RenderPass* render_pass,
+ShaderPass* MaterialSystem::BuildShader(RenderPass& render_pass,
                                         PipelineBuilder& builder,
                                         ShaderEffect* effect) {
   MaterialSystem& system = Get();

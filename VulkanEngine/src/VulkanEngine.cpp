@@ -102,11 +102,10 @@ void VulkanEngine::Init() {
   LOG_SUCCESS("Swapchain created");
 
   VkExtent2D extent = swapchain_.GetImageExtent();
-  VK_CHECK(color_image_.Create(allocator_, &device_,
-                               {extent.width, extent.height, 1},
-                               VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                               1, samples_));
+  VK_CHECK(color_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
+      samples_));
   LOG_SUCCESS("Color image created");
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
@@ -180,6 +179,7 @@ void VulkanEngine::Cleanup() {
 
     Renderer::MaterialSystem::Cleanup();
 
+    forward_framebuffer_.Destroy();
     for (size_t i = 0; i < kMaxFramesInFlight; ++i)
       swapchain_framebuffers_[i].Destroy();
     depth_pyramid_.Destroy();
@@ -302,69 +302,80 @@ void VulkanEngine::InitCVars() {
 
 void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
   Renderer::RenderPassBuilder render_pass_builder(&device_);
+  {
+    Renderer::RenderPassAttachment color_attachment, depth_attachment;
+    color_attachment
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetSamples(samples)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .SetFormat(swapchain_.GetImageFormat());
+    depth_attachment
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetSamples(samples)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        .SetFormat(VK_FORMAT_D32_SFLOAT);
 
-  Renderer::RenderPassAttachment color_attachment, depth_attachment,
-      color_attachment_resolve;
-  color_attachment
-      .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
-                     VK_ATTACHMENT_STORE_OP_STORE)
-      .SetSamples(samples)
-      .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
-                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-      .SetFormat(swapchain_.GetImageFormat());
-  depth_attachment
-      .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
-                     VK_ATTACHMENT_STORE_OP_STORE)
-      .SetSamples(samples)
-      .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
-                  VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-      .SetFormat(VK_FORMAT_D32_SFLOAT);
-  color_attachment_resolve.SetDefaults().SetFormat(swapchain_.GetImageFormat());
-
-  Renderer::RenderPassSubpass subpass;
-  if (samples_ != VK_SAMPLE_COUNT_1_BIT) {
+    Renderer::RenderPassSubpass subpass;
     render_pass_builder.AddAttachment(&color_attachment)
-        .AddAttachment(&depth_attachment)
-        .AddAttachment(&color_attachment_resolve);
-    subpass.AddColorAttachmentRef(0)
-        .SetDepthStencilAttachmentRef(1)
-        .AddResolveAttachmentRef(2);
-  } else {
-    render_pass_builder.AddAttachment(&color_attachment_resolve)
         .AddAttachment(&depth_attachment);
-    subpass.AddColorAttachmentRef(0)
-        .SetDepthStencilAttachmentRef(1);
+    subpass.AddColorAttachmentRef(0).SetDepthStencilAttachmentRef(1);
+
+    render_pass_builder.AddSubpass(&subpass);
+    render_pass_builder
+        .AddDependency(VK_SUBPASS_EXTERNAL, 0,
+                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
+                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
+        .AddDependency(VK_SUBPASS_EXTERNAL, 0,
+                       VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                           VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                       0,
+                       VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                           VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+
+    forward_pass_ = render_pass_builder.Build();
+
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::RenderPass::Destroy, forward_pass_));
   }
+  render_pass_builder.Clear();
+  {
+    Renderer::RenderPassAttachment color_attachment;
+    color_attachment.SetDefaults().SetFormat(swapchain_.GetImageFormat());
 
+    Renderer::RenderPassSubpass subpass;
+    render_pass_builder.AddAttachment(&color_attachment);
+    subpass.AddColorAttachmentRef(0);
 
-  render_pass_builder.AddSubpass(&subpass);
-  render_pass_builder
-      .AddDependency(VK_SUBPASS_EXTERNAL, 0,
-                     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
-                     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                     VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT)
-      .AddDependency(VK_SUBPASS_EXTERNAL, 0,
-                     VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                     0,
-                     VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    render_pass_builder.AddSubpass(&subpass);
+    render_pass_builder.AddDependency(
+        VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-  render_pass_ = render_pass_builder.Build();
+    copy_pass_ = render_pass_builder.Build();
 
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::RenderPass::Destroy, render_pass_));
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::RenderPass::Destroy, copy_pass_));
+  }
 }
 
 void VulkanEngine::InitFramebuffers() {
-  std::vector<VkImageView> attachments = {VK_NULL_HANDLE,
-                                          depth_image_.GetView()};
   VkExtent2D extent = swapchain_.GetImageExtent();
+  std::vector<VkImageView> attachments = {color_image_.GetView(),
+                                          depth_image_.GetView()};
+
+  VK_CHECK(forward_framebuffer_.Create(&device_, &forward_pass_, extent,
+                                       attachments));
+
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    attachments[0] = swapchain_.GetImageView(i);
-    VK_CHECK(swapchain_framebuffers_[i].Create(&device_, &render_pass_, extent,
-                                               attachments));
+    VK_CHECK(swapchain_framebuffers_[i].Create(&device_, &copy_pass_, extent,
+                                               {swapchain_.GetImageView(i)}));
   }
 }
 
@@ -414,6 +425,24 @@ void VulkanEngine::InitDescriptors() {
 }
 
 void VulkanEngine::InitPipelines() {
+  Renderer::ShaderEffect* blit_effect = new Renderer::ShaderEffect();
+  blit_effect->AddStage(shader_cache_.GetShader("Shaders/blit.vert.spv"),
+                        VK_SHADER_STAGE_VERTEX_BIT);
+  blit_effect->AddStage(shader_cache_.GetShader("Shaders/blit.frag.spv"),
+                        VK_SHADER_STAGE_FRAGMENT_BIT);
+  blit_effect->ReflectLayout(&device_, nullptr, 0);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::ShaderEffect::Destroy, *blit_effect));
+
+  Renderer::PipelineBuilder builder = Renderer::PipelineBuilder::Begin(&device_);
+  blit_pipeline_ =
+      builder.SetDefaults()
+          .SetDepthStencil(VK_FALSE)
+          .SetShaders(blit_effect)
+          .Build(copy_pass_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Pipeline::Destroy, blit_pipeline_));
+
   LoadComputeShader("Shaders/indirect_compute.comp.spv", cull_pipeline_,
                     cull_layout_);
   LoadComputeShader("Shaders/depth_reduce.comp.spv", depth_reduce_pipeline_,
@@ -454,6 +483,10 @@ void VulkanEngine::InitSamplers() {
       .Create(&device_, 0.f, 16.f, &reduction_info);
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::TextureSampler::Destroy, depth_sampler_));
+
+  smooth_sampler_.SetDefaults().SetAnisotropyEnable(true).Create(&device_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::TextureSampler::Destroy, smooth_sampler_));
 }
 
 uint32_t PrevPowOf2(uint32_t x) {
@@ -781,7 +814,7 @@ void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   init_info.ImageCount = 3;
   init_info.MSAASamples = samples_;
 
-  ImGui_ImplVulkan_Init(&init_info, render_pass_.GetRenderPass());
+  ImGui_ImplVulkan_Init(&init_info, forward_pass_.GetRenderPass());
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin();
@@ -884,11 +917,10 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
 
   extent = swapchain_.GetImageExtent();
   color_image_.Destroy();
-  VK_CHECK(color_image_.Create(allocator_, &device_,
-                               {extent.width, extent.height, 1},
-                               VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                                   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                               1, samples_));
+  VK_CHECK(color_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
+      samples_));
 
   depth_image_.Destroy();
   depth_image_.Create(
@@ -897,11 +929,12 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
       1, samples_, VK_FORMAT_D32_SFLOAT,
       VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-  std::vector<VkImageView> attachments = {VK_NULL_HANDLE,
+  std::vector<VkImageView> attachments = {color_image_.GetView(),
                                           depth_image_.GetView()};
+  VK_CHECK(forward_framebuffer_.Resize(extent, attachments));
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    attachments[0] = swapchain_.GetImageView(i);
-    swapchain_framebuffers_[i].Resize(swapchain_.GetImageExtent(), attachments);
+    VK_CHECK(swapchain_framebuffers_[i].Resize(extent,
+                                               {swapchain_.GetImageView(i)}));
   }
 
   depth_pyramid_.Destroy();
@@ -946,13 +979,6 @@ void VulkanEngine::Draw() {
     prefabs_to_load_.pop_back();
     render_scene_.BuildBatches();
   }
-
-  VkClearValue clear_value{};
-  auto clear_color = CVarSystem::Get()->GetVec4CVar("scene.clear_color");
-  clear_value.color = {
-      {clear_color->x, clear_color->y, clear_color->z, clear_color->w}};
-  VkClearValue depth_clear{};
-  depth_clear.depthStencil.depth = 1.f;
 
   profiler_.GrabQueries(command_buffer);
   {
@@ -1002,28 +1028,12 @@ void VulkanEngine::Draw() {
                            post_cull_barriers_.data(), 0, nullptr);
     }
 
-    render_pass_.Begin(command_buffer,
-                       swapchain_framebuffers_[image_index].GetFramebuffer(),
-                       {{0, 0}, swapchain_.GetImageExtent()},
-                       {clear_value, depth_clear, clear_value});
-
-    VkExtent2D extent = swapchain_.GetImageExtent();
-    VkViewport viewport{0.f, 0.f, (float)extent.width, (float)extent.height,
-                        0.f, 1.f};
-    VkRect2D scissors{{0, 0}, extent};
-
-    vkCmdSetViewport(command_buffer.GetBuffer(), 0, 1, &viewport);
-    vkCmdSetScissor(command_buffer.GetBuffer(), 0, 1, &scissors);
-
     DrawForward(command_buffer, render_scene_.forward_pass);
-
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-                                    command_buffer.GetBuffer());
-
-    render_pass_.End(command_buffer);
 
     if (forward_cull.occlusion_cull)
       ReduceDepth(command_buffer);
+
+    CopyRenderToSwapchain(command_buffer, image_index);
   }
 
   VK_CHECK(command_buffer.End());
@@ -1449,6 +1459,25 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
+  VkClearValue clear_value{};
+  auto clear_color = CVarSystem::Get()->GetVec4CVar("scene.clear_color");
+  clear_value.color = {
+      {clear_color->x, clear_color->y, clear_color->z, clear_color->w}};
+  VkClearValue depth_clear{};
+  depth_clear.depthStencil.depth = 1.f;
+
+  forward_pass_.Begin(command_buffer, forward_framebuffer_.GetFramebuffer(),
+                      {{0, 0}, swapchain_.GetImageExtent()},
+                      {clear_value, depth_clear, clear_value});
+
+  VkExtent2D extent = swapchain_.GetImageExtent();
+  VkViewport viewport{0.f, 0.f, (float)extent.width, (float)extent.height,
+                      0.f, 1.f};
+  VkRect2D scissors{{0, 0}, extent};
+
+  vkCmdSetViewport(command_buffer.GetBuffer(), 0, 1, &viewport);
+  vkCmdSetScissor(command_buffer.GetBuffer(), 0, 1, &scissors);
+
   scene_data_.camera_data.view = camera_.GetViewMat();
   scene_data_.camera_data.projection = camera_.GetProjMat();
   scene_data_.camera_data.pos = camera_.GetPosition();
@@ -1616,6 +1645,11 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
       }
     }
   }
+
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+                                  command_buffer.GetBuffer());
+
+  forward_pass_.End(command_buffer);
 }
 
 struct alignas(16) DepthReduceData {
@@ -1703,6 +1737,49 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
       VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,
       VK_DEPENDENCY_BY_REGION_BIT);
+}
+
+void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
+                                         uint32_t index) {
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
+
+  VkClearValue clear_value = {{{0.f, 0.f, 0.f, 1.f}}};
+  copy_pass_.Begin(
+      command_buffer, swapchain_framebuffers_[index].GetFramebuffer(),
+      {{0, 0}, swapchain_.GetImageExtent()}, {clear_value, clear_value});
+
+  VkExtent2D extent = swapchain_.GetImageExtent();
+  VkViewport viewport{0.f, 0.f,
+                      static_cast<float>(extent.width),
+                      static_cast<float>(extent.height),
+                      0.f, 1.f};
+  VkRect2D scissors{{0, 0}, extent};
+
+  vkCmdSetViewport(command_buffer.GetBuffer(), 0, 1, &viewport);
+  vkCmdSetScissor(command_buffer.GetBuffer(), 0, 1, &scissors);
+
+  blit_pipeline_.Bind(command_buffer);
+
+  VkDescriptorImageInfo source_image;
+  source_image.sampler = smooth_sampler_.GetSampler();
+  source_image.imageView = color_image_.GetView();
+  source_image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+  VkDescriptorSet blit_set;
+  Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                     &frame.dynamic_descriptor_allocator)
+      .BindImage(0, &source_image, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                 VK_SHADER_STAGE_FRAGMENT_BIT)
+      .Build(blit_set);
+
+  vkCmdBindDescriptorSets(
+      command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+      blit_pipeline_.GetLayout(), 0, 1, &blit_set, 0, nullptr);
+
+  vkCmdDraw(command_buffer.GetBuffer(), 3, 1, 0, 0);
+
+  copy_pass_.End(command_buffer);
 }
 
 void VulkanEngine::DrawMenu() {

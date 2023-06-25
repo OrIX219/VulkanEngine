@@ -72,6 +72,7 @@ class RenderPassBuilder {
   RenderPassBuilder(LogicalDevice* device);
 
   RenderPass Build();
+  void Clear();
 
   RenderPassBuilder& AddAttachment(RenderPassAttachment* attachment);
   RenderPassBuilder& AddSubpass(

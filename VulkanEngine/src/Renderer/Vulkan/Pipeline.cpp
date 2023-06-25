@@ -60,7 +60,7 @@ PipelineBuilder PipelineBuilder::Begin(LogicalDevice* device) {
   return builder;
 }
 
-Pipeline PipelineBuilder::Build(RenderPass* render_pass) {
+Pipeline PipelineBuilder::Build(RenderPass& render_pass) {
   std::vector<VkDynamicState> dynamic_states;
   if (!viewport_.has_value())
     dynamic_states.push_back(VK_DYNAMIC_STATE_VIEWPORT);
@@ -117,7 +117,7 @@ Pipeline PipelineBuilder::Build(RenderPass* render_pass) {
   if (dynamic_state.dynamicStateCount > 0)
     pipeline_info.pDynamicState = &dynamic_state;
   pipeline_info.layout = pipeline_layout_;
-  pipeline_info.renderPass = render_pass->GetRenderPass();
+  pipeline_info.renderPass = render_pass.GetRenderPass();
   pipeline_info.subpass = 0;
 
   Pipeline pipeline;

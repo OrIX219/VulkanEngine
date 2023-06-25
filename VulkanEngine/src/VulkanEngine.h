@@ -120,6 +120,8 @@ class VulkanEngine {
   void DrawForward(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderScene::MeshPass& pass);
   void ReduceDepth(Renderer::CommandBuffer command_buffer);
+  void CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
+                             uint32_t index); 
 
   void DrawMenu();
   void DrawToolbar();
@@ -189,7 +191,9 @@ class VulkanEngine {
   uint32_t depth_pyramid_height_;
   uint32_t depth_pyramid_levels_;
 
-  Renderer::RenderPass render_pass_;
+  Renderer::RenderPass forward_pass_;
+  Renderer::RenderPass copy_pass_;
+  Renderer::Framebuffer forward_framebuffer_;
   std::array<Renderer::Framebuffer, kMaxFramesInFlight> swapchain_framebuffers_;
 
   Renderer::DescriptorAllocator descriptor_allocator_;
@@ -214,6 +218,8 @@ class VulkanEngine {
   VkPipeline depth_reduce_pipeline_;
   VkPipelineLayout depth_reduce_layout_;
 
+  Renderer::Pipeline blit_pipeline_;
+
   Renderer::ShaderCache shader_cache_;
 
   Renderer::RenderScene render_scene_;
@@ -228,6 +234,7 @@ class VulkanEngine {
   Renderer::TextureSampler texture_sampler_;
   Renderer::TextureSampler depth_sampler_;
   Renderer::TextureSampler depth_reduction_sampler_;
+  Renderer::TextureSampler smooth_sampler_;
   VkImageView depth_pyramid_mips_[16] = {};
 };
 

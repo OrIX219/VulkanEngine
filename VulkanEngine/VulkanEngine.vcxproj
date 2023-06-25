@@ -178,6 +178,8 @@
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\blit.frag" />
+    <None Include="Shaders\blit.vert" />
     <None Include="Shaders\default_lit.frag" />
     <None Include="Shaders\depth_reduce.comp" />
     <None Include="Shaders\indirect_compute.comp" />
