@@ -192,6 +192,7 @@ class VulkanEngine {
   uint32_t depth_pyramid_width_;
   uint32_t depth_pyramid_height_;
   uint32_t depth_pyramid_levels_;
+  VkImageView depth_pyramid_mips_[16] = {};
 
   Renderer::RenderPass forward_pass_;
   Renderer::RenderPass copy_pass_;
@@ -237,7 +238,6 @@ class VulkanEngine {
   Renderer::TextureSampler depth_sampler_;
   Renderer::TextureSampler depth_reduction_sampler_;
   Renderer::TextureSampler smooth_sampler_;
-  VkImageView depth_pyramid_mips_[16] = {};
 };
 
 }  // namespace Engine

@@ -22,6 +22,7 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
   image_extent_ = extent;
   mip_levels_ = mip_levels;
   image_format_ = format;
+  current_layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VkImageCreateInfo image_info{};
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -29,9 +30,9 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
   image_info.extent = image_extent_;
   image_info.mipLevels = mip_levels_;
   image_info.arrayLayers = 1;
-  image_info.format = format;
+  image_info.format = image_format_;
   image_info.tiling = tiling;
-  image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  image_info.initialLayout = current_layout_;
   image_info.usage = usage;
   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   image_info.samples = samples;
@@ -62,9 +63,11 @@ VkFormat Image::GetFormat() const { return image_format_; }
 
 uint32_t Image::GetMipLevels() const { return mip_levels_; }
 
+VkImageLayout Image::GetLayout() const { return current_layout_; }
+
 void Image::TransitionLayout(CommandBuffer command_buffer,
                              VkAccessFlags src_access, VkAccessFlags dst_access,
-                             VkImageLayout old_layout, VkImageLayout new_layout,
+                             VkImageLayout new_layout,
                              VkPipelineStageFlags src_stage,
                              VkPipelineStageFlags dst_stage,
                              VkImageAspectFlags aspect_flags,
@@ -73,7 +76,7 @@ void Image::TransitionLayout(CommandBuffer command_buffer,
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   barrier.srcAccessMask = src_access;
   barrier.dstAccessMask = dst_access;
-  barrier.oldLayout = old_layout;
+  barrier.oldLayout = current_layout_;
   barrier.newLayout = new_layout;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

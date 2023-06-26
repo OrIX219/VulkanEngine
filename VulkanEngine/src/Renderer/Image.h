@@ -33,6 +33,7 @@ class Image {
   VkExtent3D GetExtent() const;
   VkFormat GetFormat() const;
   uint32_t GetMipLevels() const;
+  VkImageLayout GetLayout() const;
 
   static uint32_t CalculateMipLevels(uint32_t width, uint32_t height) {
     return static_cast<uint32_t>(
@@ -42,9 +43,8 @@ class Image {
 
   void TransitionLayout(
       CommandBuffer command_buffer, VkAccessFlags src_access,
-      VkAccessFlags dst_access, VkImageLayout old_layout,
-      VkImageLayout new_layout, VkPipelineStageFlags src_stage,
-      VkPipelineStageFlags dst_stage,
+      VkAccessFlags dst_access, VkImageLayout new_layout,
+      VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage,
       VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
       VkDependencyFlags dependency = 0);
 
@@ -76,6 +76,7 @@ class Image {
   VkExtent3D image_extent_;
   VkFormat image_format_;
   uint32_t mip_levels_;
+  VkImageLayout current_layout_;
 
   VmaAllocator allocator_;
   LogicalDevice* device_;

@@ -55,37 +55,37 @@ VulkanEngine::~VulkanEngine() {}
 
 void VulkanEngine::Init() {
   Logger::Get().SetTime();
-  LOG_INFO("Engine init");
+  LOG_INFO("Initializing engine...");
 
   window_.Init(1600, 900, "Vulkan Engine", this);
   glfwSetInputMode(window_.GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-  LOG_SUCCESS("Window created");
+  LOG_SUCCESS("Created window");
   VK_CHECK(instance_.Init(
       kEnableValidationLayers,
       {"VK_LAYER_KHRONOS_validation", "VK_LAYER_LUNARG_monitor"}));
-  LOG_SUCCESS("Vulkan instance initialized");
+  LOG_SUCCESS("Initialized Vulkan instance");
 
   Logger::Init(&instance_);
-  LOG_SUCCESS("Logger initialized");
+  LOG_SUCCESS("Initialized logger");
 
   VK_CHECK(surface_.Init(&instance_, &window_));
-  LOG_SUCCESS("GLFW surface initialized");
+  LOG_SUCCESS("Initialized GLFW surface");
   VK_CHECK(
       physical_device_.Init(&instance_, &surface_,
                             {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                              VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
                              VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
                              VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME}));
-  LOG_SUCCESS("GPU found");
+  LOG_SUCCESS("Found GPU");
   samples_ = physical_device_.GetMaxSamples();
   VK_CHECK(device_.Init(&physical_device_));
-  LOG_SUCCESS("Logical device initialized");
+  LOG_SUCCESS("Initialized logical device");
 
   profiler_.Init(&device_,
                  physical_device_.GetProperties().limits.timestampPeriod);
-  LOG_SUCCESS("Profiler initialized");
+  LOG_SUCCESS("Initialized profiler");
   InitCVars();
-  LOG_SUCCESS("CVars system initialized");
+  LOG_SUCCESS("Initialized CVar system");
 
   VmaAllocatorCreateInfo allocator_info{};
   allocator_info.instance = instance_.GetInstance();
@@ -100,38 +100,38 @@ void VulkanEngine::Init() {
       &device_, device_.GetQueueFamilies().graphics_family.value()));
 
   VK_CHECK(swapchain_.Create(&device_, &surface_));
-  LOG_SUCCESS("Swapchain created");
+  LOG_SUCCESS("Created swapchain");
 
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
       samples_));
-  LOG_SUCCESS("Color image created");
+  LOG_SUCCESS("Created backbuffer image");
   VK_CHECK(color_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
       VK_SAMPLE_COUNT_1_BIT));
-  LOG_SUCCESS("Color resolve image created");
+  LOG_SUCCESS("Created backbuffer resolve image");
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
           VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
       1, samples_, VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
       VK_IMAGE_ASPECT_DEPTH_BIT));
-  LOG_SUCCESS("Depth image created");
+  LOG_SUCCESS("Created depth image");
   VK_CHECK(depth_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       1, VK_SAMPLE_COUNT_1_BIT,
       VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
       VK_IMAGE_ASPECT_DEPTH_BIT));
-  LOG_SUCCESS("Depth resolve image created");
+  LOG_SUCCESS("Created depth resolve image");
 
   InitRenderPasses(samples_);
-  LOG_SUCCESS("Render passes initialized");
+  LOG_SUCCESS("Initialized render passes");
   InitFramebuffers();
-  LOG_SUCCESS("Framebuffers initialized");
+  LOG_SUCCESS("Initialized framebuffers");
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(frames_[i].command_pool.Create(
@@ -154,14 +154,17 @@ void VulkanEngine::Init() {
   render_scene_.Init();
 
   Renderer::MaterialSystem::Init(this);
-  LOG_SUCCESS("Material System initialized");
+  LOG_SUCCESS("Initialized material system");
   
   InitSyncStructures();
   InitDescriptors();
+  LOG_SUCCESS("Initialized descriptors");
   InitPipelines();
+  LOG_SUCCESS("Initialized pipelines");
   InitSamplers();
+  LOG_SUCCESS("Initialized samplers");
   InitDepthPyramid(init_pool);
-  LOG_SUCCESS("Descriptors initialized");
+  LOG_SUCCESS("Created depth pyramid");
 
   Renderer::Queue& init_queue = device_.GetQueue(init_pool.GetQueueFamily());
 
@@ -176,9 +179,12 @@ void VulkanEngine::Init() {
 
   init_queue.SubmitBatches();
   device_.GetTransferQueue().SubmitBatches();  
+  LOG_SUCCESS("Initialized scene");
 
   device_.WaitIdle();
   is_initialized_ = true;
+
+  LOG_INFO("Finished initializing engine");
 
   init_pool.Destroy();
 }
@@ -575,8 +581,7 @@ void VulkanEngine::InitDepthPyramid(Renderer::CommandPool& init_pool) {
   command_buffer.Begin(true);
   depth_pyramid_.TransitionLayout(
       command_buffer, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-      VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_IMAGE_ASPECT_COLOR_BIT,
       VK_DEPENDENCY_BY_REGION_BIT);
   command_buffer.End();
@@ -1389,13 +1394,12 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 }
 
 void VulkanEngine::ReadyCullData(Renderer::CommandBuffer command_buffer,
-                                    Renderer::RenderScene::MeshPass& pass) {
+                                 Renderer::RenderScene::MeshPass& pass) {
   if (pass.clear_indirect_buffer.GetBuffer() == VK_NULL_HANDLE) return;
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
-  pass.clear_indirect_buffer.CopyTo(
-      command_buffer, pass.draw_indirect_buffer);
+  pass.clear_indirect_buffer.CopyTo(command_buffer, pass.draw_indirect_buffer);
 
   pass.clear_count_buffer.CopyTo(command_buffer, pass.count_buffer);
 
@@ -1528,7 +1532,9 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
                       {clear_value, depth_clear, clear_value, depth_clear});
 
   VkExtent2D extent = swapchain_.GetImageExtent();
-  VkViewport viewport{0.f, 0.f, (float)extent.width, (float)extent.height,
+  VkViewport viewport{0.f, 0.f,
+                      static_cast<float>(extent.width),
+                      static_cast<float>(extent.height),
                       0.f, 1.f};
   VkRect2D scissors{{0, 0}, extent};
 
@@ -1725,9 +1731,7 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
 
   depth_resolve_image_.TransitionLayout(
       command_buffer, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-      VK_ACCESS_SHADER_READ_BIT,
-      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
       VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,
       VK_DEPENDENCY_BY_REGION_BIT);
@@ -1779,8 +1783,7 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
 
     depth_pyramid_.TransitionLayout(
         command_buffer, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-        VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_IMAGE_ASPECT_COLOR_BIT,
         VK_DEPENDENCY_BY_REGION_BIT);
   }
@@ -1789,7 +1792,6 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
       command_buffer, VK_ACCESS_SHADER_READ_BIT,
       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
       VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
       VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,

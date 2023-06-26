@@ -5,6 +5,7 @@ layout(location = 0) out vec4 outColor;
 layout(location = 0) in vec3 inColor;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec3 inFragPos;
+layout(location = 3) in vec2 inTextureCoords;
 
 struct CameraData {
 	mat4 view;
