@@ -24,6 +24,7 @@ namespace fs = std::filesystem;
 
 struct ConverterState {
   fs::path asset_path;
+  fs::path root_export_path;
   fs::path export_path;
 
   fs::path ConvertToExportRelative(fs::path path) const {
@@ -478,34 +479,26 @@ void ExtractGltfNodes(tinygltf::Model& model, const fs::path& input,
   Assets::SaveBinaryFile(scene_path.string().c_str(), file);
 }
 
-int main(int argc, char* argv[]) {
-  if (argc < 2) {
-    std::cout << "No path specified\n";
-    return -1;
-  }
-
-  fs::path path{argv[1]};
-  fs::path directory = path;
-  fs::path export_dir = path.parent_path() / "asset_export";
-
-  std::cout << "Loading asset directory at " << directory << std::endl;
-
-  ConverterState state;
-  state.asset_path = path;
-  state.export_path = export_dir;
-
+void ProcessDirectory(fs::path directory, ConverterState& state) {
   for (auto& p : fs::directory_iterator(directory)) {
+    if (p.is_directory()) {
+      state.export_path /= p.path().stem();
+      ProcessDirectory(p.path(), state);
+      state.export_path = state.export_path.parent_path();
+      continue;
+    }
+
     std::cout << "File: " << p << std::endl;
 
     fs::path relative = p.path().lexically_proximate(directory);
-    fs::path export_path = export_dir / relative;
+    fs::path export_path = state.export_path / relative;
 
     if (!fs::is_directory(export_path.parent_path()))
       fs::create_directory(export_path.parent_path());
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    if (p.path().extension() == ".png") {
+    if (p.path().extension() == ".png" || p.path().extension() == ".jpg") {
       std::cout << "Found texture" << std::endl;
 
       export_path.replace_extension(".tx");
@@ -547,6 +540,26 @@ int main(int argc, char* argv[]) {
         << std::chrono::duration_cast<std::chrono::milliseconds>(diff).count()
         << "ms" << std::endl;
   }
+}
+
+int main(int argc, char* argv[]) {
+  if (argc < 2) {
+    std::cout << "No path specified\n";
+    return -1;
+  }
+
+  fs::path path{argv[1]};
+  fs::path directory = path;
+  fs::path export_dir = path.parent_path() / "asset_export";
+
+  std::cout << "Loading asset directory at " << directory << std::endl;
+
+  ConverterState state;
+  state.asset_path = path;
+  state.root_export_path = export_dir;
+  state.export_path = export_dir;
+
+  ProcessDirectory(directory, state);
 
   return 0; 
 }
