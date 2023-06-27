@@ -54,6 +54,8 @@ class Buffer : public BufferBase {
     VmaAllocationCreateInfo alloc_info{};
     alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
     alloc_info.flags = alloc_flags;
+    if constexpr (!persistently_mapped)
+      alloc_info.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
     VkResult res = vmaCreateBuffer(allocator_, &buffer_info, &alloc_info,
                                    &buffer_, &allocation_, nullptr);
@@ -107,7 +109,7 @@ class Buffer : public BufferBase {
     copy_region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     copy_region.imageSubresource.mipLevel = 0;
     copy_region.imageSubresource.baseArrayLayer = 0;
-    copy_region.imageSubresource.layerCount = 1;
+    copy_region.imageSubresource.layerCount = image.GetArrayLayers();
     copy_region.imageOffset = {0, 0, 0};
     copy_region.imageExtent = image.GetExtent();
 

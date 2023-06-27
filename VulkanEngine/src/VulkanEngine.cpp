@@ -105,27 +105,24 @@ void VulkanEngine::Init() {
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       samples_));
   LOG_SUCCESS("Created backbuffer image");
   VK_CHECK(color_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       VK_SAMPLE_COUNT_1_BIT));
   LOG_SUCCESS("Created backbuffer resolve image");
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
           VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
-      1, samples_, VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_ASPECT_DEPTH_BIT));
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, samples_));
   LOG_SUCCESS("Created depth image");
   VK_CHECK(depth_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      1, VK_SAMPLE_COUNT_1_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_ASPECT_DEPTH_BIT));
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, VK_SAMPLE_COUNT_1_BIT));
   LOG_SUCCESS("Created depth resolve image");
 
   InitRenderPasses(samples_);
@@ -963,13 +960,13 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
   color_image_.Destroy();
   VK_CHECK(color_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       samples_));
 
   color_resolve_image_.Destroy();
   VK_CHECK(color_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       VK_SAMPLE_COUNT_1_BIT));
 
   depth_image_.Destroy();
@@ -977,16 +974,13 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
           VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
-      1, samples_, VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_ASPECT_DEPTH_BIT));
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, samples_));
 
   depth_resolve_image_.Destroy();
   VK_CHECK(depth_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      1, VK_SAMPLE_COUNT_1_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
-      VK_IMAGE_ASPECT_DEPTH_BIT));
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, VK_SAMPLE_COUNT_1_BIT));
 
   std::vector<VkImageView> attachments = {
       color_image_.GetView(), depth_image_.GetView(),

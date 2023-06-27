@@ -83,7 +83,7 @@ void Texture::GenerateMipmaps(CommandBuffer command_buffer) {
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.levelCount = 1;
   barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = 1;
+  barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
   VkExtent3D extent = image_.GetExtent();
   int32_t mip_width = extent.width;

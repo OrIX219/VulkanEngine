@@ -2,26 +2,47 @@
 
 namespace Renderer {
 
-Image::Image() : image_(VK_NULL_HANDLE) {}
+Image::Image() : image_(VK_NULL_HANDLE), view_type_(VK_IMAGE_VIEW_TYPE_2D) {}
 
 Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
              VkImageUsageFlags usage, uint32_t mip_levels,
              VkSampleCountFlagBits samples, VkFormat format,
-             VkImageTiling tiling, VkImageAspectFlags aspect_flags) {
+             VkImageTiling tiling, VkImageAspectFlags aspect_flags,
+             uint32_t array_layers, VkImageViewType view_type) {
   Create(allocator, device, extent, usage, mip_levels, samples, format, tiling,
-         aspect_flags);
+         aspect_flags, array_layers, view_type);
+}
+
+Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
+             VkImageUsageFlags usage, VkFormat format,
+             VkImageAspectFlags aspect_flags, VkSampleCountFlagBits samples) {
+  Create(allocator, device, extent, usage, format, aspect_flags, samples);
+}
+
+Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
+             VkImageUsageFlags usage, VkImageViewType view_type,
+             uint32_t array_layers, uint32_t mip_levels) {
+  Create(allocator, device, extent, usage, view_type, array_layers, mip_levels);
+}
+
+Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
+             VkImageUsageFlags usage, VkSampleCountFlagBits samples) {
+  Create(allocator, device, extent, usage, samples);
 }
 
 VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
                        VkExtent3D extent, VkImageUsageFlags usage,
                        uint32_t mip_levels, VkSampleCountFlagBits samples,
                        VkFormat format, VkImageTiling tiling,
-                       VkImageAspectFlags aspect_flags) {
+                       VkImageAspectFlags aspect_flags, uint32_t array_layers,
+                       VkImageViewType view_type) {
   allocator_ = allocator;
   device_ = device;
   image_extent_ = extent;
   mip_levels_ = mip_levels;
+  array_layers_ = array_layers;
   image_format_ = format;
+  view_type_ = view_type;
   current_layout_ = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VkImageCreateInfo image_info{};
@@ -29,7 +50,7 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
   image_info.imageType = VK_IMAGE_TYPE_2D;
   image_info.extent = image_extent_;
   image_info.mipLevels = mip_levels_;
-  image_info.arrayLayers = 1;
+  image_info.arrayLayers = array_layers_;
   image_info.format = image_format_;
   image_info.tiling = tiling;
   image_info.initialLayout = current_layout_;
@@ -48,6 +69,30 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
   return CreateImageView(aspect_flags);
 }
 
+VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
+                       VkExtent3D extent, VkImageUsageFlags usage,
+                       VkFormat format, VkImageAspectFlags aspect_flags,
+                       VkSampleCountFlagBits samples) {
+  return Create(allocator, device, extent, usage, 1, samples, format,
+                VK_IMAGE_TILING_OPTIMAL, aspect_flags);
+}
+
+VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
+                       VkExtent3D extent, VkImageUsageFlags usage,
+                       VkImageViewType view_type, uint32_t array_layers,
+                       uint32_t mip_levels) {
+  return Create(allocator, device, extent, usage, mip_levels,
+                VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB,
+                VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT,
+                array_layers, view_type);
+}
+
+VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
+                       VkExtent3D extent, VkImageUsageFlags usage,
+                       VkSampleCountFlagBits samples) {
+  return Create(allocator, device, extent, usage, 1, samples);
+}
+
 void Image::Destroy() {
   vkDestroyImageView(device_->GetDevice(), image_view_, nullptr);
   vmaDestroyImage(allocator_, image_, allocation_);
@@ -62,6 +107,10 @@ VkExtent3D Image::GetExtent() const { return image_extent_; }
 VkFormat Image::GetFormat() const { return image_format_; }
 
 uint32_t Image::GetMipLevels() const { return mip_levels_; }
+
+uint32_t Image::GetArrayLayers() const { return array_layers_; }
+
+VkImageViewType Image::GetViewType() const { return view_type_; }
 
 VkImageLayout Image::GetLayout() const { return current_layout_; }
 
@@ -95,13 +144,13 @@ VkResult Image::CreateImageView(VkImageAspectFlags aspect_flags) {
   VkImageViewCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   create_info.image = image_;
-  create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  create_info.viewType = view_type_;
   create_info.format = image_format_;
   create_info.subresourceRange.aspectMask = aspect_flags;
   create_info.subresourceRange.baseMipLevel = 0;
   create_info.subresourceRange.levelCount = mip_levels_;
   create_info.subresourceRange.baseArrayLayer = 0;
-  create_info.subresourceRange.layerCount = 1;
+  create_info.subresourceRange.layerCount = array_layers_;
 
   return vkCreateImageView(device_->GetDevice(), &create_info, nullptr,
                            &image_view_);
