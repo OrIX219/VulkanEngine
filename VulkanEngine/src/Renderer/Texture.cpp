@@ -26,14 +26,6 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
   Assets::TextureInfo texture_info = Assets::ReadTextureInfo(file);
 
   VkDeviceSize image_size = texture_info.texture_size;
-  VkFormat image_format;
-  switch (texture_info.texture_format) {
-    case Assets::TextureFormat::RGBA8:
-      image_format = VK_FORMAT_R8G8B8A8_SRGB;
-      break;
-    default:
-      return false;
-  }
 
   staging_buffer_.Destroy();
   staging_buffer_.Create(
@@ -69,6 +61,8 @@ void Texture::Destroy() {
   image_.Destroy();
   staging_buffer_.Destroy();
 }
+
+void Texture::ReleaseStagingMemory() { staging_buffer_.Destroy(); }
 
 VkImage Texture::GetImage() { return image_.GetImage(); }
 

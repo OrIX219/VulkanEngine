@@ -14,11 +14,11 @@ Camera::Camera()
       yaw_{-90.f},
       pitch_{0.f} {}
 
-const glm::mat4& Camera::GetViewMat() const {
+glm::mat4 Camera::GetViewMat() const {
   return glm::lookAt(pos_, pos_ + front_, up_);
 }
 
-const glm::mat4& Camera::GetProjMat(bool reverse) const {
+glm::mat4 Camera::GetProjMat(bool reverse) const {
   glm::mat4 projection;
   if (reverse) {
     projection =

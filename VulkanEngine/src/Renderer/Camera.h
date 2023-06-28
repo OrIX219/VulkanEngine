@@ -10,8 +10,8 @@ class Camera {
 
   Camera();
 
-  const glm::mat4& GetViewMat() const;
-  const glm::mat4& GetProjMat(bool reverse = false) const;
+  glm::mat4 GetViewMat() const;
+  glm::mat4 GetProjMat(bool reverse = false) const;
   const glm::vec3& GetPosition() const;
 
   void ProcessKeyboard(Direction direction, float delta_time);

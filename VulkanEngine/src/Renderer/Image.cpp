@@ -57,6 +57,8 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
   image_info.usage = usage;
   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   image_info.samples = samples;
+  if (view_type_ == VK_IMAGE_VIEW_TYPE_CUBE)
+    image_info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
   VmaAllocationCreateInfo alloc_info{};
   alloc_info.usage = VMA_MEMORY_USAGE_AUTO;

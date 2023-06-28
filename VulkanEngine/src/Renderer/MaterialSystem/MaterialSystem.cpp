@@ -81,6 +81,8 @@ void MaterialSystem::BuildDefaultTemplates() {
       BuildEffect("mesh_instanced.vert.spv", "default_lit.frag.spv");
   ShaderEffect* normals = BuildEffect(
       "normals.vert.spv", "normals.frag.spv", "normals.geom.spv");
+  ShaderEffect* skybox =
+      BuildEffect("skybox.vert.spv", "skybox.frag.spv");
 
   ShaderPass* textured_lit_pass = BuildShader(
       system.engine_->forward_pass_, system.forward_builder_, textured_lit);
@@ -88,6 +90,8 @@ void MaterialSystem::BuildDefaultTemplates() {
       system.engine_->forward_pass_, system.forward_builder_, default_lit);
   ShaderPass* normals_pass = BuildShader(system.engine_->forward_pass_,
                                          system.forward_builder_, normals);
+  ShaderPass* skybox_pass = BuildShader(system.engine_->forward_pass_,
+                                        system.forward_builder_, skybox);
 
   {
     EffectTemplate default_textured;
@@ -148,6 +152,16 @@ void MaterialSystem::BuildDefaultTemplates() {
     normals_template.transparency = Assets::TransparencyMode::kOpaque;
 
     system.template_cache_["normals"] = normals_template;
+  }
+  {
+    EffectTemplate skybox_template;
+    skybox_template.pass_shaders[MeshPassType::kForward] = skybox_pass;
+    skybox_template.pass_shaders[MeshPassType::kTransparency] = nullptr;
+    skybox_template.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+
+    skybox_template.transparency = Assets::TransparencyMode::kOpaque;
+
+    system.template_cache_["skybox"] = skybox_template;
   }
 }
 

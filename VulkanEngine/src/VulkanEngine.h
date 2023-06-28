@@ -23,6 +23,7 @@
 #include "Surface.h"
 #include "Swapchain.h"
 #include "Texture.h"
+#include "TextureCube.h"
 #include "TextureSampler.h"
 #include "VulkanInstance.h"
 #include "VulkanProfiler.h"
@@ -119,6 +120,8 @@ class VulkanEngine {
                    const Renderer::CullParams& params);
   void DrawForward(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderScene::MeshPass& pass);
+  void DrawSkybox(Renderer::CommandBuffer command_buffer,
+                  VkDescriptorBufferInfo scene_info, uint32_t dynamic_offset);
   void ReduceDepth(Renderer::CommandBuffer command_buffer);
   void CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                              uint32_t index); 
@@ -223,9 +226,12 @@ class VulkanEngine {
 
   Renderer::Pipeline blit_pipeline_;
 
+  Renderer::Pipeline skybox_pipeline_;
+
   Renderer::ShaderCache shader_cache_;
 
   Renderer::RenderScene render_scene_;
+  Renderer::TextureCube skybox_texture_;
 
   std::unordered_map<std::string, Renderer::Material> materials_;
   std::unordered_map<std::string, Renderer::Mesh> meshes_;
@@ -238,6 +244,7 @@ class VulkanEngine {
   Renderer::TextureSampler depth_sampler_;
   Renderer::TextureSampler depth_reduction_sampler_;
   Renderer::TextureSampler smooth_sampler_;
+  Renderer::TextureSampler skybox_sampler_;
 };
 
 }  // namespace Engine

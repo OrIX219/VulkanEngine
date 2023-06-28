@@ -18,6 +18,8 @@ class Texture {
                      CommandBuffer command_buffer, const char* path);
   void Destroy();
 
+  void ReleaseStagingMemory();
+
   VkImage GetImage();
   VkImageView GetView();
 

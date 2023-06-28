@@ -115,6 +115,7 @@
     <ClInclude Include="src\Renderer\RenderObject.h" />
     <ClInclude Include="src\Renderer\Scene.h" />
     <ClInclude Include="src\Renderer\Texture.h" />
+    <ClInclude Include="src\Renderer\TextureCube.h" />
     <ClInclude Include="src\Renderer\TextureSampler.h" />
     <ClInclude Include="src\Renderer\Vertex.h" />
     <ClInclude Include="src\Renderer\VertexBuffer.h" />
@@ -158,6 +159,7 @@
     <ClCompile Include="src\Renderer\PushBuffer.cpp" />
     <ClCompile Include="src\Renderer\Scene.cpp" />
     <ClCompile Include="src\Renderer\Texture.cpp" />
+    <ClCompile Include="src\Renderer\TextureCube.cpp" />
     <ClCompile Include="src\Renderer\TextureSampler.cpp" />
     <ClCompile Include="src\Renderer\VertexBuffer.cpp" />
     <ClCompile Include="src\Renderer\Vulkan\CommandBuffer.cpp" />
@@ -187,6 +189,8 @@
     <None Include="Shaders\normals.frag" />
     <None Include="Shaders\normals.geom" />
     <None Include="Shaders\normals.vert" />
+    <None Include="Shaders\skybox.frag" />
+    <None Include="Shaders\skybox.vert" />
     <None Include="Shaders\sparse_upload.comp" />
     <None Include="Shaders\textured_lit.frag" />
     <None Include="Shaders\tri_mesh.vert" />

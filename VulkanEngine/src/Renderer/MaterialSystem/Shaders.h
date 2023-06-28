@@ -34,8 +34,9 @@ class ShaderEffect {
 
   void AddStage(ShaderModule* module, VkShaderStageFlagBits stage);
 
-  void ReflectLayout(LogicalDevice* device, ReflectionOverrides* overrides,
-                     size_t override_count);
+  void ReflectLayout(LogicalDevice* device,
+                     ReflectionOverrides* overrides = nullptr,
+                     size_t override_count = 0);
 
   void FillStages(
       std::vector<VkPipelineShaderStageCreateInfo>& pipeline_stages);

@@ -206,6 +206,7 @@ void VulkanEngine::Cleanup() {
     color_image_.Destroy();
     swapchain_.Destroy();
 
+    skybox_texture_.Destroy();
     render_scene_.Destroy();
 
     shader_cache_.Destroy();
@@ -472,7 +473,7 @@ void VulkanEngine::InitPipelines() {
                         VK_SHADER_STAGE_VERTEX_BIT);
   blit_effect->AddStage(shader_cache_.GetShader("Shaders/blit.frag.spv"),
                         VK_SHADER_STAGE_FRAGMENT_BIT);
-  blit_effect->ReflectLayout(&device_, nullptr, 0);
+  blit_effect->ReflectLayout(&device_);
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::ShaderEffect::Destroy, *blit_effect));
 
@@ -484,6 +485,29 @@ void VulkanEngine::InitPipelines() {
           .Build(copy_pass_);
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Pipeline::Destroy, blit_pipeline_));
+
+  std::array<Renderer::ShaderEffect::ReflectionOverrides, 1> overrides = {
+      {"sceneData", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC}};
+  Renderer::ShaderEffect* skybox_effect = new Renderer::ShaderEffect();
+  skybox_effect->AddStage(shader_cache_.GetShader("Shaders/skybox.vert.spv"),
+                          VK_SHADER_STAGE_VERTEX_BIT);
+  skybox_effect->AddStage(shader_cache_.GetShader("Shaders/skybox.frag.spv"),
+                          VK_SHADER_STAGE_FRAGMENT_BIT);
+  skybox_effect->ReflectLayout(&device_, overrides.data(), overrides.size());
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::ShaderEffect::Destroy, *skybox_effect));
+
+  skybox_pipeline_ =
+      builder.SetDefaults()
+          .SetShaders(skybox_effect)
+          .SetMultisampling(samples_, VK_TRUE)
+          .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL)
+          .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
+                         VK_FRONT_FACE_COUNTER_CLOCKWISE)
+          .SetVertexInputDescription(Renderer::Vertex::GetDescription())
+          .Build(forward_pass_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Pipeline::Destroy, skybox_pipeline_));
 
   LoadComputeShader("Shaders/indirect_compute.comp.spv", cull_pipeline_,
                     cull_layout_);
@@ -529,6 +553,14 @@ void VulkanEngine::InitSamplers() {
   smooth_sampler_.SetDefaults().SetAnisotropyEnable(true).Create(&device_);
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::TextureSampler::Destroy, smooth_sampler_));
+
+  skybox_sampler_.SetDefaults()
+      .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE})
+      .Create(&device_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::TextureSampler::Destroy, skybox_sampler_));
 }
 
 uint32_t PrevPowOf2(uint32_t x) {
@@ -595,7 +627,7 @@ bool VulkanEngine::LoadComputeShader(const char* path, VkPipeline& pipeline,
 
   Renderer::ShaderEffect* effect = new Renderer::ShaderEffect();
   effect->AddStage(&compute_module, VK_SHADER_STAGE_COMPUTE_BIT);
-  effect->ReflectLayout(&device_, nullptr, 0);
+  effect->ReflectLayout(&device_);
 
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::ShaderEffect::Destroy, effect));
@@ -806,6 +838,10 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   textured_info.base_template = "texturedPBR_opaque";
   textured_info.textures.push_back(white_texture);
   Renderer::MaterialSystem::BuildMaterial("textured", textured_info);
+
+  skybox_texture_.LoadFromDirectory(allocator_, &device_, command_buffer,
+                                    AssetPath("skybox").c_str());
+  LoadMesh(command_buffer, "skybox", AssetPath("cube.mesh").c_str());
 
   LoadPrefab(command_buffer, AssetPath("Test.pfb").c_str());
 
@@ -1703,10 +1739,43 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
     }
   }
 
+  DrawSkybox(command_buffer, scene_info, scene_data_offset);
+
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
                                   command_buffer.GetBuffer());
 
   forward_pass_.End(command_buffer);
+}
+
+void VulkanEngine::DrawSkybox(Renderer::CommandBuffer command_buffer,
+                              VkDescriptorBufferInfo scene_info,
+                              uint32_t dynamic_offset) {
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
+
+  VkDescriptorImageInfo cubemap_info{};
+  cubemap_info.sampler = skybox_sampler_.GetSampler();
+  cubemap_info.imageView = skybox_texture_.GetView();
+  cubemap_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+  VkDescriptorSet skybox_set;
+  Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                     &frame.dynamic_descriptor_allocator)
+      .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                  VK_SHADER_STAGE_VERTEX_BIT)
+      .BindImage(1, &cubemap_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                 VK_SHADER_STAGE_FRAGMENT_BIT)
+      .Build(skybox_set);
+
+  skybox_pipeline_.Bind(command_buffer);
+  vkCmdBindDescriptorSets(
+      command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+      skybox_pipeline_.GetLayout(), 0, 1, &skybox_set, 1, &dynamic_offset);
+
+  Renderer::Mesh* cube = GetMesh("skybox");
+  cube->BindBuffers(command_buffer);
+  vkCmdDrawIndexed(command_buffer.GetBuffer(), cube->GetIndicesCount(), 1, 0, 0,
+                   0);
 }
 
 struct alignas(16) DepthReduceData {
