@@ -24,6 +24,13 @@ class Pipeline {
   void Bind(CommandBuffer command_buffer,
             VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS);
 
+  friend bool operator==(const Pipeline& lhs, const Pipeline& rhs) {
+    return lhs.pipeline_ == rhs.pipeline_;
+  }
+  friend bool operator!=(const Pipeline& lhs, const Pipeline& rhs) {
+    return lhs.pipeline_ != rhs.pipeline_;
+  }
+
  private:
   bool foreign_layout_;
   VkPipelineLayout pipeline_layout_;

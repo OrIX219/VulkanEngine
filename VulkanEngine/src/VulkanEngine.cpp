@@ -486,29 +486,6 @@ void VulkanEngine::InitPipelines() {
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Pipeline::Destroy, blit_pipeline_));
 
-  std::array<Renderer::ShaderEffect::ReflectionOverrides, 1> overrides = {
-      {"sceneData", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC}};
-  Renderer::ShaderEffect* skybox_effect = new Renderer::ShaderEffect();
-  skybox_effect->AddStage(shader_cache_.GetShader("Shaders/skybox.vert.spv"),
-                          VK_SHADER_STAGE_VERTEX_BIT);
-  skybox_effect->AddStage(shader_cache_.GetShader("Shaders/skybox.frag.spv"),
-                          VK_SHADER_STAGE_FRAGMENT_BIT);
-  skybox_effect->ReflectLayout(&device_, overrides.data(), overrides.size());
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::ShaderEffect::Destroy, *skybox_effect));
-
-  skybox_pipeline_ =
-      builder.SetDefaults()
-          .SetShaders(skybox_effect)
-          .SetMultisampling(samples_, VK_TRUE)
-          .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL)
-          .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
-                         VK_FRONT_FACE_COUNTER_CLOCKWISE)
-          .SetVertexInputDescription(Renderer::Vertex::GetDescription())
-          .Build(forward_pass_);
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Pipeline::Destroy, skybox_pipeline_));
-
   LoadComputeShader("Shaders/indirect_compute.comp.spv", cull_pipeline_,
                     cull_layout_);
   LoadComputeShader("Shaders/depth_reduce.comp.spv", depth_reduce_pipeline_,
@@ -824,6 +801,8 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   command_buffer.Begin();
 
   LoadTexture(command_buffer, "white", AssetPath("white.tx").c_str());
+  skybox_texture_.LoadFromDirectory(allocator_, &device_, command_buffer,
+                                    AssetPath("skybox").c_str());
 
   Renderer::SampledTexture white_texture;
   white_texture.sampler = texture_sampler_.GetSampler();
@@ -839,8 +818,15 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   textured_info.textures.push_back(white_texture);
   Renderer::MaterialSystem::BuildMaterial("textured", textured_info);
 
-  skybox_texture_.LoadFromDirectory(allocator_, &device_, command_buffer,
-                                    AssetPath("skybox").c_str());
+  Renderer::SampledTexture skybox_texture;
+  skybox_texture.sampler = skybox_sampler_.GetSampler();
+  skybox_texture.view = skybox_texture_.GetView();
+
+  Renderer::MaterialData skybox_info;
+  skybox_info.base_template = "skybox";
+  skybox_info.textures.push_back(skybox_texture);
+  Renderer::MaterialSystem::BuildMaterial("skybox", skybox_info);
+
   LoadMesh(command_buffer, "skybox", AssetPath("cube.mesh").c_str());
 
   LoadPrefab(command_buffer, AssetPath("Test.pfb").c_str());
@@ -1628,32 +1614,30 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
       auto& multibatch = pass.multibatches[i];
       auto& instance = pass.indirect_batches[multibatch.first];
 
-      VkPipeline new_pipeline = instance.material.shader_pass->pipeline;
-      VkPipelineLayout new_layout =
-          instance.material.shader_pass->pipeline_layout;
+      Renderer::Pipeline new_pipeline = instance.material.shader_pass->pipeline;
       VkDescriptorSet new_material_set = instance.material.material_set;
 
       Renderer::Mesh* draw_mesh = render_scene_.GetMesh(instance.mesh_id)->mesh;
 
-      if (new_pipeline != last_pipeline) {
-        last_pipeline = new_pipeline;
-        vkCmdBindPipeline(command_buffer.GetBuffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS, new_pipeline);
+      if (new_pipeline.GetPipeline() != last_pipeline) {
+        last_pipeline = new_pipeline.GetPipeline();
+        new_pipeline.Bind(command_buffer);
+        vkCmdBindDescriptorSets(
+            command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+            new_pipeline.GetLayout(), 0, 1, &frame.global_descriptor,
+            static_cast<uint32_t>(dynamic_offsets.size()),
+            dynamic_offsets.data());
         vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                                VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 0,
-                                1, &frame.global_descriptor,
-                                static_cast<uint32_t>(dynamic_offsets.size()),
-                                dynamic_offsets.data());
-        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                                VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 1,
+                                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                new_pipeline.GetLayout(), 1,
                                 1, &frame.object_descriptor, 0, nullptr);
       }
 
       if (new_material_set != last_material_set) {
         last_material_set = new_material_set;
-        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                                VK_PIPELINE_BIND_POINT_GRAPHICS, new_layout, 2,
-                                1, &new_material_set, 0, nullptr);
+        vkCmdBindDescriptorSets(
+            command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+            new_pipeline.GetLayout(), 2, 1, &new_material_set, 0, nullptr);
       }
 
       bool merged = render_scene_.GetMesh(instance.mesh_id)->is_merged;
@@ -1696,14 +1680,11 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
       if (show_normals) {
         Renderer::Material* material =
             Renderer::MaterialSystem::GetMaterial("normals");
-        VkPipeline pipeline =
+        Renderer::Pipeline pipeline =
             material->original->pass_shaders[Renderer::MeshPassType::kForward]
                 ->pipeline;
-        VkPipelineLayout layout =
-            material->original->pass_shaders[Renderer::MeshPassType::kForward]
-                ->pipeline_layout;
 
-        last_pipeline = pipeline;
+        last_pipeline = pipeline.GetPipeline();
 
         VkDescriptorSet normals_global_set;
         Renderer::DescriptorBuilder::Begin(&layout_cache_,
@@ -1713,17 +1694,16 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT)
             .Build(normals_global_set);
 
+        pipeline.Bind(command_buffer);
         vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                                VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1,
-                                &normals_global_set,
+                                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                pipeline.GetLayout(), 0, 1, &normals_global_set,
                                 static_cast<uint32_t>(dynamic_offsets.size()),
                                 dynamic_offsets.data());
-        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                                VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 1, 1,
-                                &frame.object_descriptor, 0, nullptr);
+        vkCmdBindDescriptorSets(
+            command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipeline.GetLayout(), 1, 1, &frame.object_descriptor, 0, nullptr);
 
-        vkCmdBindPipeline(command_buffer.GetBuffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         if (!has_indices) {
           vkCmdDraw(command_buffer.GetBuffer(), draw_mesh->GetVerticesCount(),
                     instance.count, 0, instance.first);
@@ -1753,24 +1733,28 @@ void VulkanEngine::DrawSkybox(Renderer::CommandBuffer command_buffer,
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
-  VkDescriptorImageInfo cubemap_info{};
-  cubemap_info.sampler = skybox_sampler_.GetSampler();
-  cubemap_info.imageView = skybox_texture_.GetView();
-  cubemap_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  Renderer::Material* material =
+      Renderer::MaterialSystem::GetMaterial("skybox");
+  Renderer::Pipeline pipeline =
+      material->original->pass_shaders[Renderer::MeshPassType::kForward]
+          ->pipeline;
+  VkDescriptorSet skybox_set =
+      material->pass_sets[Renderer::MeshPassType::kForward];
 
-  VkDescriptorSet skybox_set;
+  VkDescriptorSet skybox_global_set;
   Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                      &frame.dynamic_descriptor_allocator)
       .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                   VK_SHADER_STAGE_VERTEX_BIT)
-      .BindImage(1, &cubemap_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                 VK_SHADER_STAGE_FRAGMENT_BIT)
-      .Build(skybox_set);
+      .Build(skybox_global_set);
 
-  skybox_pipeline_.Bind(command_buffer);
-  vkCmdBindDescriptorSets(
-      command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-      skybox_pipeline_.GetLayout(), 0, 1, &skybox_set, 1, &dynamic_offset);
+  pipeline.Bind(command_buffer);
+  vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                          VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetLayout(),
+                          0, 1, &skybox_global_set, 1, &dynamic_offset);
+  vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+                          VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetLayout(),
+                          1, 1, &skybox_set, 0, nullptr);
 
   Renderer::Mesh* cube = GetMesh("skybox");
   cube->BindBuffers(command_buffer);

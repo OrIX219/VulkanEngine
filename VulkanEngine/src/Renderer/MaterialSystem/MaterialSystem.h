@@ -21,8 +21,7 @@ namespace Renderer {
 class ShaderEffect;
 struct ShaderPass {
   ShaderEffect* effect{nullptr};
-  VkPipeline pipeline{VK_NULL_HANDLE};
-  VkPipelineLayout pipeline_layout{VK_NULL_HANDLE};
+  Pipeline pipeline;
 };
 
 struct SampledTexture {
@@ -102,6 +101,7 @@ class MaterialSystem {
 
   PipelineBuilder forward_builder_;
   PipelineBuilder shadow_builder_;
+  PipelineBuilder skybox_builder_;
 
   std::unordered_map<std::string, EffectTemplate> template_cache_;
   std::unordered_map<std::string, Material*> materials_;

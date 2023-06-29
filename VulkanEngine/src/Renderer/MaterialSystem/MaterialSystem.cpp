@@ -91,7 +91,7 @@ void MaterialSystem::BuildDefaultTemplates() {
   ShaderPass* normals_pass = BuildShader(system.engine_->forward_pass_,
                                          system.forward_builder_, normals);
   ShaderPass* skybox_pass = BuildShader(system.engine_->forward_pass_,
-                                        system.forward_builder_, skybox);
+                                        system.skybox_builder_, skybox);
 
   {
     EffectTemplate default_textured;
@@ -172,15 +172,14 @@ ShaderPass* MaterialSystem::BuildShader(RenderPass& render_pass,
 
   ShaderPass* pass = new ShaderPass();
   pass->effect = effect;
-  pass->pipeline_layout = effect->built_layout;
 
   PipelineBuilder pipline_builder = builder;
   pipline_builder.SetShaders(effect);
-  pass->pipeline = pipline_builder.Build(render_pass).GetPipeline();
+  pass->pipeline = pipline_builder.Build(render_pass);
 
   system.engine_->main_deletion_queue_.PushFunction([=]() {
-    vkDestroyPipeline(system.engine_->device_.GetDevice(), pass->pipeline,
-                      nullptr);
+    vkDestroyPipeline(system.engine_->device_.GetDevice(),
+                      pass->pipeline.GetPipeline(), nullptr);
   });
 
   return pass;
@@ -244,12 +243,21 @@ void MaterialSystem::FillBuilders() {
                      VK_FRONT_FACE_COUNTER_CLOCKWISE)
       .SetDepthStencil()
       .SetMultisampling(system.engine_->samples_, VK_TRUE);
+
   system.shadow_builder_ = PipelineBuilder::Begin(&system.engine_->device_);
   system.shadow_builder_.SetDefaults()
       .SetVertexInputDescription(Vertex::GetDescription())
       .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
                      VK_FRONT_FACE_COUNTER_CLOCKWISE)
       .SetDepthStencil()
+      .SetMultisampling(system.engine_->samples_, VK_TRUE);
+
+  system.skybox_builder_ = PipelineBuilder::Begin(&system.engine_->device_);
+  system.skybox_builder_.SetDefaults()
+      .SetVertexInputDescription(Renderer::Vertex::GetDescription())
+      .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
+                     VK_FRONT_FACE_COUNTER_CLOCKWISE)
+      .SetDepthStencil(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL)
       .SetMultisampling(system.engine_->samples_, VK_TRUE);
 }
 
