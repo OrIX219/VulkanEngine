@@ -6,7 +6,7 @@ Framebuffer::Framebuffer() {}
 
 Framebuffer::~Framebuffer() {}
 
-VkFramebuffer Framebuffer::GetFramebuffer() const { return framebuffer_; }
+VkFramebuffer Framebuffer::Get() const { return framebuffer_; }
 
 VkResult Framebuffer::Resize(VkExtent2D extent) {
   extent_ = extent;
@@ -25,7 +25,7 @@ VkResult Framebuffer::Resize(VkExtent2D extent,
 VkResult Framebuffer::Create() {
   VkFramebufferCreateInfo framebuffer_info{};
   framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-  framebuffer_info.renderPass = render_pass_->GetRenderPass();
+  framebuffer_info.renderPass = render_pass_->Get();
   framebuffer_info.attachmentCount =
       static_cast<uint32_t>(attachments_.size());
   framebuffer_info.pAttachments = attachments_.data();
@@ -33,7 +33,7 @@ VkResult Framebuffer::Create() {
   framebuffer_info.height = extent_.height;
   framebuffer_info.layers = 1;
 
-  return vkCreateFramebuffer(device_->GetDevice(), &framebuffer_info, nullptr,
+  return vkCreateFramebuffer(device_->Get(), &framebuffer_info, nullptr,
                              &framebuffer_);
 }
 
@@ -48,7 +48,7 @@ VkResult Framebuffer::Create(LogicalDevice* device, RenderPass* render_pass,
 }
 
 void Framebuffer::Destroy() {
-  vkDestroyFramebuffer(device_->GetDevice(), framebuffer_, nullptr);
+  vkDestroyFramebuffer(device_->Get(), framebuffer_, nullptr);
 }
 
 }  // namespace Renderer

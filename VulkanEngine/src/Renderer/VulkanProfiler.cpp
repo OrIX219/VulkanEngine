@@ -10,7 +10,7 @@ VulkanScopeTimer::VulkanScopeTimer(CommandBuffer command_buffer,
 
   VkQueryPool pool = profiler_->GetTimerPool();
 
-  vkCmdWriteTimestamp(command_buffer_.GetBuffer(),
+  vkCmdWriteTimestamp(command_buffer_.Get(),
                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, pool,
                       timer_.start_timestamp);
 }
@@ -20,7 +20,7 @@ VulkanScopeTimer::~VulkanScopeTimer() {
 
   VkQueryPool pool = profiler_->GetTimerPool();
 
-  vkCmdWriteTimestamp(command_buffer_.GetBuffer(),
+  vkCmdWriteTimestamp(command_buffer_.Get(),
                       VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, pool,
                       timer_.end_timestamp);
 
@@ -33,12 +33,12 @@ VulkanPipelineStatRecorder::VulkanPipelineStatRecorder(
   stat_recorder_.name = name;
   stat_recorder_.query = profiler_->GetStatId();
 
-  vkCmdBeginQuery(command_buffer_.GetBuffer(), profiler_->GetStatPool(),
+  vkCmdBeginQuery(command_buffer_.Get(), profiler_->GetStatPool(),
                   stat_recorder_.query, 0);
 }
 
 VulkanPipelineStatRecorder::~VulkanPipelineStatRecorder() {
-  vkCmdEndQuery(command_buffer_.GetBuffer(), profiler_->GetStatPool(),
+  vkCmdEndQuery(command_buffer_.Get(), profiler_->GetStatPool(),
                 stat_recorder_.query);
 
   profiler_->AddStat(stat_recorder_);
@@ -57,7 +57,7 @@ void VulkanProfiler::Init(LogicalDevice* device, float timestamp_period,
   pool_info.queryCount = pool_size;
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    vkCreateQueryPool(device_->GetDevice(), &pool_info, nullptr,
+    vkCreateQueryPool(device_->Get(), &pool_info, nullptr,
                       &query_frames_[i].timer_pool);
     query_frames_[i].timer_last = per_frame_pool_sizes;
   }
@@ -66,7 +66,7 @@ void VulkanProfiler::Init(LogicalDevice* device, float timestamp_period,
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     pool_info.pipelineStatistics =
         VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT;
-    vkCreateQueryPool(device_->GetDevice(), &pool_info, nullptr,
+    vkCreateQueryPool(device_->Get(), &pool_info, nullptr,
                       &query_frames_[i].stat_pool);
     query_frames_[i].stat_last = per_frame_pool_sizes;
   }
@@ -74,10 +74,8 @@ void VulkanProfiler::Init(LogicalDevice* device, float timestamp_period,
 
 void VulkanProfiler::Destroy() {
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    vkDestroyQueryPool(device_->GetDevice(), query_frames_[i].timer_pool,
-                       nullptr);
-    vkDestroyQueryPool(device_->GetDevice(), query_frames_[i].stat_pool,
-                       nullptr);
+    vkDestroyQueryPool(device_->Get(), query_frames_[i].timer_pool, nullptr);
+    vkDestroyQueryPool(device_->Get(), query_frames_[i].stat_pool, nullptr);
   }
 }
 
@@ -85,12 +83,12 @@ void VulkanProfiler::GrabQueries(CommandBuffer command_buffer) {
   uint32_t frame = current_frame_;
   current_frame_ = (current_frame_ + 1) % kMaxFramesInFlight;
 
-  vkCmdResetQueryPool(command_buffer.GetBuffer(),
+  vkCmdResetQueryPool(command_buffer.Get(),
                       query_frames_[current_frame_].timer_pool, 0,
                       query_frames_[current_frame_].timer_last);
   query_frames_[current_frame_].timer_last = 0;
   query_frames_[current_frame_].timers.clear();
-  vkCmdResetQueryPool(command_buffer.GetBuffer(),
+  vkCmdResetQueryPool(command_buffer.Get(),
                       query_frames_[current_frame_].stat_pool, 0,
                       query_frames_[current_frame_].stat_last);
   query_frames_[current_frame_].stat_last = 0;
@@ -100,8 +98,7 @@ void VulkanProfiler::GrabQueries(CommandBuffer command_buffer) {
   std::vector<uint64_t> query_state;
   query_state.resize(state.timer_last);
   if (state.timer_last != 0) {
-    vkGetQueryPoolResults(device_->GetDevice(), state.timer_pool, 0,
-                          state.timer_last,
+    vkGetQueryPoolResults(device_->Get(), state.timer_pool, 0, state.timer_last,
                           query_state.size() * sizeof(query_state[0]),
                           query_state.data(), sizeof(query_state[0]),
                           VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
@@ -109,8 +106,7 @@ void VulkanProfiler::GrabQueries(CommandBuffer command_buffer) {
   std::vector<uint64_t> stat_results;
   stat_results.resize(state.stat_last);
   if (state.stat_last != 0) {
-    vkGetQueryPoolResults(device_->GetDevice(), state.stat_pool, 0,
-                          state.stat_last,
+    vkGetQueryPoolResults(device_->Get(), state.stat_pool, 0, state.stat_last,
                           stat_results.size() * sizeof(stat_results[0]),
                           stat_results.data(), sizeof(stat_results[0]),
                           VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);

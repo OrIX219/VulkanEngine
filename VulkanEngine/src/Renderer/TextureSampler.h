@@ -22,7 +22,7 @@ class TextureSampler {
               float max_lod = VK_LOD_CLAMP_NONE, const void* next = nullptr);
   void Destroy();
 
-  VkSampler GetSampler();
+  VkSampler Get();
 
   VkFilter GetMagFilter() const;
   VkFilter GetMinFilter() const;

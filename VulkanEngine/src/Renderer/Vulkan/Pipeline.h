@@ -18,7 +18,7 @@ class Pipeline {
                   bool foreign_layout);
   void Destroy();
 
-  VkPipeline GetPipeline() const;
+  VkPipeline Get() const;
   VkPipelineLayout GetLayout() const;
 
   void Bind(CommandBuffer command_buffer,

@@ -268,7 +268,7 @@ void RenderScene::RefreshPass(MeshPass* pass) {
       new_batch.object = obj;
 
       uint64_t pipeline_hash = std::hash<uint64_t>()(
-          uint64_t(object.material.shader_pass->pipeline.GetPipeline()));
+          uint64_t(object.material.shader_pass->pipeline.Get()));
       int64_t set_hash =
           std::hash<uint64_t>()(uint64_t(object.material.material_set));
 
@@ -342,7 +342,7 @@ void RenderScene::RefreshPass(MeshPass* pass) {
     new_batch.object.handle = i;
 
     uint64_t pipeline_hash = std::hash<uint64_t>()(
-        uint64_t(object.material.shader_pass->pipeline.GetPipeline()));
+        uint64_t(object.material.shader_pass->pipeline.Get()));
     int64_t set_hash =
         std::hash<uint64_t>()(uint64_t(object.material.material_set));
 

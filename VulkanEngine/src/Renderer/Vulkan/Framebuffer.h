@@ -16,7 +16,7 @@ class Framebuffer {
   Framebuffer();
   ~Framebuffer();
 
-  VkFramebuffer GetFramebuffer() const;
+  VkFramebuffer Get() const;
 
   VkResult Create(LogicalDevice* device, RenderPass* render_pass,
                   VkExtent2D extent,

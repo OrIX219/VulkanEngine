@@ -4,9 +4,9 @@ namespace Renderer {
 
 Queue::Queue() : current_batch_(0) {}
 
-void Queue::SetQueue(const VkQueue& queue) { queue_ = queue; }
+void Queue::Set(const VkQueue& queue) { queue_ = queue; }
 
-VkQueue Queue::GetQueue() { return queue_; }
+VkQueue Queue::Get() { return queue_; }
 
 void Queue::BeginBatch() {
   if (current_batch_ < batches_.size()) EndBatch();

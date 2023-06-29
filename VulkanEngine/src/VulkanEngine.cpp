@@ -88,9 +88,9 @@ void VulkanEngine::Init() {
   LOG_SUCCESS("Initialized CVar system");
 
   VmaAllocatorCreateInfo allocator_info{};
-  allocator_info.instance = instance_.GetInstance();
-  allocator_info.physicalDevice = physical_device_.GetDevice();
-  allocator_info.device = device_.GetDevice();
+  allocator_info.instance = instance_.Get();
+  allocator_info.physicalDevice = physical_device_.Get();
+  allocator_info.device = device_.Get();
   allocator_info.vulkanApiVersion = VK_API_VERSION_1_2;
 
   VK_CHECK(vmaCreateAllocator(&allocator_info, &allocator_));
@@ -430,25 +430,23 @@ void VulkanEngine::InitSyncStructures() {
   VkSemaphoreCreateInfo semaphore_info{};
   semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-  VK_CHECK(vkCreateFence(device_.GetDevice(), &fence_info, nullptr,
+  VK_CHECK(vkCreateFence(device_.Get(), &fence_info, nullptr,
                          &window_resize_fence_));
-  main_deletion_queue_.PushFunction([=]() {
-    vkDestroyFence(device_.GetDevice(), window_resize_fence_, nullptr);
+  main_deletion_queue_.PushFunction(
+      [=]() { vkDestroyFence(device_.Get(), window_resize_fence_, nullptr);
   });
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
-    VK_CHECK(vkCreateFence(device_.GetDevice(), &fence_info, nullptr,
+    VK_CHECK(vkCreateFence(device_.Get(), &fence_info, nullptr,
                            &frames_[i].render_fence));
-    VK_CHECK(vkCreateSemaphore(device_.GetDevice(), &semaphore_info, nullptr,
+    VK_CHECK(vkCreateSemaphore(device_.Get(), &semaphore_info, nullptr,
                                &frames_[i].render_semaphore));
-    VK_CHECK(vkCreateSemaphore(device_.GetDevice(), &semaphore_info, nullptr,
+    VK_CHECK(vkCreateSemaphore(device_.Get(), &semaphore_info, nullptr,
                                &frames_[i].present_semaphore));
 
     main_deletion_queue_.PushFunction([=]() {
-      vkDestroyFence(device_.GetDevice(), frames_[i].render_fence, nullptr);
-      vkDestroySemaphore(device_.GetDevice(), frames_[i].render_semaphore,
-                         nullptr);
-      vkDestroySemaphore(device_.GetDevice(), frames_[i].present_semaphore,
-                         nullptr);
+      vkDestroyFence(device_.Get(), frames_[i].render_fence, nullptr);
+      vkDestroySemaphore(device_.Get(), frames_[i].render_semaphore, nullptr);
+      vkDestroySemaphore(device_.Get(), frames_[i].present_semaphore, nullptr);
     });
   }
 }
@@ -569,7 +567,7 @@ void VulkanEngine::InitDepthPyramid(Renderer::CommandPool& init_pool) {
     VkImageViewCreateInfo level_info{};
     level_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     level_info.format = VK_FORMAT_R32_SFLOAT;
-    level_info.image = depth_pyramid_.GetImage();
+    level_info.image = depth_pyramid_.Get();
     level_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     level_info.subresourceRange.baseMipLevel = i;
     level_info.subresourceRange.levelCount = 1;
@@ -577,10 +575,10 @@ void VulkanEngine::InitDepthPyramid(Renderer::CommandPool& init_pool) {
     level_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
     VkImageView view;
-    vkCreateImageView(device_.GetDevice(), &level_info, nullptr, &view);
+    vkCreateImageView(device_.Get(), &level_info, nullptr, &view);
     depth_pyramid_mips_[i] = view;
     main_deletion_queue_.PushFunction(
-        [=]() { vkDestroyImageView(device_.GetDevice(), view, nullptr); });
+        [=]() { vkDestroyImageView(device_.Get(), view, nullptr); });
   }
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
@@ -622,10 +620,10 @@ bool VulkanEngine::LoadComputeShader(const char* path, VkPipeline& pipeline,
   pipeline = builder.Build();
   layout = effect->built_layout;
 
-  vkDestroyShaderModule(device_.GetDevice(), compute_module.module, nullptr);
+  vkDestroyShaderModule(device_.Get(), compute_module.module, nullptr);
 
-  main_deletion_queue_.PushFunction([=]() {
-    vkDestroyPipeline(device_.GetDevice(), pipeline, nullptr);
+  main_deletion_queue_.PushFunction(
+      [=]() { vkDestroyPipeline(device_.Get(), pipeline, nullptr);
   });
 
   return true;
@@ -752,7 +750,7 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
       LoadTexture(command_buffer, texture.c_str(), AssetPath(texture).c_str());
 
       Renderer::SampledTexture tex;
-      tex.sampler = texture_sampler_.GetSampler();
+      tex.sampler = texture_sampler_.Get();
       tex.view = textures_[texture].GetView();
 
       Renderer::MaterialData info;
@@ -805,7 +803,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
                                     AssetPath("skybox").c_str());
 
   Renderer::SampledTexture white_texture;
-  white_texture.sampler = texture_sampler_.GetSampler();
+  white_texture.sampler = texture_sampler_.Get();
   white_texture.view = textures_["white"].GetView();
 
   Renderer::MaterialData material_info;
@@ -819,7 +817,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   Renderer::MaterialSystem::BuildMaterial("textured", textured_info);
 
   Renderer::SampledTexture skybox_texture;
-  skybox_texture.sampler = skybox_sampler_.GetSampler();
+  skybox_texture.sampler = skybox_sampler_.Get();
   skybox_texture.view = skybox_texture_.GetView();
 
   Renderer::MaterialData skybox_info;
@@ -857,10 +855,10 @@ void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   pool_info.pPoolSizes = sizes.data();
   pool_info.maxSets = kMaxCount;
 
-  VK_CHECK(vkCreateDescriptorPool(device_.GetDevice(), &pool_info, nullptr,
-                                  &imgui_pool_));
-  main_deletion_queue_.PushFunction([=]() {
-    vkDestroyDescriptorPool(device_.GetDevice(), imgui_pool_, nullptr);
+  VK_CHECK(
+      vkCreateDescriptorPool(device_.Get(), &pool_info, nullptr, &imgui_pool_));
+  main_deletion_queue_.PushFunction(
+      [=]() { vkDestroyDescriptorPool(device_.Get(), imgui_pool_, nullptr);
   });
 
   ImGui::CreateContext();
@@ -868,20 +866,20 @@ void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   ImGui_ImplGlfw_InitForVulkan(window_.GetWindow(), true);
 
   ImGui_ImplVulkan_InitInfo init_info{};
-  init_info.Instance = instance_.GetInstance();
-  init_info.PhysicalDevice = physical_device_.GetDevice();
-  init_info.Device = device_.GetDevice();
-  init_info.Queue = device_.GetGraphicsQueue().GetQueue();
+  init_info.Instance = instance_.Get();
+  init_info.PhysicalDevice = physical_device_.Get();
+  init_info.Device = device_.Get();
+  init_info.Queue = device_.GetGraphicsQueue().Get();
   init_info.DescriptorPool = imgui_pool_;
   init_info.MinImageCount = 3;
   init_info.ImageCount = 3;
   init_info.MSAASamples = samples_;
 
-  ImGui_ImplVulkan_Init(&init_info, forward_pass_.GetRenderPass());
+  ImGui_ImplVulkan_Init(&init_info, forward_pass_.Get());
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin();
-  ImGui_ImplVulkan_CreateFontsTexture(command_buffer.GetBuffer());
+  ImGui_ImplVulkan_CreateFontsTexture(command_buffer.Get());
   command_buffer.End();
   command_buffer.Submit();
   device_.GetGraphicsQueue().SubmitBatches();
@@ -1022,9 +1020,8 @@ void VulkanEngine::Draw() {
   FrameData& frame = frames_[frame_index];
 
   std::array<VkFence, 2> fences = {frame.render_fence, window_resize_fence_};
-  VK_CHECK(vkWaitForFences(device_.GetDevice(),
-                           static_cast<uint32_t>(fences.size()), fences.data(),
-                           VK_TRUE, UINT64_MAX));
+  VK_CHECK(vkWaitForFences(device_.Get(), static_cast<uint32_t>(fences.size()),
+                           fences.data(), VK_TRUE, UINT64_MAX));
 
   uint32_t image_index;
   VkResult res =
@@ -1037,7 +1034,7 @@ void VulkanEngine::Draw() {
     VK_CHECK(res);
   }
 
-  VK_CHECK(vkResetFences(device_.GetDevice(), 1, &frame.render_fence));
+  VK_CHECK(vkResetFences(device_.Get(), 1, &frame.render_fence));
 
   frame.deletion_queue.Flush();
   VK_CHECK(frame.command_pool.Reset());
@@ -1074,8 +1071,7 @@ void VulkanEngine::Draw() {
       ReadyCullData(command_buffer, render_scene_.transparent_pass);
       ReadyCullData(command_buffer, render_scene_.shadow_pass);
 
-      vkCmdPipelineBarrier(command_buffer.GetBuffer(),
-                           VK_PIPELINE_STAGE_TRANSFER_BIT,
+      vkCmdPipelineBarrier(command_buffer.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
                            static_cast<uint32_t>(pre_cull_barriers_.size()),
                            pre_cull_barriers_.data(), 0, nullptr);
@@ -1097,7 +1093,7 @@ void VulkanEngine::Draw() {
       ExecuteCull(command_buffer, render_scene_.forward_pass, forward_cull);
       ExecuteCull(command_buffer, render_scene_.transparent_pass, forward_cull);
 
-      vkCmdPipelineBarrier(command_buffer.GetBuffer(),
+      vkCmdPipelineBarrier(command_buffer.Get(),
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr,
                            static_cast<uint32_t>(post_cull_barriers_.size()),
@@ -1129,7 +1125,7 @@ void VulkanEngine::Draw() {
 
   VkPresentInfoKHR present_info{};
   present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  VkSwapchainKHR swapchains[] = {swapchain_.GetSwapchain()};
+  VkSwapchainKHR swapchains[] = {swapchain_.Get()};
   present_info.swapchainCount = 1;
   present_info.pSwapchains = swapchains;
   present_info.waitSemaphoreCount = 1;
@@ -1142,7 +1138,7 @@ void VulkanEngine::Draw() {
       window_.GetResized()) {
     window_.SetResized(false);
     RecreateSwapchain(frame.command_pool);
-    VK_CHECK(vkResetFences(device_.GetDevice(), 1, &window_resize_fence_));
+    VK_CHECK(vkResetFences(device_.Get(), 1, &window_resize_fence_));
     VK_CHECK(device_.GetGraphicsQueue().SubmitBatches(window_resize_fence_));
   } else if (res != VK_SUCCESS) {
     VK_CHECK(res);
@@ -1242,18 +1238,17 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
                       VK_SHADER_STAGE_COMPUTE_BIT)
           .Build(upload_set);
 
-      vkCmdBindPipeline(command_buffer.GetBuffer(),
-                        VK_PIPELINE_BIND_POINT_COMPUTE,
+      vkCmdBindPipeline(command_buffer.Get(), VK_PIPELINE_BIND_POINT_COMPUTE,
                         sparse_upload_pipeline_);
 
-      vkCmdPushConstants(command_buffer.GetBuffer(), sparse_upload_layout_,
+      vkCmdPushConstants(command_buffer.Get(), sparse_upload_layout_,
                          VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t),
                          &launch_count);
       vkCmdBindDescriptorSets(
-          command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE,
+          command_buffer.Get(), VK_PIPELINE_BIND_POINT_COMPUTE,
           sparse_upload_layout_, 0, 1, &upload_set, 0, nullptr);
 
-      vkCmdDispatch(command_buffer.GetBuffer(), launch_count / 256 + 1, 1, 1);
+      vkCmdDispatch(command_buffer.Get(), launch_count / 256 + 1, 1, 1);
     }
 
     Renderer::BufferMemoryBarrier barrier(
@@ -1263,7 +1258,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
     barrier.SetDstAccessMask(VK_ACCESS_SHADER_WRITE_BIT |
                              VK_ACCESS_SHADER_READ_BIT);
 
-    upload_barriers_.push_back(barrier.GetBarrier());
+    upload_barriers_.push_back(barrier.Get());
 
     render_scene_.ClearDirtyObjects();
 
@@ -1328,7 +1323,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
       Renderer::RenderScene* scene = &render_scene_;
 
       if (pass->needs_indirect_refresh && pass->indirect_batches.size() > 0) {
-        if (pass->clear_indirect_buffer.GetBuffer() != VK_NULL_HANDLE) {
+        if (pass->clear_indirect_buffer.Get() != VK_NULL_HANDLE) {
           frame.deletion_queue.PushFunction(std::bind(
               &Renderer::Buffer<true>::Destroy, pass->clear_indirect_buffer));
         }
@@ -1348,7 +1343,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
           scene->FillIndirectArray(indirect, *pass);
         }));
 
-        if (pass->clear_count_buffer.GetBuffer() != VK_NULL_HANDLE) {
+        if (pass->clear_count_buffer.Get() != VK_NULL_HANDLE) {
           frame.deletion_queue.PushFunction(std::bind(
               &Renderer::Buffer<true>::Destroy, pass->clear_count_buffer));
         }
@@ -1392,7 +1387,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
         barrier.SetDstAccessMask(VK_ACCESS_SHADER_WRITE_BIT |
                                  VK_ACCESS_SHADER_READ_BIT);
 
-        upload_barriers_.push_back(barrier.GetBarrier());
+        upload_barriers_.push_back(barrier.Get());
 
         pass->needs_instance_refresh = false;
       }
@@ -1400,8 +1395,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 
     for (auto& call : async_calls) call.get();
 
-    vkCmdPipelineBarrier(command_buffer.GetBuffer(),
-                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+    vkCmdPipelineBarrier(command_buffer.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
                          static_cast<uint32_t>(upload_barriers_.size()),
                          upload_barriers_.data(), 0, nullptr);
@@ -1411,7 +1405,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 
 void VulkanEngine::ReadyCullData(Renderer::CommandBuffer command_buffer,
                                  Renderer::RenderScene::MeshPass& pass) {
-  if (pass.clear_indirect_buffer.GetBuffer() == VK_NULL_HANDLE) return;
+  if (pass.clear_indirect_buffer.Get() == VK_NULL_HANDLE) return;
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
@@ -1425,10 +1419,10 @@ void VulkanEngine::ReadyCullData(Renderer::CommandBuffer command_buffer,
   barrier.SetSrcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
   barrier.SetDstAccessMask(VK_ACCESS_SHADER_WRITE_BIT |
                            VK_ACCESS_SHADER_READ_BIT);
-  pre_cull_barriers_.push_back(barrier.GetBarrier());
+  pre_cull_barriers_.push_back(barrier.Get());
 
   barrier.SetBuffer(pass.count_buffer);
-  pre_cull_barriers_.push_back(barrier.GetBarrier());
+  pre_cull_barriers_.push_back(barrier.Get());
 }
 
 void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
@@ -1453,7 +1447,7 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
   VkDescriptorBufferInfo count_info = pass.count_buffer.GetDescriptorInfo();
 
   VkDescriptorImageInfo depth_pyramid;
-  depth_pyramid.sampler = depth_sampler_.GetSampler();
+  depth_pyramid.sampler = depth_sampler_.Get();
   depth_pyramid.imageView = depth_pyramid_.GetView();
   depth_pyramid.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
@@ -1502,17 +1496,16 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
 
   cull_data.dist_cull = (params.draw_dist > 10000.f ? 0 : 1);
 
-  vkCmdBindPipeline(command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE,
+  vkCmdBindPipeline(command_buffer.Get(), VK_PIPELINE_BIND_POINT_COMPUTE,
                     cull_pipeline_);
 
-  vkCmdPushConstants(command_buffer.GetBuffer(), cull_layout_,
+  vkCmdPushConstants(command_buffer.Get(), cull_layout_,
                      VK_SHADER_STAGE_COMPUTE_BIT, 0,
                      sizeof(Renderer::DrawCullData), &cull_data);
 
-  vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                          VK_PIPELINE_BIND_POINT_COMPUTE, cull_layout_, 0, 1,
-                          &compute_set, 0, nullptr);
-  vkCmdDispatch(command_buffer.GetBuffer(),
+  vkCmdBindDescriptorSets(command_buffer.Get(), VK_PIPELINE_BIND_POINT_COMPUTE,
+                          cull_layout_, 0, 1, &compute_set, 0, nullptr);
+  vkCmdDispatch(command_buffer.Get(),
                 static_cast<uint32_t>(pass.batches.size() / 256 + 1), 1, 1);
 
   Renderer::BufferMemoryBarrier barrier(
@@ -1520,13 +1513,13 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
       device_.GetQueueFamilies().graphics_family.value());
   barrier.SetSrcAccessMask(VK_ACCESS_SHADER_WRITE_BIT);
   barrier.SetDstAccessMask(VK_ACCESS_INDIRECT_COMMAND_READ_BIT);
-  post_cull_barriers_.push_back(barrier.GetBarrier());
+  post_cull_barriers_.push_back(barrier.Get());
 
   barrier.SetBuffer(pass.compacted_instance_buffer);
-  post_cull_barriers_.push_back(barrier.GetBarrier());
+  post_cull_barriers_.push_back(barrier.Get());
 
   barrier.SetBuffer(pass.count_buffer);
-  post_cull_barriers_.push_back(barrier.GetBarrier());
+  post_cull_barriers_.push_back(barrier.Get());
 }
 
 void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
@@ -1543,7 +1536,7 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   VkClearValue depth_clear{};
   depth_clear.depthStencil.depth = 1.f;
 
-  forward_pass_.Begin(command_buffer, forward_framebuffer_.GetFramebuffer(),
+  forward_pass_.Begin(command_buffer, forward_framebuffer_.Get(),
                       {{0, 0}, swapchain_.GetImageExtent()},
                       {clear_value, depth_clear, clear_value, depth_clear});
 
@@ -1554,8 +1547,8 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
                       0.f, 1.f};
   VkRect2D scissors{{0, 0}, extent};
 
-  vkCmdSetViewport(command_buffer.GetBuffer(), 0, 1, &viewport);
-  vkCmdSetScissor(command_buffer.GetBuffer(), 0, 1, &scissors);
+  vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
+  vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
 
   scene_data_.camera_data.view = camera_.GetViewMat();
   scene_data_.camera_data.projection = camera_.GetProjMat();
@@ -1603,11 +1596,10 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
     VkDescriptorSet last_material_set = nullptr;
 
     VkDeviceSize offset = 0;
-    VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.GetBuffer();
-    vkCmdBindVertexBuffers(command_buffer.GetBuffer(), 0, 1, &vertex_buffer,
-                           &offset);
-    vkCmdBindIndexBuffer(command_buffer.GetBuffer(),
-                         render_scene_.merged_index_buffer.GetBuffer(), 0,
+    VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.Get();
+    vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, &vertex_buffer, &offset);
+    vkCmdBindIndexBuffer(command_buffer.Get(),
+                         render_scene_.merged_index_buffer.Get(), 0,
                          VK_INDEX_TYPE_UINT32);
 
     for (size_t i = 0; i < pass.multibatches.size(); ++i) {
@@ -1619,24 +1611,24 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
       Renderer::Mesh* draw_mesh = render_scene_.GetMesh(instance.mesh_id)->mesh;
 
-      if (new_pipeline.GetPipeline() != last_pipeline) {
-        last_pipeline = new_pipeline.GetPipeline();
+      if (new_pipeline.Get() != last_pipeline) {
+        last_pipeline = new_pipeline.Get();
         new_pipeline.Bind(command_buffer);
         vkCmdBindDescriptorSets(
-            command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+            command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
             new_pipeline.GetLayout(), 0, 1, &frame.global_descriptor,
             static_cast<uint32_t>(dynamic_offsets.size()),
             dynamic_offsets.data());
-        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+        vkCmdBindDescriptorSets(command_buffer.Get(),
                                 VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                new_pipeline.GetLayout(), 1,
-                                1, &frame.object_descriptor, 0, nullptr);
+                                new_pipeline.GetLayout(), 1, 1,
+                                &frame.object_descriptor, 0, nullptr);
       }
 
       if (new_material_set != last_material_set) {
         last_material_set = new_material_set;
         vkCmdBindDescriptorSets(
-            command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+            command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
             new_pipeline.GetLayout(), 2, 1, &new_material_set, 0, nullptr);
       }
 
@@ -1644,35 +1636,34 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
       if (merged) {
         if (last_mesh != nullptr) {
           VkDeviceSize offset = 0;
-          VkBuffer vertex_buffer =
-              render_scene_.merged_vertex_buffer.GetBuffer();
-          vkCmdBindVertexBuffers(command_buffer.GetBuffer(), 0, 1,
-                                 &vertex_buffer, &offset);
-          vkCmdBindIndexBuffer(command_buffer.GetBuffer(),
-                               render_scene_.merged_index_buffer.GetBuffer(), 0,
+          VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.Get();
+          vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, &vertex_buffer,
+                                 &offset);
+          vkCmdBindIndexBuffer(command_buffer.Get(),
+                               render_scene_.merged_index_buffer.Get(), 0,
                                VK_INDEX_TYPE_UINT32);
           last_mesh = nullptr;
         }
       } else if (last_mesh != draw_mesh) {
         VkDeviceSize offset = 0;
-        VkBuffer vertex_buffer = draw_mesh->GetVertexBuffer().GetBuffer();
-        vkCmdBindVertexBuffers(command_buffer.GetBuffer(), 0, 1, &vertex_buffer,
+        VkBuffer vertex_buffer = draw_mesh->GetVertexBuffer().Get();
+        vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, &vertex_buffer,
                                &offset);
-        vkCmdBindIndexBuffer(command_buffer.GetBuffer(),
-                             draw_mesh->GetIndexBuffer().GetBuffer(), 0,
+        vkCmdBindIndexBuffer(command_buffer.Get(),
+                             draw_mesh->GetIndexBuffer().Get(), 0,
                              VK_INDEX_TYPE_UINT32);
         last_mesh = draw_mesh;
       }
 
       bool has_indices = draw_mesh->GetIndicesCount() > 0;
       if (!has_indices) {
-        vkCmdDraw(command_buffer.GetBuffer(), draw_mesh->GetVerticesCount(),
+        vkCmdDraw(command_buffer.Get(), draw_mesh->GetVerticesCount(),
                   instance.count, 0, instance.first);
       } else {
         vkCmdDrawIndexedIndirectCount(
-            command_buffer.GetBuffer(), pass.draw_indirect_buffer.GetBuffer(),
+            command_buffer.Get(), pass.draw_indirect_buffer.Get(),
             multibatch.first * sizeof(Renderer::GPUIndirectObject),
-            pass.count_buffer.GetBuffer(), multibatch.first * sizeof(uint32_t),
+            pass.count_buffer.Get(), multibatch.first * sizeof(uint32_t),
             multibatch.count, sizeof(Renderer::GPUIndirectObject));
       }
 
@@ -1684,7 +1675,7 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
             material->original->pass_shaders[Renderer::MeshPassType::kForward]
                 ->pipeline;
 
-        last_pipeline = pipeline.GetPipeline();
+        last_pipeline = pipeline.Get();
 
         VkDescriptorSet normals_global_set;
         Renderer::DescriptorBuilder::Begin(&layout_cache_,
@@ -1695,23 +1686,23 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
             .Build(normals_global_set);
 
         pipeline.Bind(command_buffer);
-        vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+        vkCmdBindDescriptorSets(command_buffer.Get(),
                                 VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 pipeline.GetLayout(), 0, 1, &normals_global_set,
                                 static_cast<uint32_t>(dynamic_offsets.size()),
                                 dynamic_offsets.data());
         vkCmdBindDescriptorSets(
-            command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+            command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
             pipeline.GetLayout(), 1, 1, &frame.object_descriptor, 0, nullptr);
 
         if (!has_indices) {
-          vkCmdDraw(command_buffer.GetBuffer(), draw_mesh->GetVerticesCount(),
+          vkCmdDraw(command_buffer.Get(), draw_mesh->GetVerticesCount(),
                     instance.count, 0, instance.first);
         } else {
           vkCmdDrawIndexedIndirectCount(
-              command_buffer.GetBuffer(), pass.draw_indirect_buffer.GetBuffer(),
+              command_buffer.Get(), pass.draw_indirect_buffer.Get(),
               multibatch.first * sizeof(Renderer::GPUIndirectObject),
-              pass.count_buffer.GetBuffer(),
+              pass.count_buffer.Get(),
               multibatch.first * sizeof(uint32_t), multibatch.count,
               sizeof(Renderer::GPUIndirectObject));
         }
@@ -1721,8 +1712,7 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
   DrawSkybox(command_buffer, scene_info, scene_data_offset);
 
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
-                                  command_buffer.GetBuffer());
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer.Get());
 
   forward_pass_.End(command_buffer);
 }
@@ -1749,17 +1739,15 @@ void VulkanEngine::DrawSkybox(Renderer::CommandBuffer command_buffer,
       .Build(skybox_global_set);
 
   pipeline.Bind(command_buffer);
-  vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetLayout(),
-                          0, 1, &skybox_global_set, 1, &dynamic_offset);
-  vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GetLayout(),
-                          1, 1, &skybox_set, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          pipeline.GetLayout(), 0, 1, &skybox_global_set, 1,
+                          &dynamic_offset);
+  vkCmdBindDescriptorSets(command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          pipeline.GetLayout(), 1, 1, &skybox_set, 0, nullptr);
 
   Renderer::Mesh* cube = GetMesh("skybox");
   cube->BindBuffers(command_buffer);
-  vkCmdDrawIndexed(command_buffer.GetBuffer(), cube->GetIndicesCount(), 1, 0, 0,
-                   0);
+  vkCmdDrawIndexed(command_buffer.Get(), cube->GetIndicesCount(), 1, 0, 0, 0);
 }
 
 struct alignas(16) DepthReduceData {
@@ -1783,17 +1771,17 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,
       VK_DEPENDENCY_BY_REGION_BIT);
 
-  vkCmdBindPipeline(command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE,
+  vkCmdBindPipeline(command_buffer.Get(), VK_PIPELINE_BIND_POINT_COMPUTE,
                     depth_reduce_pipeline_);
 
   for (int32_t i = 0; i < depth_pyramid_levels_; ++i) {
     VkDescriptorImageInfo dst;
-    dst.sampler = depth_reduction_sampler_.GetSampler();
+    dst.sampler = depth_reduction_sampler_.Get();
     dst.imageView = depth_pyramid_mips_[i];
     dst.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkDescriptorImageInfo src;
-    src.sampler = depth_reduction_sampler_.GetSampler();
+    src.sampler = depth_reduction_sampler_.Get();
     if (i == 0) {
       src.imageView = depth_resolve_image_.GetView();
       src.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1811,7 +1799,7 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
                    VK_SHADER_STAGE_COMPUTE_BIT)
         .Build(depth_set);
 
-    vkCmdBindDescriptorSets(command_buffer.GetBuffer(),
+    vkCmdBindDescriptorSets(command_buffer.Get(),
                             VK_PIPELINE_BIND_POINT_COMPUTE,
                             depth_reduce_layout_, 0, 1, &depth_set, 0, nullptr);
 
@@ -1822,10 +1810,10 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
 
     DepthReduceData reduce_data = {glm::vec2(level_width, level_height)};
 
-    vkCmdPushConstants(command_buffer.GetBuffer(), depth_reduce_layout_,
+    vkCmdPushConstants(command_buffer.Get(), depth_reduce_layout_,
                        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(reduce_data),
                        &reduce_data);
-    vkCmdDispatch(command_buffer.GetBuffer(), GetGroupCount(level_width, 32),
+    vkCmdDispatch(command_buffer.Get(), GetGroupCount(level_width, 32),
                   GetGroupCount(level_height, 32), 1);
 
     depth_pyramid_.TransitionLayout(
@@ -1853,8 +1841,7 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
   Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Copy to Swapchain");
 
   VkClearValue clear_value = {{{0.f, 0.f, 0.f, 1.f}}};
-  copy_pass_.Begin(
-      command_buffer, swapchain_framebuffers_[index].GetFramebuffer(),
+  copy_pass_.Begin(command_buffer, swapchain_framebuffers_[index].Get(),
       {{0, 0}, swapchain_.GetImageExtent()}, {clear_value, clear_value});
 
   VkExtent2D extent = swapchain_.GetImageExtent();
@@ -1864,13 +1851,13 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                       0.f, 1.f};
   VkRect2D scissors{{0, 0}, extent};
 
-  vkCmdSetViewport(command_buffer.GetBuffer(), 0, 1, &viewport);
-  vkCmdSetScissor(command_buffer.GetBuffer(), 0, 1, &scissors);
+  vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
+  vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
 
   blit_pipeline_.Bind(command_buffer);
 
   VkDescriptorImageInfo source_image;
-  source_image.sampler = smooth_sampler_.GetSampler();
+  source_image.sampler = smooth_sampler_.Get();
   source_image.imageView = color_resolve_image_.GetView();
   source_image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -1881,11 +1868,11 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                  VK_SHADER_STAGE_FRAGMENT_BIT)
       .Build(blit_set);
 
-  vkCmdBindDescriptorSets(
-      command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-      blit_pipeline_.GetLayout(), 0, 1, &blit_set, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          blit_pipeline_.GetLayout(), 0, 1, &blit_set, 0,
+                          nullptr);
 
-  vkCmdDraw(command_buffer.GetBuffer(), 3, 1, 0, 0);
+  vkCmdDraw(command_buffer.Get(), 3, 1, 0, 0);
 
   copy_pass_.End(command_buffer);
 }

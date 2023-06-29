@@ -55,7 +55,7 @@ class Image {
 
   void Destroy();
 
-  VkImage GetImage();
+  VkImage Get();
   VkImageView GetView();
 
   VkExtent3D GetExtent() const;
@@ -84,7 +84,7 @@ class Image {
                                       VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {
       VkFormatProperties props;
-      vkGetPhysicalDeviceFormatProperties(physical_device->GetDevice(), format,
+      vkGetPhysicalDeviceFormatProperties(physical_device->Get(), format,
                                           &props);
 
       if (tiling == VK_IMAGE_TILING_LINEAR &&

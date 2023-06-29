@@ -39,7 +39,7 @@ class PhysicalDevice {
   VkResult Init(VulkanInstance* instance, Surface* surface,
                 std::vector<const char*> device_extensions = {});
 
-  VkPhysicalDevice GetDevice();
+  VkPhysicalDevice Get();
   VkPhysicalDeviceProperties GetProperties() const;
   VkSampleCountFlagBits GetMaxSamples() const;
 

@@ -72,7 +72,7 @@ VkResult RenderPass::CreateDefault(LogicalDevice* device,
   render_pass_info.dependencyCount = static_cast<uint32_t>(dependencies.size());
   render_pass_info.pDependencies = dependencies.data();
 
-  return vkCreateRenderPass(device_->GetDevice(), &render_pass_info, nullptr,
+  return vkCreateRenderPass(device_->Get(), &render_pass_info, nullptr,
                             &render_pass_);
 }
 
@@ -80,15 +80,15 @@ VkResult RenderPass::Create(LogicalDevice* device,
                             VkRenderPassCreateInfo2* create_info) {
   device_ = device;
 
-  return vkCreateRenderPass2(device_->GetDevice(), create_info, nullptr,
+  return vkCreateRenderPass2(device_->Get(), create_info, nullptr,
                              &render_pass_);
 }
 
 void RenderPass::Destroy() {
-  vkDestroyRenderPass(device_->GetDevice(), render_pass_, nullptr);
+  vkDestroyRenderPass(device_->Get(), render_pass_, nullptr);
 }
 
-VkRenderPass RenderPass::GetRenderPass() const { return render_pass_; }
+VkRenderPass RenderPass::Get() const { return render_pass_; }
 
 void RenderPass::Begin(CommandBuffer command_buffer, VkFramebuffer framebuffer,
                        VkRect2D render_area,
@@ -102,12 +102,12 @@ void RenderPass::Begin(CommandBuffer command_buffer, VkFramebuffer framebuffer,
   render_pass_info.clearValueCount = static_cast<uint32_t>(clear_values.size());
   render_pass_info.pClearValues = clear_values.data();
 
-  vkCmdBeginRenderPass(command_buffer.GetBuffer(), &render_pass_info,
+  vkCmdBeginRenderPass(command_buffer.Get(), &render_pass_info,
                        subpass_contents);
 }
 
 void RenderPass::End(CommandBuffer command_buffer) {
-  vkCmdEndRenderPass(command_buffer.GetBuffer());
+  vkCmdEndRenderPass(command_buffer.Get());
 }
 
 RenderPassAttachment::RenderPassAttachment()

@@ -178,8 +178,8 @@ ShaderPass* MaterialSystem::BuildShader(RenderPass& render_pass,
   pass->pipeline = pipline_builder.Build(render_pass);
 
   system.engine_->main_deletion_queue_.PushFunction([=]() {
-    vkDestroyPipeline(system.engine_->device_.GetDevice(),
-                      pass->pipeline.GetPipeline(), nullptr);
+    vkDestroyPipeline(system.engine_->device_.Get(), pass->pipeline.Get(),
+                      nullptr);
   });
 
   return pass;

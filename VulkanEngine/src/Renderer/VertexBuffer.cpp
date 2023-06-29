@@ -23,7 +23,7 @@ void VertexBuffer::Destroy() {
   buffer_.Destroy();
 }
 
-VkBuffer VertexBuffer::GetBuffer() { return buffer_.GetBuffer(); }
+VkBuffer VertexBuffer::Get() { return buffer_.Get(); }
 
 uint32_t VertexBuffer::GetVerticesCount() const { return vertices_count_; }
 

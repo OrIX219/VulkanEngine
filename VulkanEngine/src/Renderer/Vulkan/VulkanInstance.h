@@ -17,7 +17,7 @@ class VulkanInstance {
 
   void Destroy();
 
-  VkInstance GetInstance();
+  VkInstance Get();
 
   bool ValidationLayersEnabled() const;
 

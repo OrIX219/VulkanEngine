@@ -20,7 +20,7 @@ class CommandPool {
   VkResult Create(LogicalDevice* device, VkCommandPoolCreateInfo* create_info);
   void Destroy();
 
-  VkCommandPool GetPool() const; 
+  VkCommandPool Get() const; 
 
   size_t GetBuffersCount() const;
 

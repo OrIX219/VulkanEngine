@@ -15,7 +15,7 @@ class LogicalDevice {
   VkResult Init(PhysicalDevice* physical_device);
   void Destroy();
 
-  VkDevice GetDevice();
+  VkDevice Get();
   PhysicalDevice* GetPhysicalDevice();
 
   QueueFamilyIndicies GetQueueFamilies() const;

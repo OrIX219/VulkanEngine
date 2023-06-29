@@ -10,15 +10,15 @@ VkResult Surface::Init(VulkanInstance* instance, Window* window) {
   instance_ = instance;
   window_ = window;
 
-  return glfwCreateWindowSurface(instance_->GetInstance(), window->GetWindow(),
+  return glfwCreateWindowSurface(instance_->Get(), window->GetWindow(),
                                  nullptr, &surface_);
 }
 
 void Surface::Destroy() {
-  vkDestroySurfaceKHR(instance_->GetInstance(), surface_, nullptr);
+  vkDestroySurfaceKHR(instance_->Get(), surface_, nullptr);
 }
 
-VkSurfaceKHR Surface::GetSurface() { return surface_; }
+VkSurfaceKHR Surface::Get() { return surface_; }
 
 Window* Surface::GetWindow() { return window_; }
 

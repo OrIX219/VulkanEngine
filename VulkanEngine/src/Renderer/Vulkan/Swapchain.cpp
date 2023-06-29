@@ -26,7 +26,7 @@ VkResult Swapchain::Create(LogicalDevice* device, Surface* surface) {
 
   VkSwapchainCreateInfoKHR create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-  create_info.surface = surface_->GetSurface();
+  create_info.surface = surface_->Get();
   create_info.minImageCount = image_count;
   create_info.imageFormat = surface_format.format;
   create_info.imageColorSpace = surface_format.colorSpace;
@@ -54,14 +54,13 @@ VkResult Swapchain::Create(LogicalDevice* device, Surface* surface) {
   create_info.clipped = VK_TRUE;
   create_info.oldSwapchain = VK_NULL_HANDLE;
 
-  VkResult res = vkCreateSwapchainKHR(device_->GetDevice(), &create_info,
-                                      nullptr, &swapchain_);
+  VkResult res =
+      vkCreateSwapchainKHR(device_->Get(), &create_info, nullptr, &swapchain_);
   if (res != VK_SUCCESS) return res;
 
-  vkGetSwapchainImagesKHR(device_->GetDevice(), swapchain_, &image_count,
-                          nullptr);
+  vkGetSwapchainImagesKHR(device_->Get(), swapchain_, &image_count, nullptr);
   images_.resize(image_count);
-  vkGetSwapchainImagesKHR(device_->GetDevice(), swapchain_, &image_count,
+  vkGetSwapchainImagesKHR(device_->Get(), swapchain_, &image_count,
                           images_.data());
 
   format_ = surface_format.format;
@@ -72,8 +71,8 @@ VkResult Swapchain::Create(LogicalDevice* device, Surface* surface) {
 
 void Swapchain::Destroy() {
   for (auto image_view : image_views_)
-    vkDestroyImageView(device_->GetDevice(), image_view, nullptr);
-  vkDestroySwapchainKHR(device_->GetDevice(), swapchain_, nullptr);
+    vkDestroyImageView(device_->Get(), image_view, nullptr);
+  vkDestroySwapchainKHR(device_->Get(), swapchain_, nullptr);
 }
 
 VkResult Swapchain::Recreate() {
@@ -84,11 +83,11 @@ VkResult Swapchain::Recreate() {
 VkResult Swapchain::AcquireNextImage(uint32_t* image_index,
                                      VkSemaphore semaphore, VkFence fence,
                                      uint32_t timeout) {
-  return vkAcquireNextImageKHR(device_->GetDevice(), swapchain_, timeout,
-                               semaphore, fence, image_index);
+  return vkAcquireNextImageKHR(device_->Get(), swapchain_, timeout, semaphore,
+                               fence, image_index);
 }
 
-VkSwapchainKHR Swapchain::GetSwapchain() const { return swapchain_; }
+VkSwapchainKHR Swapchain::Get() const { return swapchain_; }
 
 const std::vector<VkImage>& Swapchain::GetImages() const {
   return images_;
@@ -127,8 +126,8 @@ VkResult Swapchain::CreateImageViews() {
     create_info.subresourceRange.baseArrayLayer = 0;
     create_info.subresourceRange.layerCount = 1;
 
-    VkResult res = vkCreateImageView(device_->GetDevice(), &create_info,
-                                     nullptr, &image_views_[i]);
+    VkResult res = vkCreateImageView(device_->Get(), &create_info, nullptr,
+                                     &image_views_[i]);
     if (res != VK_SUCCESS) return res;
   }
 

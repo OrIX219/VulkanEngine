@@ -10,8 +10,8 @@ class Queue {
  public:
   Queue();
 
-  void SetQueue(const VkQueue& queue);
-  VkQueue GetQueue();
+  void Set(const VkQueue& queue);
+  VkQueue Get();
 
   /*
   Begin new command buffer batch

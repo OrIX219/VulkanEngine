@@ -29,7 +29,7 @@ class Swapchain {
       VkFence fence = VK_NULL_HANDLE,
       uint32_t timeout = std::numeric_limits<uint64_t>::max());
 
-  VkSwapchainKHR GetSwapchain() const;
+  VkSwapchainKHR Get() const;
   const std::vector<VkImage>& GetImages() const;
   VkImage GetImage(size_t index) const;
   const std::vector<VkImageView>& GetImageViews() const;

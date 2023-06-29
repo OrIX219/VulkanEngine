@@ -15,7 +15,7 @@ class CommandBuffer {
                 VkCommandBufferLevel level);
   ~CommandBuffer();
 
-  VkCommandBuffer GetBuffer();
+  VkCommandBuffer Get();
 
   VkResult Reset();
 

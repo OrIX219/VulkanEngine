@@ -13,7 +13,7 @@ class BufferBase {
  public:
   BufferBase() : buffer_(VK_NULL_HANDLE), buffer_size_(0) {}
 
-  VkBuffer GetBuffer() { return buffer_; }
+  VkBuffer Get() { return buffer_; }
   VkDeviceSize GetSize() const { return buffer_size_; }
 
   VkDescriptorBufferInfo GetDescriptorInfo() const {
@@ -97,8 +97,7 @@ class Buffer : public BufferBase {
     VkBufferCopy copy_region{};
     copy_region.size = buffer_size_;
     copy_region.dstOffset = offset;
-    vkCmdCopyBuffer(command_buffer.GetBuffer(), buffer_,
-                    dst.GetBuffer(), 1, &copy_region);
+    vkCmdCopyBuffer(command_buffer.Get(), buffer_, dst.Get(), 1, &copy_region);
   }
 
   void CopyToImage(CommandBuffer command_buffer, Image& image) {
@@ -113,8 +112,7 @@ class Buffer : public BufferBase {
     copy_region.imageOffset = {0, 0, 0};
     copy_region.imageExtent = image.GetExtent();
 
-    vkCmdCopyBufferToImage(
-        command_buffer.GetBuffer(), buffer_, image.GetImage(),
+    vkCmdCopyBufferToImage(command_buffer.Get(), buffer_, image.Get(),
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
   }
 

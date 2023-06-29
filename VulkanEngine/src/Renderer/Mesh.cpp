@@ -88,11 +88,11 @@ bool Mesh::LoadFromAsset(VmaAllocator allocator, CommandBuffer command_buffer,
 }
 
 void Mesh::BindBuffers(CommandBuffer command_buffer) {
-  VkBuffer vertex_buffers[] = {vertex_buffer_.GetBuffer()};
+  VkBuffer vertex_buffers[] = {vertex_buffer_.Get()};
   VkDeviceSize offsets[] = {0};
-  vkCmdBindVertexBuffers(command_buffer.GetBuffer(), 0, 1, vertex_buffers,
+  vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, vertex_buffers,
                          offsets);
-  vkCmdBindIndexBuffer(command_buffer.GetBuffer(), index_buffer_.GetBuffer(), 0,
+  vkCmdBindIndexBuffer(command_buffer.Get(), index_buffer_.Get(), 0,
                        VK_INDEX_TYPE_UINT32);
 }
 

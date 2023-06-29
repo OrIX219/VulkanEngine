@@ -86,7 +86,7 @@ void TextureCube::Destroy() {
 
 void TextureCube::ReleaseStagingMemory() { staging_buffer_.Destroy(); }
 
-VkImage TextureCube::GetImage() { return image_.GetImage(); }
+VkImage TextureCube::GetImage() { return image_.Get(); }
 
 VkImageView TextureCube::GetView() { return image_.GetView(); }
 

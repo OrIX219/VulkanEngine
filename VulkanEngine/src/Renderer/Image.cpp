@@ -96,11 +96,11 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
 }
 
 void Image::Destroy() {
-  vkDestroyImageView(device_->GetDevice(), image_view_, nullptr);
+  vkDestroyImageView(device_->Get(), image_view_, nullptr);
   vmaDestroyImage(allocator_, image_, allocation_);
 }
 
-VkImage Image::GetImage() { return image_; }
+VkImage Image::Get() { return image_; }
 
 VkImageView Image::GetView() { return image_view_; }
 
@@ -138,7 +138,7 @@ void Image::TransitionLayout(CommandBuffer command_buffer,
   barrier.subresourceRange.baseArrayLayer = 0;
   barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-  vkCmdPipelineBarrier(command_buffer.GetBuffer(), src_stage, dst_stage,
+  vkCmdPipelineBarrier(command_buffer.Get(), src_stage, dst_stage,
                        dependency, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
@@ -154,7 +154,7 @@ VkResult Image::CreateImageView(VkImageAspectFlags aspect_flags) {
   create_info.subresourceRange.baseArrayLayer = 0;
   create_info.subresourceRange.layerCount = array_layers_;
 
-  return vkCreateImageView(device_->GetDevice(), &create_info, nullptr,
+  return vkCreateImageView(device_->Get(), &create_info, nullptr,
                            &image_view_);
 }
 

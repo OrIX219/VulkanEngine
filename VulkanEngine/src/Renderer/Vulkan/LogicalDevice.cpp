@@ -65,7 +65,7 @@ VkResult LogicalDevice::Init(PhysicalDevice* physical_device) {
     create_info.enabledLayerCount = 0;
   }
 
-  VkResult res = vkCreateDevice(physical_device_->GetDevice(), &create_info,
+  VkResult res = vkCreateDevice(physical_device_->Get(), &create_info,
                                 nullptr, &device_);
   if (res != VK_SUCCESS) return res;
 
@@ -77,10 +77,10 @@ VkResult LogicalDevice::Init(PhysicalDevice* physical_device) {
   vkGetDeviceQueue(device_, queue_family_indices_.transfer_family.value(), 0,
                    &transfer_queue);
   queues_.resize(queue_family_indices_.MaxIndex() + 1);
-  queues_[queue_family_indices_.graphics_family.value()].SetQueue(
+  queues_[queue_family_indices_.graphics_family.value()].Set(
       graphics_queue);
-  queues_[queue_family_indices_.present_family.value()].SetQueue(present_queue);
-  queues_[queue_family_indices_.transfer_family.value()].SetQueue(
+  queues_[queue_family_indices_.present_family.value()].Set(present_queue);
+  queues_[queue_family_indices_.transfer_family.value()].Set(
       transfer_queue);
 
   return res;
@@ -88,7 +88,7 @@ VkResult LogicalDevice::Init(PhysicalDevice* physical_device) {
 
 void LogicalDevice::Destroy() { vkDestroyDevice(device_, nullptr); }
 
-VkDevice LogicalDevice::GetDevice() { return device_; }
+VkDevice LogicalDevice::Get() { return device_; }
 
 PhysicalDevice* LogicalDevice::GetPhysicalDevice() { return physical_device_; }
 

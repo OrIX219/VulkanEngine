@@ -12,7 +12,7 @@ class IndexBuffer {
   void Create(VmaAllocator allocator, uint64_t size);
   void Destroy();
 
-  VkBuffer GetBuffer();
+  VkBuffer Get();
   uint32_t GetIndicesCount() const;
 
   void SetData(CommandBuffer command_buffer,

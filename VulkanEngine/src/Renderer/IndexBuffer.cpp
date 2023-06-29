@@ -24,7 +24,7 @@ void IndexBuffer::Destroy() {
   buffer_.Destroy();
 }
 
-VkBuffer IndexBuffer::GetBuffer() { return buffer_.GetBuffer(); }
+VkBuffer IndexBuffer::Get() { return buffer_.Get(); }
 
 uint32_t IndexBuffer::GetIndicesCount() const { return indices_count_; }
 

@@ -25,7 +25,7 @@ uint32_t PushBuffer::Push(void* data, uint32_t size) {
 
 void PushBuffer::Reset() { current_offset_ = 0; }
 
-VkBuffer PushBuffer::GetBuffer() { return buffer_.GetBuffer(); }
+VkBuffer PushBuffer::GetBuffer() { return buffer_.Get(); }
 
 VkDeviceSize PushBuffer::GetSize() const { return buffer_.GetSize(); }
 

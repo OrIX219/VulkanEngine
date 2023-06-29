@@ -19,7 +19,7 @@ class RenderPass {
   VkResult Create(LogicalDevice* device, VkRenderPassCreateInfo2* create_info);
   void Destroy();
 
-  VkRenderPass GetRenderPass() const;
+  VkRenderPass Get() const;
 
   void Begin(CommandBuffer command_buffer, VkFramebuffer framebuffer,
              VkRect2D render_area,

@@ -59,7 +59,7 @@ VkResult VulkanInstance::Init(bool enable_validation_layers,
 
 void VulkanInstance::Destroy() { vkDestroyInstance(instance_, nullptr); }
 
-VkInstance VulkanInstance::GetInstance() { return instance_; }
+VkInstance VulkanInstance::Get() { return instance_; }
 
 bool VulkanInstance::ValidationLayersEnabled() const {
   return enable_validation_layers_;

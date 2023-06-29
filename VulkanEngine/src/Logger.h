@@ -48,15 +48,15 @@ class Logger {
     create_info.pfnUserCallback = DebugCallback;
     create_info.pUserData = nullptr;
 
-    CreateDebugUtilsMessengerEXT(logger.instance_->GetInstance(), &create_info,
-                                 nullptr, &logger.debug_messenger_);
+    CreateDebugUtilsMessengerEXT(logger.instance_->Get(), &create_info, nullptr,
+                                 &logger.debug_messenger_);
   }
 
   static void Cleanup() {
     Logger& logger = Get();
 
     if (!logger.instance_->ValidationLayersEnabled()) return;
-    DestroyDebugUtilsMessengerEXT(logger.instance_->GetInstance(),
+    DestroyDebugUtilsMessengerEXT(logger.instance_->Get(),
                                   logger.debug_messenger_, nullptr);
   }
 

@@ -16,7 +16,7 @@ class Surface {
   VkResult Init(VulkanInstance* instance, Window* window);
   void Destroy();
 
-  VkSurfaceKHR GetSurface();
+  VkSurfaceKHR Get();
 
   Window* GetWindow();
 

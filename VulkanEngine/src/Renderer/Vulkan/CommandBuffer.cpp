@@ -12,7 +12,7 @@ CommandBuffer::CommandBuffer(CommandPool* command_pool, uint32_t pool_index,
 
 CommandBuffer::~CommandBuffer() {}
 
-VkCommandBuffer CommandBuffer::GetBuffer() { return command_buffer_; }
+VkCommandBuffer CommandBuffer::Get() { return command_buffer_; }
 
 VkResult CommandBuffer::Reset() {
   return vkResetCommandBuffer(command_buffer_, 0);
@@ -52,16 +52,16 @@ void CommandBuffer::Submit(VkSubmitInfo sync_info) {
 
 VkResult CommandBuffer::Create(VkCommandBufferLevel level) {
   VkCommandBufferAllocateInfo alloc_info =
-      CommandBuffer::AllocateInfo(pool_->GetPool(), 1, level);
+      CommandBuffer::AllocateInfo(pool_->Get(), 1, level);
 
-  return vkAllocateCommandBuffers(pool_->GetLogicalDevice()->GetDevice(),
+  return vkAllocateCommandBuffers(pool_->GetLogicalDevice()->Get(),
                                   &alloc_info, &command_buffer_);
 }
 
 void CommandBuffer::Destroy() {
   if (command_buffer_ == VK_NULL_HANDLE) return;
 
-  vkFreeCommandBuffers(pool_->GetLogicalDevice()->GetDevice(), pool_->GetPool(),
+  vkFreeCommandBuffers(pool_->GetLogicalDevice()->Get(), pool_->Get(),
                        1, &command_buffer_);
 }
 

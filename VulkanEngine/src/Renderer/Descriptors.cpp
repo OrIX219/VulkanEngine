@@ -8,7 +8,7 @@ DescriptorAllocator::DescriptorAllocator() : current_pool_(VK_NULL_HANDLE) {}
 
 void DescriptorAllocator::ResetPools() {
   for (auto pool : used_pools_) {
-    vkResetDescriptorPool(device_->GetDevice(), pool, 0);
+    vkResetDescriptorPool(device_->Get(), pool, 0);
     free_pools_.push_back(pool);
   }
 
@@ -31,7 +31,7 @@ bool DescriptorAllocator::Allocate(VkDescriptorSet* set,
   alloc_info.descriptorPool = current_pool_;
 
   VkResult alloc_result =
-      vkAllocateDescriptorSets(device_->GetDevice(), &alloc_info, set);
+      vkAllocateDescriptorSets(device_->Get(), &alloc_info, set);
   bool need_reallocate = false;
 
   switch (alloc_result) {
@@ -50,8 +50,7 @@ bool DescriptorAllocator::Allocate(VkDescriptorSet* set,
     used_pools_.push_back(current_pool_);
     alloc_info.descriptorPool = current_pool_;
 
-    alloc_result =
-        vkAllocateDescriptorSets(device_->GetDevice(), &alloc_info, set);
+    alloc_result = vkAllocateDescriptorSets(device_->Get(), &alloc_info, set);
   }
 
   return alloc_result == VK_SUCCESS;
@@ -60,9 +59,9 @@ void DescriptorAllocator::Init(LogicalDevice* device) { device_ = device; }
 
 void DescriptorAllocator::Destroy() {
   for (auto pool : free_pools_)
-    vkDestroyDescriptorPool(device_->GetDevice(), pool, nullptr);
+    vkDestroyDescriptorPool(device_->Get(), pool, nullptr);
   for (auto pool : used_pools_)
-    vkDestroyDescriptorPool(device_->GetDevice(), pool, nullptr);
+    vkDestroyDescriptorPool(device_->Get(), pool, nullptr);
 }
 
 LogicalDevice* DescriptorAllocator::GetLogicalDevice() { return device_; }
@@ -92,8 +91,7 @@ VkDescriptorPool DescriptorAllocator::CreatePool(
   pool_info.flags = flags;
 
   VkDescriptorPool descriptor_pool;
-  vkCreateDescriptorPool(device_->GetDevice(), &pool_info, nullptr,
-                         &descriptor_pool);
+  vkCreateDescriptorPool(device_->Get(), &pool_info, nullptr, &descriptor_pool);
 
   return descriptor_pool;
 }
@@ -102,7 +100,7 @@ void DescriptorLayoutCache::Init(LogicalDevice* device) { device_ = device; }
 
 void DescriptorLayoutCache::Destroy() {
   for (auto layout : layout_cache_)
-    vkDestroyDescriptorSetLayout(device_->GetDevice(), layout.second, nullptr);
+    vkDestroyDescriptorSetLayout(device_->Get(), layout.second, nullptr);
 }
 
 VkDescriptorSetLayout DescriptorLayoutCache::CreateDescriptorLayout(
@@ -134,7 +132,7 @@ VkDescriptorSetLayout DescriptorLayoutCache::CreateDescriptorLayout(
     return iter->second;
   } else {
     VkDescriptorSetLayout layout;
-    vkCreateDescriptorSetLayout(device_->GetDevice(), info, nullptr, &layout);
+    vkCreateDescriptorSetLayout(device_->Get(), info, nullptr, &layout);
 
     layout_cache_[layout_info] = layout;
     return layout;
@@ -237,7 +235,7 @@ bool DescriptorBuilder::Build(VkDescriptorSet& set,
 
   for (VkWriteDescriptorSet& write : writes_) write.dstSet = set;
 
-  vkUpdateDescriptorSets(allocator_->GetLogicalDevice()->GetDevice(),
+  vkUpdateDescriptorSets(allocator_->GetLogicalDevice()->Get(),
                          static_cast<uint32_t>(writes_.size()), writes_.data(),
                          0, nullptr);
 
@@ -257,7 +255,7 @@ bool DescriptorBuilder::Build(VkDescriptorSet& set) {
 
   for (VkWriteDescriptorSet& write : writes_) write.dstSet = set;
 
-  vkUpdateDescriptorSets(allocator_->GetLogicalDevice()->GetDevice(),
+  vkUpdateDescriptorSets(allocator_->GetLogicalDevice()->Get(),
                          static_cast<uint32_t>(writes_.size()), writes_.data(),
                          0, nullptr);
 

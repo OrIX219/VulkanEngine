@@ -17,7 +17,7 @@ VkResult CommandPool::Create(LogicalDevice* device, uint32_t queue_family_index,
   VkCommandPoolCreateInfo create_info =
       CommandPool::CreateInfo(queue_family_, flags_);
 
-  return vkCreateCommandPool(device_->GetDevice(), &create_info, nullptr,
+  return vkCreateCommandPool(device_->Get(), &create_info, nullptr,
                              &command_pool_);
 }
 
@@ -27,16 +27,16 @@ VkResult CommandPool::Create(LogicalDevice* device,
   queue_family_ = create_info->queueFamilyIndex;
   flags_ = create_info->flags;
 
-  return vkCreateCommandPool(device_->GetDevice(), create_info, nullptr,
+  return vkCreateCommandPool(device_->Get(), create_info, nullptr,
                              &command_pool_);
 }
 
 void CommandPool::Destroy() {
   if (command_pool_ == VK_NULL_HANDLE) return;
-  vkDestroyCommandPool(device_->GetDevice(), command_pool_, nullptr);
+  vkDestroyCommandPool(device_->Get(), command_pool_, nullptr);
 }
 
-VkCommandPool CommandPool::GetPool() const { return command_pool_; }
+VkCommandPool CommandPool::Get() const { return command_pool_; }
 
 size_t CommandPool::GetBuffersCount() const { return command_buffers_.size(); }
 
@@ -59,7 +59,7 @@ void CommandPool::Clear() {
 
 VkResult CommandPool::Reset() {
   available_index_ = 0;
-  return vkResetCommandPool(device_->GetDevice(), command_pool_, 0);
+  return vkResetCommandPool(device_->Get(), command_pool_, 0);
 }
 
 uint32_t CommandPool::GetQueueFamily() const { return queue_family_; }

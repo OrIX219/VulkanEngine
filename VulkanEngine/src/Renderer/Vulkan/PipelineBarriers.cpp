@@ -26,7 +26,7 @@ BufferMemoryBarrier::BufferMemoryBarrier(BufferBase buffer,
 }
 
 void BufferMemoryBarrier::SetBuffer(BufferBase buffer) {
-  barrier_.buffer = buffer.GetBuffer();
+  barrier_.buffer = buffer.Get();
   barrier_.size = buffer.GetSize();
 }
 
@@ -52,11 +52,11 @@ void BufferMemoryBarrier::SetDstAccessMask(VkAccessFlags mask) {
 void BufferMemoryBarrier::Use(CommandBuffer command_buffer,
                               VkPipelineStageFlags src_stage,
                               VkPipelineStageFlags dst_stage) {
-  vkCmdPipelineBarrier(command_buffer.GetBuffer(), src_stage, dst_stage, 0, 0,
+  vkCmdPipelineBarrier(command_buffer.Get(), src_stage, dst_stage, 0, 0,
                        nullptr, 1, &barrier_, 0, nullptr);
 }
 
-VkBufferMemoryBarrier BufferMemoryBarrier::GetBarrier() {
+VkBufferMemoryBarrier BufferMemoryBarrier::Get() {
   return barrier_;
 }
 

@@ -64,14 +64,14 @@ void Texture::Destroy() {
 
 void Texture::ReleaseStagingMemory() { staging_buffer_.Destroy(); }
 
-VkImage Texture::GetImage() { return image_.GetImage(); }
+VkImage Texture::GetImage() { return image_.Get(); }
 
 VkImageView Texture::GetView() { return image_.GetView(); }
 
 void Texture::GenerateMipmaps(CommandBuffer command_buffer) {
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.image = image_.GetImage();
+  barrier.image = image_.Get();
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -90,8 +90,7 @@ void Texture::GenerateMipmaps(CommandBuffer command_buffer) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-    vkCmdPipelineBarrier(
-        command_buffer.GetBuffer(), VK_PIPELINE_STAGE_TRANSFER_BIT,
+    vkCmdPipelineBarrier(command_buffer.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
     VkImageBlit blit{};
@@ -109,8 +108,8 @@ void Texture::GenerateMipmaps(CommandBuffer command_buffer) {
     blit.dstSubresource.baseArrayLayer = 0;
     blit.dstSubresource.layerCount = 1;
 
-    vkCmdBlitImage(command_buffer.GetBuffer(), image_.GetImage(),
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image_.GetImage(),
+    vkCmdBlitImage(command_buffer.Get(), image_.Get(),
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image_.Get(),
                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit,
                    VK_FILTER_LINEAR);
 
@@ -119,8 +118,7 @@ void Texture::GenerateMipmaps(CommandBuffer command_buffer) {
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    vkCmdPipelineBarrier(command_buffer.GetBuffer(),
-                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+    vkCmdPipelineBarrier(command_buffer.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
                          0, nullptr, 1, &barrier);
 
@@ -134,8 +132,7 @@ void Texture::GenerateMipmaps(CommandBuffer command_buffer) {
   barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
   barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-  vkCmdPipelineBarrier(command_buffer.GetBuffer(),
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,
+  vkCmdPipelineBarrier(command_buffer.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0,
                        nullptr, 1, &barrier);
 }

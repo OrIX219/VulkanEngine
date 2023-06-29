@@ -17,27 +17,27 @@ VkResult Pipeline::Create(LogicalDevice* device,
   device_ = device;
   pipeline_layout_ = create_info->layout;
   foreign_layout_ = foreign_layout;
-  return vkCreateGraphicsPipelines(device->GetDevice(), VK_NULL_HANDLE, 1,
+  return vkCreateGraphicsPipelines(device->Get(), VK_NULL_HANDLE, 1,
                                    create_info, nullptr, &pipeline_);
 }
 
 void Pipeline::Destroy() {
   if (pipeline_ == VK_NULL_HANDLE) return;
 
-  vkDestroyPipeline(device_->GetDevice(), pipeline_, nullptr);
+  vkDestroyPipeline(device_->Get(), pipeline_, nullptr);
   if (!foreign_layout_)
-    vkDestroyPipelineLayout(device_->GetDevice(), pipeline_layout_, nullptr);
+    vkDestroyPipelineLayout(device_->Get(), pipeline_layout_, nullptr);
 
   pipeline_ = VK_NULL_HANDLE;
 }
 
-VkPipeline Pipeline::GetPipeline() const { return pipeline_; }
+VkPipeline Pipeline::Get() const { return pipeline_; }
 
 VkPipelineLayout Pipeline::GetLayout() const { return pipeline_layout_; }
 
 void Pipeline::Bind(CommandBuffer command_buffer,
                     VkPipelineBindPoint bind_point) {
-  vkCmdBindPipeline(command_buffer.GetBuffer(), bind_point, pipeline_);
+  vkCmdBindPipeline(command_buffer.Get(), bind_point, pipeline_);
 }
 
 PipelineBuilder::PipelineBuilder()
@@ -98,7 +98,7 @@ Pipeline PipelineBuilder::Build(RenderPass& render_pass) {
         static_cast<uint32_t>(push_constants_.size());
     if (push_constants_.size() > 0)
       pipeline_layout_info.pPushConstantRanges = push_constants_.data();
-    vkCreatePipelineLayout(device_->GetDevice(), &pipeline_layout_info, nullptr,
+    vkCreatePipelineLayout(device_->Get(), &pipeline_layout_info, nullptr,
                            &pipeline_layout_);
   }
 
@@ -117,7 +117,7 @@ Pipeline PipelineBuilder::Build(RenderPass& render_pass) {
   if (dynamic_state.dynamicStateCount > 0)
     pipeline_info.pDynamicState = &dynamic_state;
   pipeline_info.layout = pipeline_layout_;
-  pipeline_info.renderPass = render_pass.GetRenderPass();
+  pipeline_info.renderPass = render_pass.Get();
   pipeline_info.subpass = 0;
 
   Pipeline pipeline;
@@ -317,7 +317,7 @@ VkPipeline ComputePipelineBuilder::Build() {
   pipeline_info.layout = pipeline_layout_;
 
   VkPipeline pipeline;
-  if (vkCreateComputePipelines(device_->GetDevice(), VK_NULL_HANDLE, 1,
+  if (vkCreateComputePipelines(device_->Get(), VK_NULL_HANDLE, 1,
                                &pipeline_info, nullptr,
                                &pipeline) != VK_SUCCESS) {
     LOG_ERROR("Failed to create compute pipeline!");

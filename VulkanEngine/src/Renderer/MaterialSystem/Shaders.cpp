@@ -29,7 +29,7 @@ bool LoadShaderModule(LogicalDevice* device, const char* path,
   create_info.pCode = reinterpret_cast<const uint32_t*>(buffer.data());
 
   VkShaderModule shader_module;
-  if (vkCreateShaderModule(device->GetDevice(), &create_info, nullptr,
+  if (vkCreateShaderModule(device->Get(), &create_info, nullptr,
                            &shader_module) != VK_SUCCESS)
     return false;
 
@@ -59,10 +59,10 @@ uint32_t HashDescriptorLayoutInfo(VkDescriptorSetLayoutCreateInfo* info) {
 }
 
 void ShaderEffect::Destroy() {
-  vkDestroyPipelineLayout(device_->GetDevice(), built_layout, nullptr);
+  vkDestroyPipelineLayout(device_->Get(), built_layout, nullptr);
   for (size_t i = 0; i < 4; ++i) {
     if (set_layouts[i] != VK_NULL_HANDLE)
-      vkDestroyDescriptorSetLayout(device_->GetDevice(), set_layouts[i],
+      vkDestroyDescriptorSetLayout(device_->Get(), set_layouts[i],
                                    nullptr);
   }
 }
@@ -202,7 +202,7 @@ void ShaderEffect::ReflectLayout(LogicalDevice* device,
     if (layout.create_info.bindingCount > 0) {
       set_hashes[i] = HashDescriptorLayoutInfo(&layout.create_info);
       
-      vkCreateDescriptorSetLayout(device->GetDevice(), &layout.create_info,
+      vkCreateDescriptorSetLayout(device->Get(), &layout.create_info,
                                   nullptr, &set_layouts[i]);
     } else {
       set_hashes[i] = 0;
@@ -228,7 +228,7 @@ void ShaderEffect::ReflectLayout(LogicalDevice* device,
   pipeline_layout_info.setLayoutCount = s;
   pipeline_layout_info.pSetLayouts = compacted_layouts.data();
 
-  vkCreatePipelineLayout(device->GetDevice(), &pipeline_layout_info, nullptr,
+  vkCreatePipelineLayout(device->Get(), &pipeline_layout_info, nullptr,
                          &built_layout);
 }
 
@@ -290,7 +290,7 @@ void ShaderDescriptorBinder::ApplyBinds(CommandBuffer command_buffer) {
   for (uint32_t i = 0; i < 4; ++i) {
     if (cached_descriptor_sets[i] == VK_NULL_HANDLE) continue;
     vkCmdBindDescriptorSets(
-        command_buffer.GetBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+        command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
         shaders_->built_layout, i, 1, &cached_descriptor_sets[i],
         set_offsets_[i].count, set_offsets_[i].offsets.data());
   }
@@ -338,7 +338,7 @@ void ShaderDescriptorBinder::BuildSets(LogicalDevice* device,
 
     for (VkWriteDescriptorSet& write : writes[i]) write.dstSet = descriptor;
 
-    vkUpdateDescriptorSets(device->GetDevice(),
+    vkUpdateDescriptorSets(device->Get(),
                            static_cast<uint32_t>(writes[i].size()),
                            writes[i].data(), 0, nullptr);
 
@@ -366,7 +366,7 @@ void ShaderCache::Init(LogicalDevice* device) { device_ = device; }
 
 void ShaderCache::Destroy() {
   for (auto& module : module_cache_)
-    vkDestroyShaderModule(device_->GetDevice(), module.second.module, nullptr);
+    vkDestroyShaderModule(device_->Get(), module.second.module, nullptr);
 }
 
 ShaderModule* ShaderCache::GetShader(const std::string& path) {

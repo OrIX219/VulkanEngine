@@ -24,7 +24,7 @@ class BufferMemoryBarrier {
   void Use(CommandBuffer command_buffer, VkPipelineStageFlags src_stage,
            VkPipelineStageFlags dst_stage);
 
-  VkBufferMemoryBarrier GetBarrier();
+  VkBufferMemoryBarrier Get();
 
  private:
   VkBufferMemoryBarrier barrier_;

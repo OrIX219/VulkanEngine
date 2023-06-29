@@ -29,7 +29,7 @@ void TextureSampler::Create(LogicalDevice* device, float min_lod, float max_lod,
   sampler_info.addressModeW = address_mode_.w;
   sampler_info.anisotropyEnable = enable_anisotropy_;
   VkPhysicalDeviceProperties properties{};
-  vkGetPhysicalDeviceProperties(device_->GetPhysicalDevice()->GetDevice(),
+  vkGetPhysicalDeviceProperties(device_->GetPhysicalDevice()->Get(),
                                 &properties);
   sampler_info.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
   sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
@@ -42,18 +42,18 @@ void TextureSampler::Create(LogicalDevice* device, float min_lod, float max_lod,
   sampler_info.maxLod = max_lod;
   sampler_info.pNext = next;
 
-  if (vkCreateSampler(device_->GetDevice(), &sampler_info, nullptr,
+  if (vkCreateSampler(device_->Get(), &sampler_info, nullptr,
                       &sampler_) != VK_SUCCESS)
     LOG_FATAL("Failed to create texure sampler!");
 }
 
 void TextureSampler::Destroy() {
   if (sampler_ == VK_NULL_HANDLE) return;
-  vkDestroySampler(device_->GetDevice(), sampler_, nullptr);
+  vkDestroySampler(device_->Get(), sampler_, nullptr);
   sampler_ = VK_NULL_HANDLE;
 }
 
-VkSampler TextureSampler::GetSampler() { return sampler_; }
+VkSampler TextureSampler::Get() { return sampler_; }
 
 VkFilter TextureSampler::GetMagFilter() const { return mag_filter_; }
 

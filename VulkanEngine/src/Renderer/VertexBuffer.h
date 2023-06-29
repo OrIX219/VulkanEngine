@@ -15,7 +15,7 @@ class VertexBuffer {
   void Create(VmaAllocator allocator, uint64_t size);
   void Destroy();
 
-  VkBuffer GetBuffer();
+  VkBuffer Get();
   uint32_t GetVerticesCount() const;
 
   void SetData(CommandBuffer command_buffer,

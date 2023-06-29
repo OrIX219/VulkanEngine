@@ -15,11 +15,11 @@ VkResult PhysicalDevice::Init(VulkanInstance* instance, Surface* surface,
   extensions_ = std::move(device_extensions);
 
   uint32_t device_count = 0;
-  vkEnumeratePhysicalDevices(instance_->GetInstance(), &device_count, nullptr);
+  vkEnumeratePhysicalDevices(instance_->Get(), &device_count, nullptr);
   if (device_count == 0) return VK_ERROR_DEVICE_LOST;
 
   std::vector<VkPhysicalDevice> devices(device_count);
-  vkEnumeratePhysicalDevices(instance_->GetInstance(), &device_count,
+  vkEnumeratePhysicalDevices(instance_->Get(), &device_count,
                              devices.data());
 
   for (const auto& device : devices) {
@@ -40,7 +40,7 @@ VkResult PhysicalDevice::Init(VulkanInstance* instance, Surface* surface,
   return VK_SUCCESS;
 }
 
-VkPhysicalDevice PhysicalDevice::GetDevice() { return device_; }
+VkPhysicalDevice PhysicalDevice::Get() { return device_; }
 
 VkPhysicalDeviceProperties PhysicalDevice::GetProperties() const {
   return properties_;
@@ -84,7 +84,7 @@ QueueFamilyIndicies PhysicalDevice::FindQueueFamilies(VkPhysicalDevice device) {
     else if (family.queueFlags & VK_QUEUE_TRANSFER_BIT)
       indicies.transfer_family = i;
     VkBool32 present_support = false;
-    vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface_->GetSurface(),
+    vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface_->Get(),
                                          &present_support);
     if (present_support && !indicies.present_family.has_value())
       indicies.present_family = i;
@@ -101,24 +101,24 @@ SwapChainSupportDetails PhysicalDevice::QuerySwapChainSupport(
     VkPhysicalDevice device) {
   SwapChainSupportDetails details;
 
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_->GetSurface(),
+  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_->Get(),
                                             &details.capabilities);
 
   uint32_t format_count = 0;
-  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_->GetSurface(),
+  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_->Get(),
                                        &format_count, nullptr);
   if (format_count != 0) {
     details.formats.resize(format_count);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_->GetSurface(),
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_->Get(),
                                          &format_count, details.formats.data());
   }
 
   uint32_t present_mode_count = 0;
-  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_->GetSurface(),
+  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_->Get(),
                                             &present_mode_count, nullptr);
   if (present_mode_count != 0) {
     details.present_modes.resize(present_mode_count);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_->GetSurface(),
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_->Get(),
                                               &present_mode_count,
                                               details.present_modes.data());
   }
