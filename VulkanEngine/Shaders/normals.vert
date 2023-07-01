@@ -22,6 +22,7 @@ layout(set = 0, binding = 0) uniform SceneData {
 	vec4 fogDistances;
 	vec4 sunlightDirection;
 	vec4 sunlightColor;
+	mat4 sunlightShadowMat;
 } sceneData;
 
 struct ObjectData {

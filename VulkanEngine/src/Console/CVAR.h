@@ -3,6 +3,8 @@
 #include "StringHash.h"
 #include <unordered_map>
 
+#include <glm/glm.hpp>
+
 namespace Engine {
 
 // Hate this workaround to use scoped enums as bitmask
@@ -36,17 +38,9 @@ class CVarSystem {
   using Float = float;
   using String = std::string;
 
-  struct Vec4 {
-    float x, y, z, w;
-  };
-
-  struct Vec3 {
-    float x, y, z;
-  };
-
-  struct Vec2 {
-    float x, y;
-  };
+  using Vec4 = glm::vec4;
+  using Vec3 = glm::vec3;
+  using Vec2 = glm::vec2;
 
   virtual CVarParameter* GetCVar(StringHash name) = 0;
 

@@ -180,12 +180,16 @@
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\axes.frag" />
+    <None Include="Shaders\axes.geom" />
+    <None Include="Shaders\axes.vert" />
     <None Include="Shaders\blit.frag" />
     <None Include="Shaders\blit.vert" />
     <None Include="Shaders\default_lit.frag" />
     <None Include="Shaders\depth_reduce.comp" />
     <None Include="Shaders\indirect_compute.comp" />
     <None Include="Shaders\mesh_instanced.vert" />
+    <None Include="Shaders\mesh_instanced_shadowcast.vert" />
     <None Include="Shaders\normals.frag" />
     <None Include="Shaders\normals.geom" />
     <None Include="Shaders\normals.vert" />
@@ -193,7 +197,6 @@
     <None Include="Shaders\skybox.vert" />
     <None Include="Shaders\sparse_upload.comp" />
     <None Include="Shaders\textured_lit.frag" />
-    <None Include="Shaders\tri_mesh.vert" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AssetLib\AssetLib.vcxproj">

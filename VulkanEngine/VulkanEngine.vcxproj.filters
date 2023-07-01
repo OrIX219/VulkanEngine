@@ -285,9 +285,6 @@
     <None Include="Shaders\textured_lit.frag">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="Shaders\tri_mesh.vert">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="Shaders\sparse_upload.comp" />
     <None Include="Shaders\normals.geom" />
     <None Include="Shaders\depth_reduce.comp" />
@@ -298,5 +295,9 @@
     <None Include="Shaders\blit.frag" />
     <None Include="Shaders\skybox.vert" />
     <None Include="Shaders\skybox.frag" />
+    <None Include="Shaders\mesh_instanced_shadowcast.vert" />
+    <None Include="Shaders\axes.vert" />
+    <None Include="Shaders\axes.geom" />
+    <None Include="Shaders\axes.frag" />
   </ItemGroup>
 </Project>

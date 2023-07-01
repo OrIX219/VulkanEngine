@@ -32,10 +32,10 @@ void TextureSampler::Create(LogicalDevice* device, float min_lod, float max_lod,
   vkGetPhysicalDeviceProperties(device_->GetPhysicalDevice()->Get(),
                                 &properties);
   sampler_info.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-  sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+  sampler_info.borderColor = border_color_;
   sampler_info.unnormalizedCoordinates = VK_FALSE;
-  sampler_info.compareEnable = VK_FALSE;
-  sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+  sampler_info.compareEnable = compare_enable_;
+  sampler_info.compareOp = compare_op_;
   sampler_info.mipmapMode = mipmap_mode_;
   sampler_info.mipLodBias = 0.f;
   sampler_info.minLod = min_lod;
@@ -89,14 +89,30 @@ TextureSampler& TextureSampler::SetMipmapMode(VkSamplerMipmapMode mode) {
   return *this;
 }
 
+TextureSampler& TextureSampler::SetCompare(bool compare_enable,
+                                           VkCompareOp compare_op) {
+  compare_enable_ = compare_enable;
+  compare_op_ = compare_op;
+  
+  return *this;
+}
+
+TextureSampler& TextureSampler::SetBorderColor(VkBorderColor border_color) {
+  border_color_ = border_color;
+
+  return *this;
+}
+
 TextureSampler& TextureSampler::SetDefaults() {
-  SetMagFilter(VK_FILTER_LINEAR)
-      .SetMinFilter(VK_FILTER_LINEAR)
+  SetMagFilter()
+      .SetMinFilter()
       .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_REPEAT,
                        VK_SAMPLER_ADDRESS_MODE_REPEAT,
                        VK_SAMPLER_ADDRESS_MODE_REPEAT})
-      .SetMipmapMode(VK_SAMPLER_MIPMAP_MODE_LINEAR)
-      .SetAnisotropyEnable(false);
+      .SetMipmapMode()
+      .SetAnisotropyEnable()
+      .SetCompare()
+      .SetBorderColor();
 
   return *this;
 }

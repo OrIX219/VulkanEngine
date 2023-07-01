@@ -29,11 +29,16 @@ class TextureSampler {
   AddressMode GetAddressMode() const;
   float GetAnisotropyEnable() const;
 
-  TextureSampler& SetMagFilter(VkFilter filter);
-  TextureSampler& SetMinFilter(VkFilter filter);
+  TextureSampler& SetMagFilter(VkFilter filter = VK_FILTER_LINEAR);
+  TextureSampler& SetMinFilter(VkFilter filter = VK_FILTER_LINEAR);
   TextureSampler& SetAddressMode(AddressMode address_mode);
-  TextureSampler& SetAnisotropyEnable(bool enable);
-  TextureSampler& SetMipmapMode(VkSamplerMipmapMode mode);
+  TextureSampler& SetAnisotropyEnable(bool enable = false);
+  TextureSampler& SetMipmapMode(
+      VkSamplerMipmapMode mode = VK_SAMPLER_MIPMAP_MODE_LINEAR);
+  TextureSampler& SetCompare(bool compare_enable = VK_FALSE,
+                             VkCompareOp compare_op = VK_COMPARE_OP_ALWAYS);
+  TextureSampler& SetBorderColor(
+      VkBorderColor border_color = VK_BORDER_COLOR_INT_OPAQUE_BLACK);
 
   TextureSampler& SetDefaults();
 
@@ -44,6 +49,9 @@ class TextureSampler {
   VkFilter min_filter_;
   AddressMode address_mode_;
   bool enable_anisotropy_;
+  bool compare_enable_;
+  VkCompareOp compare_op_;
+  VkBorderColor border_color_;
   VkSamplerMipmapMode mipmap_mode_;
 
   LogicalDevice* device_;

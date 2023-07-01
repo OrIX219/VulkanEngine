@@ -62,7 +62,8 @@ class PipelineBuilder {
   PipelineBuilder& SetRasterizer(
       VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL, float line_width = 1.f,
       VkCullModeFlags cull_mode = VK_CULL_MODE_BACK_BIT,
-      VkFrontFace front_face = VK_FRONT_FACE_CLOCKWISE);
+      VkFrontFace front_face = VK_FRONT_FACE_CLOCKWISE,
+      VkBool32 depth_bias_enable = VK_FALSE);
   PipelineBuilder& SetRasterizer(
       VkPipelineRasterizationStateCreateInfo* rasterizer);
   PipelineBuilder& SetColorBlendAttachment(VkBool32 blend_enable = VK_FALSE,

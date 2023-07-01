@@ -20,6 +20,7 @@ layout(set = 0, binding = 0) uniform SceneData {
 	vec4 fogDistances;
 	vec4 sunlightDirection;
 	vec4 sunlightColor;
+	mat4 sunlightShadowMat;
 } sceneData;
 
 void main() {
@@ -30,8 +31,8 @@ void main() {
 	vec3 diffuse = diff * sceneData.sunlightColor.xyz * sceneData.sunlightColor.w;
 
 	vec3 viewDir = normalize(sceneData.cameraData.pos - inFragPos);
-	vec3 reflectDir = reflect(-lightDir, inNormal);
-	float spec = pow(max(0.0, dot(viewDir, reflectDir)), 32);
+	vec3 halfwayDir = normalize(lightDir + viewDir);
+	float spec = pow(max(0.0, dot(inNormal, halfwayDir)), 32);
 	vec3 specular = spec * sceneData.sunlightColor.xyz * sceneData.sunlightColor.w;
 
 	vec3 color = inColor * (ambient + diffuse + specular);

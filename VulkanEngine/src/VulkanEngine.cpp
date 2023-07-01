@@ -11,8 +11,6 @@
 #include <vma\include\vk_mem_alloc.h>
 
 #define GLM_FORCE_RADIANS
-#define GLM_FORCE_LEFT_HANDED
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/gtx/transform.hpp>
 
 #include <imgui/imgui.h>
@@ -124,6 +122,14 @@ void VulkanEngine::Init() {
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
       VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, VK_SAMPLE_COUNT_1_BIT));
   LOG_SUCCESS("Created depth resolve image");
+
+  VK_CHECK(shadow_image_.Create(
+      allocator_, &device_, {shadow_extent_.width, shadow_extent_.height, 1},
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, VK_SAMPLE_COUNT_1_BIT));
+  LOG_SUCCESS("Created shadow image");
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Image::Destroy, shadow_image_));
 
   InitRenderPasses(samples_);
   LOG_SUCCESS("Initialized render passes");
@@ -405,6 +411,32 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
     main_deletion_queue_.PushFunction(
         std::bind(&Renderer::RenderPass::Destroy, copy_pass_));
   }
+  render_pass_builder.Clear();
+  {
+    Renderer::RenderPassAttachment depth_attachment;
+    depth_attachment
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetSamples(VK_SAMPLE_COUNT_1_BIT)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .SetFormat(VK_FORMAT_D32_SFLOAT);
+
+    Renderer::RenderPassSubpass subpass;
+    render_pass_builder.AddAttachment(&depth_attachment);
+    subpass.SetDepthStencilAttachmentRef(0);
+
+    render_pass_builder.AddSubpass(&subpass);
+    render_pass_builder.AddDependency(
+        VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+    shadow_pass_ = render_pass_builder.Build();
+
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::RenderPass::Destroy, shadow_pass_));
+  }
 }
 
 void VulkanEngine::InitFramebuffers() {
@@ -415,6 +447,11 @@ void VulkanEngine::InitFramebuffers() {
 
   VK_CHECK(forward_framebuffer_.Create(&device_, &forward_pass_, extent,
                                        attachments));
+
+  VK_CHECK(shadow_framebuffer_.Create(&device_, &shadow_pass_, shadow_extent_,
+                                      {shadow_image_.GetView()}));
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Framebuffer::Destroy, shadow_framebuffer_));
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(swapchain_framebuffers_[i].Create(&device_, &copy_pass_, extent,
@@ -496,6 +533,31 @@ void VulkanEngine::InitPipelines() {
   Renderer::Material* material =
       Renderer::MaterialSystem::BuildMaterial("normals", normals);
   if (!material) LOG_FATAL("Failed to build normals material");
+
+  std::array<Renderer::ShaderEffect::ReflectionOverrides, 1> overrides = {
+      {"sceneData", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC}};
+  Renderer::ShaderEffect* axes_effect = new Renderer::ShaderEffect();
+  axes_effect->AddStage(shader_cache_.GetShader("Shaders/axes.vert.spv"),
+                        VK_SHADER_STAGE_VERTEX_BIT);
+  axes_effect->AddStage(shader_cache_.GetShader("Shaders/axes.frag.spv"),
+                        VK_SHADER_STAGE_FRAGMENT_BIT);
+  axes_effect->AddStage(shader_cache_.GetShader("Shaders/axes.geom.spv"),
+                        VK_SHADER_STAGE_GEOMETRY_BIT);
+  axes_effect->ReflectLayout(&device_, overrides.data(), overrides.size());
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::ShaderEffect::Destroy, *axes_effect));
+
+  builder = Renderer::PipelineBuilder::Begin(&device_);
+  axes_pipeline_ =
+      builder.SetDefaults()
+          .SetShaders(axes_effect)
+          .SetDepthStencil(VK_FALSE)
+          .SetMultisampling(samples_)
+          .SetVertexInputDescription(Renderer::Vertex::GetDescription())
+          .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
+          .Build(forward_pass_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Pipeline::Destroy, axes_pipeline_));
 }
 
 void VulkanEngine::InitSamplers() {
@@ -536,6 +598,16 @@ void VulkanEngine::InitSamplers() {
       .Create(&device_);
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::TextureSampler::Destroy, skybox_sampler_));
+
+  shadow_sampler_.SetDefaults()
+      .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE})
+      .SetCompare(VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL)
+      .SetBorderColor(VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE)
+      .Create(&device_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::TextureSampler::Destroy, shadow_sampler_));
 }
 
 uint32_t PrevPowOf2(uint32_t x) {
@@ -795,8 +867,19 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 }
 
 void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
+  main_light_.direction = *CVarSystem::Get()->GetVec4CVar("scene.sunlight_dir");
+  main_light_.position = glm::vec3(2.f, 4.f, -1.f);
+  main_light_.shadow_extent = glm::vec3(32, 32, 64);
+
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin();
+
+  axes_buffer_.Create(allocator_, sizeof(Renderer::Vertex));
+  axes_buffer_.SetData(
+      command_buffer,
+      {{{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f}}});
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::VertexBuffer::Destroy, axes_buffer_));
 
   LoadTexture(command_buffer, "white", AssetPath("white.tx").c_str());
   skybox_texture_.LoadFromDirectory(allocator_, &device_, command_buffer,
@@ -1092,13 +1175,32 @@ void VulkanEngine::Draw() {
 
       ExecuteCull(command_buffer, render_scene_.forward_pass, forward_cull);
       ExecuteCull(command_buffer, render_scene_.transparent_pass, forward_cull);
-
-      vkCmdPipelineBarrier(command_buffer.Get(),
-                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                           VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr,
-                           static_cast<uint32_t>(post_cull_barriers_.size()),
-                           post_cull_barriers_.data(), 0, nullptr);
     }
+
+    Renderer::CullParams shadow_cull;
+    shadow_cull.view_mat = main_light_.GetView();
+    shadow_cull.proj_mat = main_light_.GetProjection();
+    shadow_cull.frustum_cull =
+        *CVarSystem::Get()->GetIntCVar("culling.enable");
+    shadow_cull.occlusion_cull =
+        *CVarSystem::Get()->GetIntCVar("culling.occlusion_culling");
+    shadow_cull.draw_dist =
+        *CVarSystem::Get()->GetFloatCVar("culling.distance");
+
+    {
+      Renderer::VulkanScopeTimer timer2(command_buffer, &profiler_,
+                                        "Shadow Cull");
+
+      ExecuteCull(command_buffer, render_scene_.shadow_pass, shadow_cull);
+    }
+
+    vkCmdPipelineBarrier(command_buffer.Get(),
+                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr,
+                         static_cast<uint32_t>(post_cull_barriers_.size()),
+                         post_cull_barriers_.data(), 0, nullptr);
+
+    DrawShadows(command_buffer, render_scene_.shadow_pass);
 
     DrawForward(command_buffer, render_scene_.forward_pass);
 
@@ -1522,6 +1624,69 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
   post_cull_barriers_.push_back(barrier.Get());
 }
 
+void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer,
+                               Renderer::RenderScene::MeshPass& pass) {
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
+
+  Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Shadow Draw");
+
+  VkClearValue depth_clear;
+  depth_clear.depthStencil.depth = 1.f;
+
+  shadow_pass_.Begin(command_buffer, shadow_framebuffer_.Get(),
+                     {{0, 0}, shadow_extent_}, {depth_clear});
+
+  VkViewport viewport{0.f, 0.f,
+                      static_cast<float>(shadow_extent_.width),
+                      static_cast<float>(shadow_extent_.height),
+                      0.f, 1.f};
+  VkRect2D scissors{{0, 0}, shadow_extent_};
+
+  vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
+  vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
+
+  if (pass.indirect_batches.size() > 0) {
+    Renderer::GPUCameraData camera_data;
+    camera_data.view = main_light_.GetView();
+    camera_data.projection = main_light_.GetProjection();
+
+    uint32_t camera_offset = frame.dynamic_data.Push(camera_data);
+
+    VkDescriptorBufferInfo object_buffer_info =
+        render_scene_.object_data_buffer.GetDescriptorInfo();
+    VkDescriptorBufferInfo camera_info = frame.dynamic_data.GetDescriptorInfo();
+    camera_info.range = sizeof(Renderer::GPUCameraData);
+    VkDescriptorBufferInfo instance_info =
+        pass.compacted_instance_buffer.GetDescriptorInfo();
+
+    VkDescriptorSet global_set;
+    Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                       &frame.dynamic_descriptor_allocator)
+        .BindBuffer(0, &camera_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                    VK_SHADER_STAGE_VERTEX_BIT)
+        .Build(global_set);
+
+    VkDescriptorSet object_set;
+    Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                       &frame.dynamic_descriptor_allocator)
+        .BindBuffer(0, &object_buffer_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    VK_SHADER_STAGE_VERTEX_BIT)
+        .BindBuffer(1, &instance_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    VK_SHADER_STAGE_VERTEX_BIT)
+        .Build(object_set);
+
+    vkCmdSetDepthBias(command_buffer.Get(), 5.25f, 0, 4.75f);
+
+    std::vector<uint32_t> dynamic_offsets;
+    dynamic_offsets.push_back(camera_offset);
+
+    ExecuteDraw(command_buffer, pass, object_set, dynamic_offsets, global_set);
+  }
+
+  shadow_pass_.End(command_buffer);
+}
+
 void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
                                Renderer::RenderScene::MeshPass& pass) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
@@ -1553,29 +1718,35 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   scene_data_.camera_data.view = camera_.GetViewMat();
   scene_data_.camera_data.projection = camera_.GetProjMat();
   scene_data_.camera_data.pos = camera_.GetPosition();
-  auto ambient_color = CVarSystem::Get()->GetVec4CVar("scene.ambient_light");
-  scene_data_.ambient_color = {ambient_color->x, ambient_color->y,
-                               ambient_color->z, ambient_color->w};
-  auto sunlight_dir = CVarSystem::Get()->GetVec4CVar("scene.sunlight_dir");
-  scene_data_.sunlight_direction = {sunlight_dir->x, sunlight_dir->y,
-                                    sunlight_dir->z, sunlight_dir->w};
-  auto sunlight_color = CVarSystem::Get()->GetVec4CVar("scene.sunlight_color");
-  scene_data_.sunlight_color = {sunlight_color->x, sunlight_color->y,
-                                sunlight_color->z, sunlight_color->w};
+
+  scene_data_.sunlight_shadow_mat =
+      main_light_.GetProjection() * main_light_.GetView();
+  scene_data_.ambient_color =
+      *CVarSystem::Get()->GetVec4CVar("scene.ambient_light");
+  scene_data_.sunlight_direction = glm::vec4(main_light_.direction, 1.f);
+  scene_data_.sunlight_color = main_light_.color;
   uint32_t scene_data_offset = frame.dynamic_data.Push(scene_data_);
 
   VkDescriptorBufferInfo object_buffer_info =
       render_scene_.object_data_buffer.GetDescriptorInfo();
 
   VkDescriptorBufferInfo scene_info = frame.dynamic_data.GetDescriptorInfo();
+  scene_info.range = sizeof(Renderer::GPUSceneData);
 
   VkDescriptorBufferInfo instance_info =
       pass.compacted_instance_buffer.GetDescriptorInfo();
+
+  VkDescriptorImageInfo shadow_info;
+  shadow_info.sampler = shadow_sampler_.Get();
+  shadow_info.imageView = shadow_image_.GetView();
+  shadow_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
   Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                      &frame.dynamic_descriptor_allocator)
       .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+      .BindImage(1, &shadow_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                 VK_SHADER_STAGE_FRAGMENT_BIT)
       .Build(frame.global_descriptor);
 
   Renderer::DescriptorBuilder::Begin(&layout_cache_,
@@ -1586,8 +1757,30 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
                   VK_SHADER_STAGE_VERTEX_BIT)
       .Build(frame.object_descriptor);
 
+  vkCmdSetDepthBias(command_buffer.Get(), 0, 0, 0);
+
   std::vector<uint32_t> dynamic_offsets;
   dynamic_offsets.push_back(scene_data_offset);
+
+  ExecuteDraw(command_buffer, pass, frame.object_descriptor, dynamic_offsets,
+              frame.global_descriptor);
+
+  DrawSkybox(command_buffer, scene_info, scene_data_offset);
+
+  DrawCoordAxes(command_buffer, scene_info, scene_data_offset);
+
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer.Get());
+
+  forward_pass_.End(command_buffer);
+}
+
+void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
+                               Renderer::RenderScene::MeshPass& pass,
+                               VkDescriptorSet object_data_set,
+                               const std::vector<uint32_t>& offsets,
+                               VkDescriptorSet global_set) {
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
 
   if (pass.indirect_batches.size() > 0) {
     Renderer::Mesh* last_mesh = nullptr;
@@ -1616,13 +1809,12 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
         new_pipeline.Bind(command_buffer);
         vkCmdBindDescriptorSets(
             command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-            new_pipeline.GetLayout(), 0, 1, &frame.global_descriptor,
-            static_cast<uint32_t>(dynamic_offsets.size()),
-            dynamic_offsets.data());
+            new_pipeline.GetLayout(), 0, 1, &global_set,
+            static_cast<uint32_t>(offsets.size()), offsets.data());
         vkCmdBindDescriptorSets(command_buffer.Get(),
                                 VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 new_pipeline.GetLayout(), 1, 1,
-                                &frame.object_descriptor, 0, nullptr);
+                                &object_data_set, 0, nullptr);
       }
 
       if (new_material_set != last_material_set) {
@@ -1660,10 +1852,14 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
         vkCmdDraw(command_buffer.Get(), draw_mesh->GetVerticesCount(),
                   instance.count, 0, instance.first);
       } else {
-        vkCmdDrawIndexedIndirectCount(
+        /*vkCmdDrawIndexedIndirectCount(
             command_buffer.Get(), pass.draw_indirect_buffer.Get(),
             multibatch.first * sizeof(Renderer::GPUIndirectObject),
             pass.count_buffer.Get(), multibatch.first * sizeof(uint32_t),
+            multibatch.count, sizeof(Renderer::GPUIndirectObject));*/
+        vkCmdDrawIndexedIndirect(
+            command_buffer.Get(), pass.draw_indirect_buffer.Get(),
+            multibatch.first * sizeof(Renderer::GPUIndirectObject),
             multibatch.count, sizeof(Renderer::GPUIndirectObject));
       }
 
@@ -1677,6 +1873,9 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
         last_pipeline = pipeline.Get();
 
+        VkDescriptorBufferInfo scene_info =
+            frame.dynamic_data.GetDescriptorInfo();
+
         VkDescriptorSet normals_global_set;
         Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                            &frame.dynamic_descriptor_allocator)
@@ -1686,11 +1885,10 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
             .Build(normals_global_set);
 
         pipeline.Bind(command_buffer);
-        vkCmdBindDescriptorSets(command_buffer.Get(),
-                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                pipeline.GetLayout(), 0, 1, &normals_global_set,
-                                static_cast<uint32_t>(dynamic_offsets.size()),
-                                dynamic_offsets.data());
+        vkCmdBindDescriptorSets(
+            command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipeline.GetLayout(), 0, 1, &normals_global_set,
+            static_cast<uint32_t>(offsets.size()), offsets.data());
         vkCmdBindDescriptorSets(
             command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
             pipeline.GetLayout(), 1, 1, &frame.object_descriptor, 0, nullptr);
@@ -1702,19 +1900,12 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
           vkCmdDrawIndexedIndirectCount(
               command_buffer.Get(), pass.draw_indirect_buffer.Get(),
               multibatch.first * sizeof(Renderer::GPUIndirectObject),
-              pass.count_buffer.Get(),
-              multibatch.first * sizeof(uint32_t), multibatch.count,
-              sizeof(Renderer::GPUIndirectObject));
+              pass.count_buffer.Get(), multibatch.first * sizeof(uint32_t),
+              multibatch.count, sizeof(Renderer::GPUIndirectObject));
         }
       }
     }
   }
-
-  DrawSkybox(command_buffer, scene_info, scene_data_offset);
-
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer.Get());
-
-  forward_pass_.End(command_buffer);
 }
 
 void VulkanEngine::DrawSkybox(Renderer::CommandBuffer command_buffer,
@@ -1748,6 +1939,31 @@ void VulkanEngine::DrawSkybox(Renderer::CommandBuffer command_buffer,
   Renderer::Mesh* cube = GetMesh("skybox");
   cube->BindBuffers(command_buffer);
   vkCmdDrawIndexed(command_buffer.Get(), cube->GetIndicesCount(), 1, 0, 0, 0);
+}
+
+void VulkanEngine::DrawCoordAxes(Renderer::CommandBuffer command_buffer,
+                                 VkDescriptorBufferInfo scene_info,
+                                 uint32_t dynamic_offset) {
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
+
+  VkDescriptorSet axes_global_set;
+  Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                     &frame.dynamic_descriptor_allocator)
+      .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                  VK_SHADER_STAGE_GEOMETRY_BIT)
+      .Build(axes_global_set);
+
+  axes_pipeline_.Bind(command_buffer);
+  vkCmdBindDescriptorSets(command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          axes_pipeline_.GetLayout(), 0, 1, &axes_global_set, 1,
+                          &dynamic_offset);
+
+  VkBuffer vertex_buffers[] = {axes_buffer_.Get()};
+  VkDeviceSize offset = 0;
+  vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, vertex_buffers, &offset);
+
+  vkCmdDraw(command_buffer.Get(), 1, 1, 0, 0);
 }
 
 struct alignas(16) DepthReduceData {
@@ -1962,6 +2178,10 @@ void VulkanEngine::Run() {
     last_time_ = current_time;
 
     ProcessInput();
+
+    main_light_.direction =
+        glm::normalize(*CVarSystem::Get()->GetVec4CVar("scene.sunlight_dir"));
+    main_light_.color = *CVarSystem::Get()->GetVec4CVar("scene.sunlight_color");
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();

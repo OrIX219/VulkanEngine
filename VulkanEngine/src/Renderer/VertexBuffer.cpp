@@ -2,7 +2,7 @@
 
 namespace Renderer {
 
-VertexBuffer::VertexBuffer() {}
+VertexBuffer::VertexBuffer() : vertices_count_(0) {}
 
 VertexBuffer::VertexBuffer(VmaAllocator allocator, uint64_t size) {
   Create(allocator, size);
@@ -39,7 +39,8 @@ void VertexBuffer::SetData(CommandBuffer command_buffer,
 
 void VertexBuffer::CopyTo(CommandBuffer command_buffer, VertexBuffer& dst,
                           VkDeviceSize offset) const {
-  buffer_.CopyTo(command_buffer, dst.buffer_, offset) ;
+  buffer_.CopyTo(command_buffer, dst.buffer_, offset);
+  dst.vertices_count_ += vertices_count_;
 }
 
 }  // namespace Renderer

@@ -183,11 +183,13 @@ PipelineBuilder& PipelineBuilder::SetScissors(VkRect2D scissors) {
 PipelineBuilder& PipelineBuilder::SetRasterizer(VkPolygonMode polygon_mode,
                                                 float line_width,
                                                 VkCullModeFlags cull_mode,
-                                                VkFrontFace front_face) {
+                                                VkFrontFace front_face,
+                                                VkBool32 depth_bias_enable) {
   rasterizer_.polygonMode = polygon_mode;
   rasterizer_.lineWidth = line_width;
   rasterizer_.cullMode = cull_mode;
   rasterizer_.frontFace = front_face;
+  rasterizer_.depthBiasEnable = depth_bias_enable;
 
   return *this;
 }

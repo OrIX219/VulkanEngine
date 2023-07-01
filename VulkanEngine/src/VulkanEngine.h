@@ -34,7 +34,10 @@
 #define VMA_VULKAN_VERSION 1002000
 #include <vma\include\vk_mem_alloc.h>
 
-#include <glm\glm.hpp>
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_LEFT_HANDED
+#include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>
 
 namespace Renderer {
 struct GPUCameraData {
@@ -50,6 +53,7 @@ struct GPUSceneData {
   glm::vec4 fog_distances;
   glm::vec4 sunlight_direction;
   glm::vec4 sunlight_color;
+  glm::mat4 sunlight_shadow_mat;
 };
 
 struct GPUObjectData {
@@ -78,6 +82,22 @@ struct DrawCullData {
   int culling_enabled;
   int occlusion_enabled;
   int dist_cull;
+};
+
+struct DirectionalLight {
+  glm::vec3 position;
+  glm::vec3 direction;
+  glm::vec4 color;
+  glm::vec3 shadow_extent;
+
+  glm::mat4 GetView() const {
+    return glm::lookAt(position, position - direction, glm::vec3(0, 1, 0));
+  }
+
+  glm::mat4 GetProjection() const {
+    return glm::ortho(-shadow_extent.x, shadow_extent.x, -shadow_extent.y,
+                      shadow_extent.y, -shadow_extent.z, shadow_extent.z);
+  }
 };
 
 }
@@ -118,10 +138,20 @@ class VulkanEngine {
   void ExecuteCull(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderScene::MeshPass& pass,
                    const Renderer::CullParams& params);
+  void DrawShadows(Renderer::CommandBuffer command_buffer,
+                   Renderer::RenderScene::MeshPass& pass);
   void DrawForward(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderScene::MeshPass& pass);
+  void ExecuteDraw(Renderer::CommandBuffer command_buffer,
+                   Renderer::RenderScene::MeshPass& pass,
+                   VkDescriptorSet object_data_set,
+                   const std::vector<uint32_t>& offsets,
+                   VkDescriptorSet global_set);
   void DrawSkybox(Renderer::CommandBuffer command_buffer,
                   VkDescriptorBufferInfo scene_info, uint32_t dynamic_offset);
+  void DrawCoordAxes(Renderer::CommandBuffer command_buffer,
+                     VkDescriptorBufferInfo scene_info,
+                     uint32_t dynamic_offset);
   void ReduceDepth(Renderer::CommandBuffer command_buffer);
   void CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                              uint32_t index); 
@@ -172,7 +202,6 @@ class VulkanEngine {
   bool menu_opened_;
 
   Renderer::Window window_;
-  Renderer::Camera camera_;
 
   Renderer::VulkanInstance instance_;
   Renderer::Surface surface_;
@@ -190,6 +219,8 @@ class VulkanEngine {
   Renderer::Image depth_image_;
   Renderer::Image color_resolve_image_;
   Renderer::Image depth_resolve_image_;
+  Renderer::Image shadow_image_;
+  VkExtent2D shadow_extent_{1024, 1024};
 
   Renderer::Image depth_pyramid_;
   uint32_t depth_pyramid_width_;
@@ -198,8 +229,10 @@ class VulkanEngine {
   VkImageView depth_pyramid_mips_[16] = {};
 
   Renderer::RenderPass forward_pass_;
+  Renderer::RenderPass shadow_pass_;
   Renderer::RenderPass copy_pass_;
   Renderer::Framebuffer forward_framebuffer_;
+  Renderer::Framebuffer shadow_framebuffer_;
   std::array<Renderer::Framebuffer, kMaxFramesInFlight> swapchain_framebuffers_;
 
   Renderer::DescriptorAllocator descriptor_allocator_;
@@ -228,9 +261,14 @@ class VulkanEngine {
 
   Renderer::Pipeline skybox_pipeline_;
 
+  Renderer::Pipeline axes_pipeline_;
+  Renderer::VertexBuffer axes_buffer_;
+
   Renderer::ShaderCache shader_cache_;
 
   Renderer::RenderScene render_scene_;
+  Renderer::Camera camera_;
+  Renderer::DirectionalLight main_light_;
   Renderer::TextureCube skybox_texture_;
 
   std::unordered_map<std::string, Renderer::Material> materials_;
@@ -245,6 +283,7 @@ class VulkanEngine {
   Renderer::TextureSampler depth_reduction_sampler_;
   Renderer::TextureSampler smooth_sampler_;
   Renderer::TextureSampler skybox_sampler_;
+  Renderer::TextureSampler shadow_sampler_;
 };
 
 }  // namespace Engine

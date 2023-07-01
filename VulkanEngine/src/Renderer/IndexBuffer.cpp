@@ -2,7 +2,7 @@
 
 namespace Renderer {
 
-IndexBuffer::IndexBuffer() {}
+IndexBuffer::IndexBuffer() : indices_count_(0) {}
 
 IndexBuffer::IndexBuffer(VmaAllocator allocator, uint64_t size) {
   Create(allocator, size);
@@ -41,6 +41,7 @@ void IndexBuffer::SetData(CommandBuffer command_buffer,
 void IndexBuffer::CopyTo(CommandBuffer command_buffer, IndexBuffer& dst,
                          VkDeviceSize offset) const {
   buffer_.CopyTo(command_buffer, dst.buffer_, offset);
+  dst.indices_count_ += indices_count_;
 }
 
 }  // namespace Renderer

@@ -127,8 +127,7 @@ void main() {
 		uint objectId = instanceBuffer.instances[gid].objectID;
 		if (isVisible(objectId)) {
 			uint batchIndex = instanceBuffer.instances[gid].batchID;
-			if (drawBuffer.draws[batchIndex].instanceCount == 0)
-				atomicAdd(finalCountBuffer.counts[batchIndex], 1);
+			atomicAdd(finalCountBuffer.counts[batchIndex], 1);
 			uint countIndex = atomicAdd(drawBuffer.draws[batchIndex].instanceCount, 1);
 			uint instanceIndex = drawBuffer.draws[batchIndex].firstInstance + countIndex;
 			finalInstanceBuffer.ids[instanceIndex] = objectId;

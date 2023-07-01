@@ -79,6 +79,8 @@ void MaterialSystem::BuildDefaultTemplates() {
       BuildEffect("mesh_instanced.vert.spv", "textured_lit.frag.spv");
   ShaderEffect* default_lit =
       BuildEffect("mesh_instanced.vert.spv", "default_lit.frag.spv");
+  ShaderEffect* opaque_shadowcast =
+      BuildEffect("mesh_instanced_shadowcast.vert.spv");
   ShaderEffect* normals = BuildEffect(
       "normals.vert.spv", "normals.frag.spv", "normals.geom.spv");
   ShaderEffect* skybox =
@@ -88,6 +90,8 @@ void MaterialSystem::BuildDefaultTemplates() {
       system.engine_->forward_pass_, system.forward_builder_, textured_lit);
   ShaderPass* default_lit_pass = BuildShader(
       system.engine_->forward_pass_, system.forward_builder_, default_lit);
+  ShaderPass* opaque_shadowcast_pass = BuildShader(
+      system.engine_->shadow_pass_, system.shadow_builder_, opaque_shadowcast);
   ShaderPass* normals_pass = BuildShader(system.engine_->forward_pass_,
                                          system.forward_builder_, normals);
   ShaderPass* skybox_pass = BuildShader(system.engine_->forward_pass_,
@@ -97,7 +101,7 @@ void MaterialSystem::BuildDefaultTemplates() {
     EffectTemplate default_textured;
     default_textured.pass_shaders[MeshPassType::kForward] = textured_lit_pass;
     default_textured.pass_shaders[MeshPassType::kTransparency] = nullptr;
-    default_textured.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+    default_textured.pass_shaders[MeshPassType::kDirectionalShadow] = opaque_shadowcast_pass;
 
     default_textured.transparency = Assets::TransparencyMode::kOpaque;
 
@@ -136,7 +140,8 @@ void MaterialSystem::BuildDefaultTemplates() {
     EffectTemplate default_colored;
     default_colored.pass_shaders[MeshPassType::kForward] = default_lit_pass;
     default_colored.pass_shaders[MeshPassType::kTransparency] = nullptr;
-    default_colored.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+    default_colored.pass_shaders[MeshPassType::kDirectionalShadow] =
+        opaque_shadowcast_pass;
 
     default_colored.transparency = Assets::TransparencyMode::kOpaque;
 
@@ -248,9 +253,9 @@ void MaterialSystem::FillBuilders() {
   system.shadow_builder_.SetDefaults()
       .SetVertexInputDescription(Vertex::GetDescription())
       .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
-                     VK_FRONT_FACE_COUNTER_CLOCKWISE)
+                     VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_TRUE)
       .SetDepthStencil()
-      .SetMultisampling(system.engine_->samples_, VK_TRUE);
+      .SetMultisampling(VK_SAMPLE_COUNT_1_BIT, VK_TRUE);
 
   system.skybox_builder_ = PipelineBuilder::Begin(&system.engine_->device_);
   system.skybox_builder_.SetDefaults()
