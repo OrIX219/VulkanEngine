@@ -66,6 +66,7 @@ Pipeline PipelineBuilder::Build(RenderPass& render_pass) {
     dynamic_states.push_back(VK_DYNAMIC_STATE_VIEWPORT);
   if (!scissors_.has_value())
     dynamic_states.push_back(VK_DYNAMIC_STATE_SCISSOR);
+  dynamic_states.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
 
   VkPipelineDynamicStateCreateInfo dynamic_state{};
   dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;

@@ -80,7 +80,7 @@ void MaterialSystem::BuildDefaultTemplates() {
   ShaderEffect* default_lit =
       BuildEffect("mesh_instanced.vert.spv", "default_lit.frag.spv");
   ShaderEffect* opaque_shadowcast =
-      BuildEffect("mesh_instanced_shadowcast.vert.spv");
+      BuildEffect("mesh_instanced_shadowcast.vert.spv", "shadowcast.frag.spv");
   ShaderEffect* normals = BuildEffect(
       "normals.vert.spv", "normals.frag.spv", "normals.geom.spv");
   ShaderEffect* skybox =
@@ -252,7 +252,7 @@ void MaterialSystem::FillBuilders() {
   system.shadow_builder_ = PipelineBuilder::Begin(&system.engine_->device_);
   system.shadow_builder_.SetDefaults()
       .SetVertexInputDescription(Vertex::GetDescription())
-      .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_BACK_BIT,
+      .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_NONE,
                      VK_FRONT_FACE_COUNTER_CLOCKWISE, VK_TRUE)
       .SetDepthStencil()
       .SetMultisampling(VK_SAMPLE_COUNT_1_BIT, VK_TRUE);

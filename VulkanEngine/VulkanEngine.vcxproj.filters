@@ -299,5 +299,6 @@
     <None Include="Shaders\axes.vert" />
     <None Include="Shaders\axes.geom" />
     <None Include="Shaders\axes.frag" />
+    <None Include="Shaders\shadowcast.frag" />
   </ItemGroup>
 </Project>

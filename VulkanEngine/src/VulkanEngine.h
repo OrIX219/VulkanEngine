@@ -90,8 +90,13 @@ struct DirectionalLight {
   glm::vec4 color;
   glm::vec3 shadow_extent;
 
+  void SetDirection(const glm::vec3 dir) { 
+    direction = dir;
+    if (abs(direction.x) < 0.01f && abs(direction.z) < 0.01f) direction.z = 0.01f;
+  }
+
   glm::mat4 GetView() const {
-    return glm::lookAt(position, position - direction, glm::vec3(0, 1, 0));
+    return glm::lookAt(position, position + direction, glm::vec3(0, 1, 0));
   }
 
   glm::mat4 GetProjection() const {
@@ -220,7 +225,7 @@ class VulkanEngine {
   Renderer::Image color_resolve_image_;
   Renderer::Image depth_resolve_image_;
   Renderer::Image shadow_image_;
-  VkExtent2D shadow_extent_{1024, 1024};
+  VkExtent2D shadow_extent_{4096, 4096};
 
   Renderer::Image depth_pyramid_;
   uint32_t depth_pyramid_width_;
