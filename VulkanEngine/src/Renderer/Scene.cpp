@@ -118,15 +118,13 @@ void RenderScene::FillObjectData(GPUObjectData* data) {
 
 void RenderScene::FillIndirectArray(GPUIndirectObject* data, MeshPass& pass) {
   for (size_t i = 0; i < pass.indirect_batches.size(); ++i) {
-    const IndirectBatch& batch = pass.indirect_batches[i];
-    DrawMesh* mesh = GetMesh(batch.mesh_id);
-    data[i].command.firstInstance = batch.first;
-    data[i].command.instanceCount = 0; // Gets incremented in compute shader
-    data[i].command.firstIndex = mesh->first_index;
-    data[i].command.vertexOffset = mesh->first_vertex;
-    data[i].command.indexCount = mesh->index_count;
+    data[i].command.firstInstance = 0;
+    data[i].command.instanceCount = 0;
+    data[i].command.firstIndex = 0;
+    data[i].command.vertexOffset = 0;
+    data[i].command.indexCount = 0;
     data[i].object_id = 0;
-    data[i].batch_id = static_cast<uint32_t>(i);
+    data[i].batch_id = 0;
   }
 }
 
@@ -134,10 +132,15 @@ void RenderScene::FillInstanceArray(GPUInstance* data, MeshPass& pass) {
   size_t data_idx = 0;
   for (size_t i = 0; i < pass.indirect_batches.size(); ++i) {
     const IndirectBatch& batch = pass.indirect_batches[i];
+    DrawMesh* mesh = GetMesh(batch.mesh_id);
     for (size_t j = 0; j < batch.count; ++j) {
       data[data_idx].object_id =
           pass.Get(pass.batches[j + batch.first].object)->original.handle;
       data[data_idx].batch_id = static_cast<uint32_t>(i);
+      data[data_idx].multibatch_id = batch.multibatch;
+      data[data_idx].first_index = mesh->first_index;
+      data[data_idx].index_count = mesh->index_count;
+      data[data_idx].vertex_offset = mesh->first_vertex;
       ++data_idx;
     }
   }
@@ -200,11 +203,6 @@ void RenderScene::BuildIndirectBatches(MeshPass* pass,
 
     bool same_mesh = obj->mesh_id.handle == back->mesh_id.handle;
     bool same_material = obj->material == back->material;
-    
-    if (!same_material || !same_mesh) {
-      new_batch.material = obj->material;
-      if (new_batch.material == back->material) same_material = true;
-    }
 
     if (same_mesh && same_material) {
       ++back->count;
@@ -212,6 +210,7 @@ void RenderScene::BuildIndirectBatches(MeshPass* pass,
       new_batch.first = static_cast<uint32_t>(i);
       new_batch.count = 1;
       new_batch.mesh_id = obj->mesh_id;
+      new_batch.material = obj->material;
       out_batches.push_back(new_batch);
       back = &out_batches.back();
     }
@@ -403,13 +402,20 @@ void RenderScene::RefreshPass(MeshPass* pass) {
         join_batch->material.shader_pass == batch->material.shader_pass)
       same_material = true;
 
+    pass->indirect_batches[new_batch.first].multibatch =
+        pass->multibatches.size();
     if (compatible_mesh && same_material) {
       ++new_batch.count;
+      batch->multibatch = join_batch->multibatch;
     } else {
       pass->multibatches.push_back(new_batch);
       new_batch.first = static_cast<uint32_t>(i);
       new_batch.count = 1;
     }
+  }
+  if (pass->indirect_batches.size() > 0) {
+    pass->indirect_batches[new_batch.first].multibatch =
+        pass->multibatches.size();
   }
   pass->multibatches.push_back(new_batch);
 }

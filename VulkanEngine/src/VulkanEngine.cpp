@@ -1194,7 +1194,7 @@ void VulkanEngine::Draw() {
 
       ExecuteCull(command_buffer, render_scene_.shadow_pass, shadow_cull);
     }
-
+    
     vkCmdPipelineBarrier(command_buffer.Get(),
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr,
@@ -1205,8 +1205,7 @@ void VulkanEngine::Draw() {
 
     DrawForward(command_buffer, render_scene_.forward_pass);
 
-    if (forward_cull.occlusion_cull)
-      ReduceDepth(command_buffer);
+    if (forward_cull.occlusion_cull) ReduceDepth(command_buffer);
 
     CopyRenderToSwapchain(command_buffer, image_index);
   }
@@ -1372,8 +1371,8 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
     for (size_t i = 0; i < 3; ++i) {
       Renderer::RenderScene::MeshPass& pass = *passes[i];
 
-      uint32_t count_size =
-          static_cast<uint32_t>(pass.multibatches.size() * sizeof(uint32_t));
+      uint32_t count_size = static_cast<uint32_t>(
+          pass.multibatches.size() * sizeof(uint32_t) + sizeof(uint32_t));
       if (pass.count_buffer.GetSize() < count_size) {
         frame.deletion_queue.PushFunction(std::bind(
             &Renderer::Buffer<false>::Destroy, pass.count_buffer));
@@ -1452,7 +1451,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
         }
         pass->clear_count_buffer.Create(
             allocator_,
-            sizeof(uint32_t) * pass->multibatches.size(),
+            sizeof(uint32_t) * pass->multibatches.size() + sizeof(uint32_t),
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -1591,7 +1590,7 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
   cull_data.frustum[1] = frustum_x.z;
   cull_data.frustum[2] = frustum_y.y;
   cull_data.frustum[3] = frustum_y.z;
-  cull_data.draw_count = static_cast<uint32_t>(pass.batches.size());
+  cull_data.max_draw_count = static_cast<uint32_t>(pass.batches.size());
   cull_data.culling_enabled = params.frustum_cull;
   cull_data.occlusion_enabled = params.occlusion_cull;
   cull_data.pyramid_width = static_cast<float>(depth_pyramid_width_);
@@ -1854,14 +1853,10 @@ void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
         vkCmdDraw(command_buffer.Get(), draw_mesh->GetVerticesCount(),
                   instance.count, 0, instance.first);
       } else {
-        /*vkCmdDrawIndexedIndirectCount(
+        vkCmdDrawIndexedIndirectCount(
             command_buffer.Get(), pass.draw_indirect_buffer.Get(),
             multibatch.first * sizeof(Renderer::GPUIndirectObject),
-            pass.count_buffer.Get(), multibatch.first * sizeof(uint32_t),
-            multibatch.count, sizeof(Renderer::GPUIndirectObject));*/
-        vkCmdDrawIndexedIndirect(
-            command_buffer.Get(), pass.draw_indirect_buffer.Get(),
-            multibatch.first * sizeof(Renderer::GPUIndirectObject),
+            pass.count_buffer.Get(), i * sizeof(uint32_t),
             multibatch.count, sizeof(Renderer::GPUIndirectObject));
       }
 

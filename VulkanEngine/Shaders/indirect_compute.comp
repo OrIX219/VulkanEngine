@@ -8,7 +8,7 @@ struct DrawCullData {
 	float frustum[4];
 	float pyramidWidth, pyramidHeight;
 
-	uint drawCount;
+	uint maxDrawCount;
 
 	int cullingEnabled;
 	int occlusionEnabled;
@@ -47,6 +47,10 @@ layout(set = 0, binding = 1)  buffer InstanceBuffer {
 struct GPUInstance {
 	uint objectID;
 	uint batchID;
+	uint multibatchID;
+	uint firstIndex;
+	uint indexCount;
+	int vertexOffset;
 };
 
 layout(set = 0, binding = 2) readonly buffer InstanceBuffer2 {
@@ -60,6 +64,7 @@ layout(set = 0, binding = 3)  buffer InstanceBuffer3 {
 layout(set = 0, binding = 4) uniform sampler2D depthPyramid;
 
 layout(set = 0, binding = 5) buffer CountBuffer {
+	uint totalCount;
 	uint counts[];
 } finalCountBuffer;
 
@@ -123,14 +128,19 @@ bool isVisible(uint objectIndex) {
 
 void main() {
 	uint gid = gl_GlobalInvocationID.x;
-	if (gid < cullData.drawCount) {
+	if (gid < cullData.maxDrawCount) {
 		uint objectId = instanceBuffer.instances[gid].objectID;
 		if (isVisible(objectId)) {
-			uint batchIndex = instanceBuffer.instances[gid].batchID;
-			atomicAdd(finalCountBuffer.counts[batchIndex], 1);
-			uint countIndex = atomicAdd(drawBuffer.draws[batchIndex].instanceCount, 1);
-			uint instanceIndex = drawBuffer.draws[batchIndex].firstInstance + countIndex;
-			finalInstanceBuffer.ids[instanceIndex] = objectId;
+			uint multibatchIndex = instanceBuffer.instances[gid].multibatchID;
+			atomicAdd(finalCountBuffer.counts[multibatchIndex], 1);
+			uint drawIndex = atomicAdd(finalCountBuffer.totalCount, 1);
+			drawBuffer.draws[drawIndex].instanceCount = 1;
+			drawBuffer.draws[drawIndex].firstInstance = gid;
+			drawBuffer.draws[drawIndex].firstIndex = instanceBuffer.instances[gid].firstIndex;
+			drawBuffer.draws[drawIndex].indexCount = instanceBuffer.instances[gid].indexCount;
+			drawBuffer.draws[drawIndex].vertexOffset = instanceBuffer.instances[gid].vertexOffset;
+			drawBuffer.draws[drawIndex].objectID = instanceBuffer.instances[gid].objectID;
+			finalInstanceBuffer.ids[gid] = objectId;
 		}
 	}
 }

@@ -77,7 +77,7 @@ struct DrawCullData {
   float frustum[4];
   float pyramid_width, pyramid_height;
 
-  uint32_t draw_count;
+  uint32_t max_draw_count;
 
   int culling_enabled;
   int occlusion_enabled;
