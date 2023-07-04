@@ -1170,36 +1170,25 @@ void VulkanEngine::Draw() {
     forward_cull.draw_dist =
         *CVarSystem::Get()->GetFloatCVar("culling.distance");
 
+    Renderer::CullParams shadow_cull;
+    shadow_cull.frustum_cull = false;
+    shadow_cull.occlusion_cull = false;
+
     {
       Renderer::VulkanScopeTimer timer2(command_buffer, &profiler_,
-                                       "Forward Cull");
+                                       "Culling");
 
       ExecuteCull(command_buffer, render_scene_.forward_pass, forward_cull);
       ExecuteCull(command_buffer, render_scene_.transparent_pass, forward_cull);
-    }
-
-    Renderer::CullParams shadow_cull;
-    shadow_cull.view_mat = main_light_.GetView();
-    shadow_cull.proj_mat = main_light_.GetProjection();
-    shadow_cull.frustum_cull =
-        *CVarSystem::Get()->GetIntCVar("culling.enable");
-    shadow_cull.occlusion_cull =
-        *CVarSystem::Get()->GetIntCVar("culling.occlusion_culling");
-    shadow_cull.draw_dist =
-        *CVarSystem::Get()->GetFloatCVar("culling.distance");
-
-    {
-      Renderer::VulkanScopeTimer timer2(command_buffer, &profiler_,
-                                        "Shadow Cull");
 
       ExecuteCull(command_buffer, render_scene_.shadow_pass, shadow_cull);
-    }
     
-    vkCmdPipelineBarrier(command_buffer.Get(),
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr,
-                         static_cast<uint32_t>(post_cull_barriers_.size()),
-                         post_cull_barriers_.data(), 0, nullptr);
+      vkCmdPipelineBarrier(command_buffer.Get(),
+                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 0, nullptr,
+                           static_cast<uint32_t>(post_cull_barriers_.size()),
+                           post_cull_barriers_.data(), 0, nullptr);
+    }
 
     DrawShadows(command_buffer, render_scene_.shadow_pass);
 
@@ -1709,7 +1698,7 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer,
                     VK_SHADER_STAGE_VERTEX_BIT)
         .Build(object_set);
 
-    vkCmdSetDepthBias(command_buffer.Get(), 0.5f, 0, 1.2f);
+    vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0, 1.2f);
 
     std::vector<uint32_t> dynamic_offsets;
     dynamic_offsets.push_back(scene_offset);
