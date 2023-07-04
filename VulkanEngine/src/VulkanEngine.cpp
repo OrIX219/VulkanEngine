@@ -1372,7 +1372,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
       Renderer::RenderScene::MeshPass& pass = *passes[i];
 
       uint32_t count_size = static_cast<uint32_t>(
-          pass.multibatches.size() * sizeof(uint32_t) + sizeof(uint32_t));
+          pass.multibatches.size() * sizeof(uint32_t));
       if (pass.count_buffer.GetSize() < count_size) {
         frame.deletion_queue.PushFunction(std::bind(
             &Renderer::Buffer<false>::Destroy, pass.count_buffer));
@@ -1415,6 +1415,16 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
             VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
       }
+
+      uint32_t multibatches_size = static_cast<uint32_t>(
+          pass.multibatches.size() * sizeof(Renderer::RenderScene::Multibatch));
+      if (pass.multibatches_buffer.GetSize() < multibatches_size) {
+        frame.deletion_queue.PushFunction(std::bind(
+            &Renderer::Buffer<false>::Destroy, pass.multibatches_buffer));
+        pass.multibatches_buffer.Create(allocator_, multibatches_size,
+                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+      }
     }
 
     std::vector<std::future<void>> async_calls;
@@ -1440,7 +1450,6 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
         Renderer::GPUIndirectObject* indirect =
             pass->clear_indirect_buffer
                 .GetMappedMemory<Renderer::GPUIndirectObject>();
-
         async_calls.push_back(std::async(std::launch::async, [=]() {
           scene->FillIndirectArray(indirect, *pass);
         }));
@@ -1451,7 +1460,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
         }
         pass->clear_count_buffer.Create(
             allocator_,
-            sizeof(uint32_t) * pass->multibatches.size() + sizeof(uint32_t),
+            sizeof(uint32_t) * pass->multibatches.size(),
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -1460,34 +1469,46 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
         async_calls.push_back(std::async(
             std::launch::async, [=]() { scene->ClearCountArray(*pass); }));
 
+        if (pass->clear_multibatches_buffer.Get() != VK_NULL_HANDLE) {
+          frame.deletion_queue.PushFunction(std::bind(&Renderer::Buffer<true>::Destroy,
+                        pass->clear_multibatches_buffer));
+        }
+        pass->clear_multibatches_buffer.Create(
+            allocator_,
+            pass->multibatches.size() *
+                sizeof(Renderer::RenderScene::Multibatch),
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+        Renderer::RenderScene::Multibatch* multibatch =
+            pass->clear_multibatches_buffer
+                .GetMappedMemory<Renderer::RenderScene::Multibatch>();
+        async_calls.push_back(std::async(std::launch::async, [=]() {
+          scene->FillMultibatchesArray(multibatch, *pass);
+        }));
+
         pass->needs_indirect_refresh = false;
       }
 
       if (pass->needs_instance_refresh && pass->batches.size() > 0) {
-        Renderer::Buffer<true> staging;
-        staging.Create(
+        Renderer::Buffer<true> instance_staging;
+        instance_staging.Create(
             allocator_, sizeof(Renderer::GPUInstance) * pass->batches.size(),
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
         frame.deletion_queue.PushFunction(
-            std::bind(&Renderer::Buffer<true>::Destroy, staging));
+            std::bind(&Renderer::Buffer<true>::Destroy, instance_staging));
 
         Renderer::GPUInstance* instance =
-            staging.GetMappedMemory<Renderer::GPUInstance>();
+            instance_staging.GetMappedMemory<Renderer::GPUInstance>();
 
         async_calls.push_back(std::async(std::launch::async, [=]() {
           scene->FillInstanceArray(instance, *pass);
         }));
 
-        staging.CopyTo(command_buffer, pass->pass_objects_buffer);
-
-        Renderer::BufferMemoryBarrier barrier(
-            pass->pass_objects_buffer,
-            device_.GetQueueFamilies().graphics_family.value());
-        barrier.SetSrcAccessMask(VK_ACCESS_TRANSFER_WRITE_BIT);
-        barrier.SetDstAccessMask(VK_ACCESS_SHADER_WRITE_BIT |
-                                 VK_ACCESS_SHADER_READ_BIT);
+        instance_staging.CopyTo(command_buffer, pass->pass_objects_buffer);
 
         upload_barriers_.push_back(barrier.Get());
 
@@ -1515,6 +1536,9 @@ void VulkanEngine::ReadyCullData(Renderer::CommandBuffer command_buffer,
 
   pass.clear_count_buffer.CopyTo(command_buffer, pass.count_buffer);
 
+  pass.clear_multibatches_buffer.CopyTo(command_buffer,
+                                        pass.multibatches_buffer);
+
   Renderer::BufferMemoryBarrier barrier(
       pass.draw_indirect_buffer,
       device_.GetQueueFamilies().graphics_family.value());
@@ -1524,6 +1548,9 @@ void VulkanEngine::ReadyCullData(Renderer::CommandBuffer command_buffer,
   pre_cull_barriers_.push_back(barrier.Get());
 
   barrier.SetBuffer(pass.count_buffer);
+  pre_cull_barriers_.push_back(barrier.Get());
+
+  barrier.SetBuffer(pass.multibatches_buffer);
   pre_cull_barriers_.push_back(barrier.Get());
 }
 
@@ -1542,6 +1569,9 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
 
   VkDescriptorBufferInfo instance_info =
       pass.pass_objects_buffer.GetDescriptorInfo();
+
+  VkDescriptorBufferInfo multibach_info =
+      pass.multibatches_buffer.GetDescriptorInfo();
 
   VkDescriptorBufferInfo final_info =
       pass.compacted_instance_buffer.GetDescriptorInfo();
@@ -1567,6 +1597,8 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
       .BindImage(4, &depth_pyramid, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                  VK_SHADER_STAGE_COMPUTE_BIT)
       .BindBuffer(5, &count_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                  VK_SHADER_STAGE_COMPUTE_BIT)
+      .BindBuffer(6, &multibach_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                   VK_SHADER_STAGE_COMPUTE_BIT)
       .Build(compute_set);
 
@@ -1898,7 +1930,7 @@ void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
           vkCmdDrawIndexedIndirectCount(
               command_buffer.Get(), pass.draw_indirect_buffer.Get(),
               multibatch.first * sizeof(Renderer::GPUIndirectObject),
-              pass.count_buffer.Get(), multibatch.first * sizeof(uint32_t),
+              pass.count_buffer.Get(), i * sizeof(uint32_t),
               multibatch.count, sizeof(Renderer::GPUIndirectObject));
         }
       }

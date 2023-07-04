@@ -28,8 +28,6 @@ struct GPUObjectData;
 
 struct GPUIndirectObject {
   VkDrawIndexedIndirectCommand command;
-  uint32_t object_id;
-  uint32_t batch_id;
 };
 
 struct DrawMesh {
@@ -57,7 +55,6 @@ struct SceneObject {
 
 struct GPUInstance {
   uint32_t object_id;
-  uint32_t batch_id;
   uint32_t multibatch_id;
   uint32_t first_index;
   uint32_t index_count;
@@ -113,6 +110,8 @@ class RenderScene {
       compacted_instance_buffer.Destroy();
       draw_indirect_buffer.Destroy();
       pass_objects_buffer.Destroy();
+      clear_multibatches_buffer.Destroy();
+      multibatches_buffer.Destroy();
     }
 
     std::vector<Multibatch> multibatches;
@@ -127,6 +126,8 @@ class RenderScene {
     Buffer<false> count_buffer;
     Buffer<false> compacted_instance_buffer;
     Buffer<false> pass_objects_buffer;
+    Buffer<true> clear_multibatches_buffer;
+    Buffer<false> multibatches_buffer;
 
     Buffer<true> clear_indirect_buffer;
     Buffer<false> draw_indirect_buffer;
@@ -153,6 +154,7 @@ class RenderScene {
   void FillObjectData(GPUObjectData* data);
   void FillIndirectArray(GPUIndirectObject* data, MeshPass& pass);
   void FillInstanceArray(GPUInstance* data, MeshPass& pass);
+  void FillMultibatchesArray(Multibatch* data, MeshPass& pass);
   void ClearCountArray(MeshPass& pass);
 
   void WriteObject(GPUObjectData* target, Handle<SceneObject> object_id);

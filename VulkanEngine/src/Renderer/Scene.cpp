@@ -123,8 +123,6 @@ void RenderScene::FillIndirectArray(GPUIndirectObject* data, MeshPass& pass) {
     data[i].command.firstIndex = 0;
     data[i].command.vertexOffset = 0;
     data[i].command.indexCount = 0;
-    data[i].object_id = 0;
-    data[i].batch_id = 0;
   }
 }
 
@@ -136,13 +134,19 @@ void RenderScene::FillInstanceArray(GPUInstance* data, MeshPass& pass) {
     for (size_t j = 0; j < batch.count; ++j) {
       data[data_idx].object_id =
           pass.Get(pass.batches[j + batch.first].object)->original.handle;
-      data[data_idx].batch_id = static_cast<uint32_t>(i);
       data[data_idx].multibatch_id = batch.multibatch;
       data[data_idx].first_index = mesh->first_index;
       data[data_idx].index_count = mesh->index_count;
       data[data_idx].vertex_offset = mesh->first_vertex;
       ++data_idx;
     }
+  }
+}
+
+void RenderScene::FillMultibatchesArray(Multibatch* data, MeshPass& pass) {
+  for (size_t i = 0; i < pass.multibatches.size(); ++i) {
+    data[i].first = pass.multibatches[i].first;
+    data[i].count = 0;
   }
 }
 

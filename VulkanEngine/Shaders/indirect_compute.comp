@@ -36,8 +36,6 @@ struct DrawCommand {
     uint firstIndex;
     int  vertexOffset;
     uint firstInstance;
-	uint objectID;
-	uint batchID;
 };
 
 layout(set = 0, binding = 1)  buffer InstanceBuffer {
@@ -46,7 +44,6 @@ layout(set = 0, binding = 1)  buffer InstanceBuffer {
 
 struct GPUInstance {
 	uint objectID;
-	uint batchID;
 	uint multibatchID;
 	uint firstIndex;
 	uint indexCount;
@@ -64,9 +61,17 @@ layout(set = 0, binding = 3)  buffer InstanceBuffer3 {
 layout(set = 0, binding = 4) uniform sampler2D depthPyramid;
 
 layout(set = 0, binding = 5) buffer CountBuffer {
-	uint totalCount;
 	uint counts[];
 } finalCountBuffer;
+
+struct Multibatch {
+	uint first;
+	uint count;
+};
+
+layout(set = 0, binding = 6) buffer MultibatchBuffer {
+	Multibatch multibatches[];
+} multibatchBuffer;
 
 bool projectSphere(vec3 C, float r, float znear, float P00, float P11, out vec4 aabb) {
 	if (C.z < r + znear) return false;
@@ -132,14 +137,14 @@ void main() {
 		uint objectId = instanceBuffer.instances[gid].objectID;
 		if (isVisible(objectId)) {
 			uint multibatchIndex = instanceBuffer.instances[gid].multibatchID;
+			uint first = multibatchBuffer.multibatches[multibatchIndex].first;
 			atomicAdd(finalCountBuffer.counts[multibatchIndex], 1);
-			uint drawIndex = atomicAdd(finalCountBuffer.totalCount, 1);
+			uint drawIndex = first + atomicAdd(multibatchBuffer.multibatches[multibatchIndex].count, 1);
 			drawBuffer.draws[drawIndex].instanceCount = 1;
 			drawBuffer.draws[drawIndex].firstInstance = gid;
 			drawBuffer.draws[drawIndex].firstIndex = instanceBuffer.instances[gid].firstIndex;
 			drawBuffer.draws[drawIndex].indexCount = instanceBuffer.instances[gid].indexCount;
 			drawBuffer.draws[drawIndex].vertexOffset = instanceBuffer.instances[gid].vertexOffset;
-			drawBuffer.draws[drawIndex].objectID = instanceBuffer.instances[gid].objectID;
 			finalInstanceBuffer.ids[gid] = objectId;
 		}
 	}
