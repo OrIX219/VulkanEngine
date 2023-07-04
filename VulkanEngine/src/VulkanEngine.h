@@ -101,7 +101,7 @@ struct DirectionalLight {
 
   glm::mat4 GetProjection() const {
     return glm::ortho(-shadow_extent.x, shadow_extent.x, -shadow_extent.y,
-                      shadow_extent.y, -shadow_extent.z, shadow_extent.z);
+                      shadow_extent.y, -shadow_extent.z * 3, shadow_extent.z);
   }
 };
 

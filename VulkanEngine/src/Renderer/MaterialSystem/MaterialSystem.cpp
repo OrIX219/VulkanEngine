@@ -75,6 +75,8 @@ void MaterialSystem::BuildDefaultTemplates() {
 
   FillBuilders();
 
+  ShaderEffect* default_effect =
+      BuildEffect("default.vert.spv", "default.frag.spv");
   ShaderEffect* textured_lit =
       BuildEffect("mesh_instanced.vert.spv", "textured_lit.frag.spv");
   ShaderEffect* default_lit =
@@ -86,6 +88,10 @@ void MaterialSystem::BuildDefaultTemplates() {
   ShaderEffect* skybox =
       BuildEffect("skybox.vert.spv", "skybox.frag.spv");
 
+  ShaderPass* default_pass = BuildShader(
+      system.engine_->forward_pass_, system.forward_builder_, default_effect);
+  ShaderPass* default_wireframe_pass = BuildShader(
+      system.engine_->forward_pass_, system.wireframe_builder_, default_effect);
   ShaderPass* textured_lit_pass = BuildShader(
       system.engine_->forward_pass_, system.forward_builder_, textured_lit);
   ShaderPass* default_lit_pass = BuildShader(
@@ -97,6 +103,27 @@ void MaterialSystem::BuildDefaultTemplates() {
   ShaderPass* skybox_pass = BuildShader(system.engine_->forward_pass_,
                                         system.skybox_builder_, skybox);
 
+  {
+    EffectTemplate default_template;
+    default_template.pass_shaders[MeshPassType::kForward] = default_pass;
+    default_template.pass_shaders[MeshPassType::kTransparency] = nullptr;
+    default_template.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+
+    default_template.transparency = Assets::TransparencyMode::kOpaque;
+
+    system.template_cache_["default"] = default_template;
+  }
+  {
+    EffectTemplate default_wireframe;
+    default_wireframe.pass_shaders[MeshPassType::kForward] =
+        default_wireframe_pass;
+    default_wireframe.pass_shaders[MeshPassType::kTransparency] = nullptr;
+    default_wireframe.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+
+    default_wireframe.transparency = Assets::TransparencyMode::kOpaque;
+
+    system.template_cache_["default_wireframe"] = default_wireframe;
+  }
   {
     EffectTemplate default_textured;
     default_textured.pass_shaders[MeshPassType::kForward] = textured_lit_pass;
@@ -240,6 +267,14 @@ Material* MaterialSystem::GetMaterial(const std::string& name) {
 
 void MaterialSystem::FillBuilders() {
   MaterialSystem& system = Get();
+
+  system.wireframe_builder_ = PipelineBuilder::Begin(&system.engine_->device_);
+  system.wireframe_builder_.SetDefaults()
+      .SetVertexInputDescription(Vertex::GetDescription())
+      .SetRasterizer(VK_POLYGON_MODE_LINE, 1.f, VK_CULL_MODE_NONE,
+                     VK_FRONT_FACE_COUNTER_CLOCKWISE)
+      .SetDepthStencil()
+      .SetMultisampling(system.engine_->samples_, VK_TRUE);
 
   system.forward_builder_ = PipelineBuilder::Begin(&system.engine_->device_);
   system.forward_builder_.SetDefaults()

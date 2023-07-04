@@ -32,7 +32,7 @@ float CalcShadow(vec4 fragPos) {
 	vec3 projCoords = fragPos.xyz / fragPos.w;
 	projCoords.xy = projCoords.xy * 0.5 + 0.5;
 
-	if (projCoords.z <= -1) return 1;
+	if (projCoords.z >= 1) return 1;
 
 	vec3 lightDir = normalize(-sceneData.sunlightDirection.xyz);
 	float bias = max(0.0001, 0.001 * (1.0 - dot(inNormal, lightDir)));

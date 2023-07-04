@@ -300,5 +300,7 @@
     <None Include="Shaders\axes.geom" />
     <None Include="Shaders\axes.frag" />
     <None Include="Shaders\shadowcast.frag" />
+    <None Include="Shaders\default.vert" />
+    <None Include="Shaders\default.frag" />
   </ItemGroup>
 </Project>

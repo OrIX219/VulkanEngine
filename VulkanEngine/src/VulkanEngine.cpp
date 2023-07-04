@@ -239,15 +239,16 @@ void VulkanEngine::InitCVars() {
                                  CVarFlagBits::kEditCheckbox);
 
   AutoCVar_Vec4 CVar_clear_color("scene.clear_color", "Background color",
-                                 {0.f, 0.f, 0.f, 1.f});
-  AutoCVar_Vec4 CVar_ambient_light("scene.ambient_light",
-                                   "Ambient light color (xyz) and power (w)",
-                                   {1.f, 1.f, 1.f, 0.1f});
-  AutoCVar_Vec4 CVar_sunlight_dir("scene.sunlight_dir", "Sunlight direction",
-                                  {1.f, 1.f, 1.f, 1.f});
-  AutoCVar_Vec4 CVar_sunlight_color("scene.sunlight_color",
-                                    "Sunlight color (xyz) and power (w)",
-                                    {1.f, 1.f, 1.f, 1.f});
+                                 {0.f, 0.f, 0.f, 1.f},
+                                 CVarFlagBits::kEditColor);
+  AutoCVar_Vec4 CVar_ambient_light(
+      "scene.ambient_light", "Ambient light color (xyz) and power (w)",
+      {1.f, 1.f, 1.f, 0.1f}, CVarFlagBits::kEditColor);
+  AutoCVar_Vec3 CVar_sunlight_dir("scene.sunlight_dir", "Sunlight direction",
+                                  {-1.f, 1.f, -1.f});
+  AutoCVar_Vec4 CVar_sunlight_color(
+      "scene.sunlight_color", "Sunlight color (xyz) and power (w)",
+      {1.f, 1.f, 1.f, 1.f}, CVarFlagBits::kEditColor);
 
   AutoCVar_Int CVar_cull_enable("culling.enable", "Enable culling", 1,
                                 CVarFlagBits::kEditCheckbox);
@@ -868,7 +869,7 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 
 void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   main_light_.SetDirection(
-      -*CVarSystem::Get()->GetVec4CVar("scene.sunlight_dir"));
+      -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"));
   main_light_.position = glm::vec3(2.f, 4.f, 1.f);
   main_light_.shadow_extent = glm::vec3(32, 32, 32);
 
@@ -885,6 +886,10 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   LoadTexture(command_buffer, "white", AssetPath("white.tx").c_str());
   skybox_texture_.LoadFromDirectory(allocator_, &device_, command_buffer,
                                     AssetPath("skybox").c_str());
+
+  Renderer::MaterialData wireframe_info;
+  wireframe_info.base_template = "default_wireframe";
+  Renderer::MaterialSystem::BuildMaterial("wireframe", wireframe_info);
 
   Renderer::SampledTexture white_texture;
   white_texture.sampler = texture_sampler_.Get();
@@ -909,7 +914,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   skybox_info.textures.push_back(skybox_texture);
   Renderer::MaterialSystem::BuildMaterial("skybox", skybox_info);
 
-  LoadMesh(command_buffer, "skybox", AssetPath("cube.mesh").c_str());
+  LoadMesh(command_buffer, "cube", AssetPath("cube.mesh").c_str());
 
   LoadPrefab(command_buffer, AssetPath("Test.pfb").c_str());
 
@@ -1955,7 +1960,7 @@ void VulkanEngine::DrawSkybox(Renderer::CommandBuffer command_buffer,
   vkCmdBindDescriptorSets(command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline.GetLayout(), 1, 1, &skybox_set, 0, nullptr);
 
-  Renderer::Mesh* cube = GetMesh("skybox");
+  Renderer::Mesh* cube = GetMesh("cube");
   cube->BindBuffers(command_buffer);
   vkCmdDrawIndexed(command_buffer.Get(), cube->GetIndicesCount(), 1, 0, 0, 0);
 }
@@ -2199,7 +2204,7 @@ void VulkanEngine::Run() {
     ProcessInput();
 
     main_light_.SetDirection(
-        -*CVarSystem::Get()->GetVec4CVar("scene.sunlight_dir"));
+        -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"));
     main_light_.color = *CVarSystem::Get()->GetVec4CVar("scene.sunlight_color");
 
     ImGui_ImplVulkan_NewFrame();

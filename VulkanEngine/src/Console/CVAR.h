@@ -16,7 +16,8 @@ enum : uint32_t {
   kAdvanced = 1 << 3,
 
   kEditCheckbox = 1 << 8,
-  kEditFloatDrag = 1 << 9
+  kEditFloatDrag = 1 << 9,
+  kEditColor = 1 << 10
 };
 }
 using CVarFlags = uint32_t;

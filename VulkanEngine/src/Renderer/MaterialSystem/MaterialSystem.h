@@ -99,6 +99,7 @@ class MaterialSystem {
     size_t operator()(const MaterialData& data) const { return data.hash(); }
   };
 
+  PipelineBuilder wireframe_builder_;
   PipelineBuilder forward_builder_;
   PipelineBuilder shadow_builder_;
   PipelineBuilder skybox_builder_;

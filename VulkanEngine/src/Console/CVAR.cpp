@@ -317,6 +317,7 @@ void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
   const bool readonly_flag = (p->flags & CVarFlagBits::kEditReadOnly);
   const bool checkbox_flag = (p->flags & CVarFlagBits::kEditCheckbox);
   const bool drag_flag = (p->flags & CVarFlagBits::kEditFloatDrag);
+  const bool color_flag = (p->flags & CVarFlagBits::kEditColor);
 
   switch (p->type) {
     case CVarType::kInt:
@@ -385,38 +386,68 @@ void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
       ImGui::PopID();
       break;
     case CVarType::kVec4:
+      ImGui::PushID(p->name.c_str());
       if (readonly_flag) {
         Label(p->name.c_str(), text_width);
-        ImGui::ColorEdit4(
-            "vec4##",
-            reinterpret_cast<float*>(
-                GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)),
-            ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoInputs);
+        if (color_flag) {
+          ImGui::ColorEdit4(
+              "",
+              reinterpret_cast<float*>(
+                  GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)),
+              ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoInputs);
+        } else {
+          ImGui::DragFloat4("", reinterpret_cast<float*>(
+                  GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)),
+              1.f, 0.f, 0.f, "%.3", ImGuiSliderFlags_NoInput);
+        }
       } else {
-        ImGui::PushID(p->name.c_str());
         Label(p->name.c_str(), text_width);
-        ImGui::ColorEdit4(
-            "", reinterpret_cast<float*>(
-                    GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)));
-        ImGui::PopID();
+        if (color_flag) {
+          ImGui::ColorEdit4(
+              "", reinterpret_cast<float*>(
+                      GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)));
+        } else {
+          ImGui::DragFloat4(
+              "",
+              reinterpret_cast<float*>(
+                  GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)),
+              0.1f);
+        }
       }
+      ImGui::PopID();
       break;
     case CVarType::kVec3:
+      ImGui::PushID(p->name.c_str());
       if (readonly_flag) {
         Label(p->name.c_str(), text_width);
-        ImGui::ColorEdit3(
-            "vec3##",
-            reinterpret_cast<float*>(
-                GetCVarArray<Vec3>()->GetCurrentPtr(p->array_index)),
-            ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoInputs);
+        if (color_flag) {
+          ImGui::ColorEdit3(
+              "",
+              reinterpret_cast<float*>(
+                  GetCVarArray<Vec3>()->GetCurrentPtr(p->array_index)),
+              ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoInputs);
+        } else {
+          ImGui::DragFloat3(
+              "",
+              reinterpret_cast<float*>(
+                  GetCVarArray<Vec3>()->GetCurrentPtr(p->array_index)),
+              1.f, 0.f, 0.f, "%.3", ImGuiSliderFlags_NoInput);
+        }
       } else {
-        ImGui::PushID(p->name.c_str());
         Label(p->name.c_str(), text_width);
-        ImGui::ColorEdit3(
-            "", reinterpret_cast<float*>(
-                    GetCVarArray<Vec3>()->GetCurrentPtr(p->array_index)));
-        ImGui::PopID();
+        if (color_flag) {
+          ImGui::ColorEdit3(
+              "", reinterpret_cast<float*>(
+                      GetCVarArray<Vec3>()->GetCurrentPtr(p->array_index)));
+        } else {
+          ImGui::DragFloat3(
+              "",
+              reinterpret_cast<float*>(
+                  GetCVarArray<Vec3>()->GetCurrentPtr(p->array_index)),
+              0.1f);
+        }
       }
+      ImGui::PopID();
       break;
     case CVarType::kVec2:
       ImGui::PushID(p->name.c_str());
@@ -432,7 +463,7 @@ void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
         ImGui::DragFloat2(
             "",
             reinterpret_cast<float*>(
-                GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)));
+                GetCVarArray<Vec4>()->GetCurrentPtr(p->array_index)), 0.1f);
       }
       ImGui::PopID();
       break;
