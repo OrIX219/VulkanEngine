@@ -10,6 +10,7 @@
 #include "Descriptors.h"
 #include "Framebuffer.h"
 #include "Image.h"
+#include "Light.h"
 #include "LogicalDevice.h"
 #include "MaterialSystem.h"
 #include "Mesh.h"
@@ -34,26 +35,24 @@
 #define VMA_VULKAN_VERSION 1002000
 #include <vma\include\vk_mem_alloc.h>
 
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_FORCE_LEFT_HANDED
-#include <glm/glm.hpp>
-#include <glm/gtx/transform.hpp>
-
 namespace Renderer {
+
 struct GPUCameraData {
   glm::mat4 view;
   glm::mat4 projection;
   alignas(16) glm::vec3 pos;
 };
 
+constexpr uint32_t kMaxPointLights = 16;
+
 struct GPUSceneData {
   GPUCameraData camera_data;
   glm::vec4 ambient_color;
   glm::vec4 fog_color;
   glm::vec4 fog_distances;
-  glm::vec4 sunlight_direction;
-  glm::vec4 sunlight_color;
-  glm::mat4 sunlight_shadow_mat;
+  GPUDirectionalLight sunlight;
+  uint32_t point_lights_count;
+  GPUPointLight point_lights[kMaxPointLights];
 };
 
 struct GPUObjectData {
@@ -82,27 +81,6 @@ struct DrawCullData {
   int culling_enabled;
   int occlusion_enabled;
   int dist_cull;
-};
-
-struct DirectionalLight {
-  glm::vec3 position;
-  glm::vec3 direction;
-  glm::vec4 color;
-  glm::vec3 shadow_extent;
-
-  void SetDirection(const glm::vec3 dir) { 
-    direction = dir;
-    if (abs(direction.x) < 0.01f && abs(direction.z) < 0.01f) direction.z = 0.01f;
-  }
-
-  glm::mat4 GetView() const {
-    return glm::lookAt(position, position + direction, glm::vec3(0, 1, 0));
-  }
-
-  glm::mat4 GetProjection() const {
-    return glm::ortho(-shadow_extent.x, shadow_extent.x, -shadow_extent.y,
-                      shadow_extent.y, -shadow_extent.z * 3, shadow_extent.z);
-  }
 };
 
 }
@@ -274,6 +252,7 @@ class VulkanEngine {
   Renderer::RenderScene render_scene_;
   Renderer::Camera camera_;
   Renderer::DirectionalLight main_light_;
+  std::vector<Renderer::PointLight> point_lights_;
   Renderer::TextureCube skybox_texture_;
 
   std::unordered_map<std::string, Renderer::Material> materials_;

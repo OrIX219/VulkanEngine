@@ -407,7 +407,7 @@ void RenderScene::RefreshPass(MeshPass* pass) {
       same_material = true;
 
     pass->indirect_batches[new_batch.first].multibatch =
-        pass->multibatches.size();
+        static_cast<uint32_t>(pass->multibatches.size());
     if (compatible_mesh && same_material) {
       ++new_batch.count;
       batch->multibatch = join_batch->multibatch;
@@ -419,7 +419,7 @@ void RenderScene::RefreshPass(MeshPass* pass) {
   }
   if (pass->indirect_batches.size() > 0) {
     pass->indirect_batches[new_batch.first].multibatch =
-        pass->multibatches.size();
+        static_cast<uint32_t>(pass->multibatches.size());
   }
   pass->multibatches.push_back(new_batch);
 }

@@ -151,6 +151,7 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\Renderer\TextureCube.h" />
+    <ClInclude Include="src\Renderer\Light.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\src\format.cc">
@@ -274,6 +275,7 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\TextureCube.cpp" />
+    <ClCompile Include="src\Renderer\Light.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\default_lit.frag">
