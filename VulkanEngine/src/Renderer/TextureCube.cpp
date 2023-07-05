@@ -45,10 +45,12 @@ bool TextureCube::LoadFromDirectory(VmaAllocator allocator,
                           file.binary_blob.size(), face_data[i]);
   }
 
-  staging_buffer_.Destroy();
-  staging_buffer_.Create(
-      allocator, full_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  if (staging_buffer_.GetSize() < full_size) {
+    staging_buffer_.Destroy();
+    staging_buffer_.Create(
+        allocator, full_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  }
 
   char* buffer_data = staging_buffer_.GetMappedMemory<char>();
   for (uint32_t i = 0; i < 6; ++i) {
@@ -69,7 +71,7 @@ bool TextureCube::LoadFromDirectory(VmaAllocator allocator,
                           VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                           VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-  staging_buffer_.CopyToImage(command_buffer, image_);
+  staging_buffer_.CopyTo(command_buffer, image_);
 
   image_.TransitionLayout(
       command_buffer, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,

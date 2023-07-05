@@ -2,7 +2,7 @@
 
 namespace Renderer {
 
-IndexBuffer::IndexBuffer() : indices_count_(0) {}
+IndexBuffer::IndexBuffer() {}
 
 IndexBuffer::IndexBuffer(VmaAllocator allocator, uint64_t size) {
   Create(allocator, size);
@@ -26,11 +26,12 @@ void IndexBuffer::Destroy() {
 
 VkBuffer IndexBuffer::Get() { return buffer_.Get(); }
 
-uint32_t IndexBuffer::GetIndicesCount() const { return indices_count_; }
+uint32_t IndexBuffer::GetIndicesCount() const {
+  return static_cast<uint32_t>(buffer_.GetSize() / sizeof(uint32_t));
+}
 
 void IndexBuffer::SetData(CommandBuffer command_buffer,
                           const std::vector<uint32_t>& indices) {
-  indices_count_ = static_cast<uint32_t>(indices.size());
   size_t data_size = sizeof(indices.at(0)) * indices.size();
 
   staging_buffer_.SetData(indices.data(), data_size);
@@ -41,7 +42,6 @@ void IndexBuffer::SetData(CommandBuffer command_buffer,
 void IndexBuffer::CopyTo(CommandBuffer command_buffer, IndexBuffer& dst,
                          VkDeviceSize offset) const {
   buffer_.CopyTo(command_buffer, dst.buffer_, offset);
-  dst.indices_count_ += indices_count_;
 }
 
 }  // namespace Renderer

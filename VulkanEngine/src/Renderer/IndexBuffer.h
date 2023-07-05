@@ -22,7 +22,6 @@ class IndexBuffer {
               VkDeviceSize offset = 0) const;
 
  private:
-  uint32_t indices_count_;
   Buffer<false> buffer_;
   Buffer<true> staging_buffer_;
 };

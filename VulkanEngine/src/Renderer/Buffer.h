@@ -100,7 +100,7 @@ class Buffer : public BufferBase {
     vkCmdCopyBuffer(command_buffer.Get(), buffer_, dst.Get(), 1, &copy_region);
   }
 
-  void CopyToImage(CommandBuffer command_buffer, Image& image) {
+  void CopyTo(CommandBuffer command_buffer, Image& image) {
     VkBufferImageCopy copy_region{};
     copy_region.bufferOffset = 0;
     copy_region.bufferRowLength = 0;

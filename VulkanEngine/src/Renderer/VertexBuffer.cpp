@@ -2,7 +2,7 @@
 
 namespace Renderer {
 
-VertexBuffer::VertexBuffer() : vertices_count_(0) {}
+VertexBuffer::VertexBuffer() {}
 
 VertexBuffer::VertexBuffer(VmaAllocator allocator, uint64_t size) {
   Create(allocator, size);
@@ -25,11 +25,12 @@ void VertexBuffer::Destroy() {
 
 VkBuffer VertexBuffer::Get() { return buffer_.Get(); }
 
-uint32_t VertexBuffer::GetVerticesCount() const { return vertices_count_; }
+uint32_t VertexBuffer::GetVerticesCount() const {
+  return static_cast<uint32_t>(buffer_.GetSize() / sizeof(Vertex));
+}
 
 void VertexBuffer::SetData(CommandBuffer command_buffer,
                            const std::vector<Vertex>& vertices) {
-  vertices_count_ = static_cast<uint32_t>(vertices.size());
   size_t data_size = sizeof(vertices.at(0)) * vertices.size();
 
   staging_buffer_.SetData(vertices.data(), data_size);
@@ -40,7 +41,6 @@ void VertexBuffer::SetData(CommandBuffer command_buffer,
 void VertexBuffer::CopyTo(CommandBuffer command_buffer, VertexBuffer& dst,
                           VkDeviceSize offset) const {
   buffer_.CopyTo(command_buffer, dst.buffer_, offset);
-  dst.vertices_count_ += vertices_count_;
 }
 
 }  // namespace Renderer

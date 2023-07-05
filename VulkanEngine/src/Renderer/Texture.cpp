@@ -27,10 +27,12 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
 
   VkDeviceSize image_size = texture_info.texture_size;
 
-  staging_buffer_.Destroy();
-  staging_buffer_.Create(
-      allocator, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  if (staging_buffer_.GetSize() < image_size) {
+    staging_buffer_.Destroy();
+    staging_buffer_.Create(
+        allocator, image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+  }
   
   Assets::UnpackTexture(&texture_info, file.binary_blob.data(),
                         file.binary_blob.size(),
@@ -50,7 +52,7 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
                           VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                           VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-  staging_buffer_.CopyToImage(command_buffer, image_);
+  staging_buffer_.CopyTo(command_buffer, image_);
 
   GenerateMipmaps(command_buffer);
 
