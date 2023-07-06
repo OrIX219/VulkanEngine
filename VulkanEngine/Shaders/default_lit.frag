@@ -15,6 +15,9 @@ struct CameraData {
 };
 
 struct DirectionalLight {
+	float ambient;
+	float diffuse;
+	float specular;
 	vec4 direction;
 	vec4 color;
 	mat4 view;
@@ -22,19 +25,33 @@ struct DirectionalLight {
 };
 
 struct PointLight {
-  vec3 position;
-  vec4 color;
-  float constant;
-  float linear;
-  float quadratic;
+	float ambient;
+	float diffuse;
+	float specular;
+	vec3 position;
+	vec4 color;
+	float constant;
+	float linear;
+	float quadratic;
+};
+
+struct SpotLight {
+	float ambient;
+	float diffuse;
+	float specular;
+	vec3 position;
+	vec3 direction;
+	vec4 color;
+	float cutOffInner;
+	float cutOffOuter;
 };
 
 layout(set = 0, binding = 0) uniform SceneData {
 	CameraData cameraData;
-	vec4 ambientColor;
 	vec4 fogColor;
 	vec4 fogDistances;
 	DirectionalLight sunlight;
+	SpotLight spotlight;
 	uint pointLightsCount;
 	PointLight pointLights[16];
 } sceneData;
@@ -66,21 +83,23 @@ float CalcShadow(vec4 fragPos) {
 }
 
 vec3 CalcDirectional() {
-	vec3 lightDir = normalize(-sceneData.sunlight.direction.xyz);
+	DirectionalLight light = sceneData.sunlight;
+	vec3 lightDir = normalize(-light.direction.xyz);
 	float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
-	vec3 lightColor = sceneData.sunlight.color.xyz * sceneData.sunlight.color.w;
+	vec3 lightColor = light.color.xyz * light.color.w;
 
 	float shadow = 0.f;
 	if (lightAngle > 0.01) shadow = CalcShadow(inShadowCoords);
 
-	vec3 diffuse = lightAngle * lightColor;
+	vec3 ambient = light.ambient * lightColor;
+
+	vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
 	vec3 viewDir = normalize(sceneData.cameraData.pos - inFragPos);
 	vec3 halfwayDir = normalize(lightDir + viewDir);
-	float spec = pow(max(0.0, dot(inNormal, halfwayDir)), 32);
-	vec3 specular = spec * lightColor;
+	vec3 specular = light.specular * pow(max(0.0, dot(inNormal, halfwayDir)), 32) * lightColor;
 
-	return (shadow * (diffuse + specular));
+	return ambient + shadow * (diffuse + specular);
 }
 
 vec3 CalcPoint() {
@@ -89,30 +108,50 @@ vec3 CalcPoint() {
 		PointLight light = sceneData.pointLights[i];
 		vec3 lightColor = light.color.xyz * light.color.w;
 
+		vec3 ambient = light.ambient * lightColor;
+
 		vec3 lightDir = normalize(light.position - inFragPos);
 		float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
-		vec3 diff = lightAngle * lightColor;
+		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
 		vec3 viewDir = normalize(sceneData.cameraData.pos - inFragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
-		float spec = pow(max(0.0, dot(inNormal, halfwayDir)), 32);
+		vec3 specular = light.specular * pow(max(0.0, dot(inNormal, halfwayDir)), 32) * lightColor;
 
 		float dist = distance(light.position, inFragPos);
 		float attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * pow(dist, 2));
-
-		vec3 diffuse = diff * attenuation;
-		vec3 specular = spec * lightColor * attenuation;
 		
-		result += (diffuse + specular);
+		result += ambient + (diffuse + specular) * attenuation;
 	}
 	return result;
 }
 
+vec3 CalcSpot() {
+	SpotLight light = sceneData.spotlight;
+	vec3 lightColor = light.color.xyz * light.color.w;
+	vec3 lightDir = normalize(light.position - inFragPos);
+	float phi = cos(radians(light.cutOffInner));
+	float gamma = cos(radians(light.cutOffOuter));
+	float theta = dot(lightDir, normalize(-light.direction));
+	float intensity = smoothstep(0.0, 1.0, (theta - gamma) / (phi - gamma));
+
+	vec3 ambient = light.ambient * lightColor;
+
+	float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
+	vec3 diffuse = light.diffuse * lightAngle * lightColor;
+
+	vec3 viewDir = normalize(sceneData.cameraData.pos - inFragPos);
+	vec3 halfwayDir = normalize(lightDir + viewDir);
+	vec3 specular = light.specular * pow(max(0.0, dot(inNormal, halfwayDir)), 32) * lightColor;;
+
+	return ambient + (diffuse + specular) * intensity;
+}
+
 void main() {
-	vec3 ambient = sceneData.ambientColor.xyz * sceneData.ambientColor.w;
 	vec3 directional = CalcDirectional();
 	vec3 point = CalcPoint();
+	vec3 spot = CalcSpot();
 
-	vec3 color = inColor * (ambient + directional + point);
+	vec3 color = inColor * (directional + point + spot);
 	outColor = vec4(color, 1.f);
 }

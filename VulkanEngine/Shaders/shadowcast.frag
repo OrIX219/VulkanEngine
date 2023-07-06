@@ -15,12 +15,31 @@ struct DirectionalLight {
 	mat4 projection;
 };
 
+struct PointLight {
+  vec3 position;
+  vec4 color;
+  float constant;
+  float linear;
+  float quadratic;
+};
+
+struct SpotLight {
+	vec3 position;
+	vec3 direction;
+	vec4 color;
+	float cutOffInner;
+	float cutOffOuter;
+};
+
 layout(set = 0, binding = 0) uniform SceneData {
 	CameraData cameraData;
 	vec4 ambientColor;
 	vec4 fogColor;
 	vec4 fogDistances;
 	DirectionalLight sunlight;
+	SpotLight spotlight;
+	uint pointLightsCount;
+	PointLight pointLights[16];
 } sceneData;
 
 void main() {

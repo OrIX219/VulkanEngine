@@ -33,6 +33,8 @@ glm::mat4 Camera::GetProjMat(bool reverse) const {
 
 const glm::vec3& Camera::GetPosition() const { return pos_; }
 
+const glm::vec3& Camera::GetDirection() const { return front_; }
+
 void Camera::ProcessKeyboard(Direction direction, float delta_time) {
   float velocity = speed_ * delta_time;
   switch (direction) {

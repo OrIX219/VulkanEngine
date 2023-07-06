@@ -241,9 +241,6 @@ void VulkanEngine::InitCVars() {
   AutoCVar_Vec4 CVar_clear_color("scene.clear_color", "Background color",
                                  {0.f, 0.f, 0.f, 1.f},
                                  CVarFlagBits::kEditColor);
-  AutoCVar_Vec4 CVar_ambient_light(
-      "scene.ambient_light", "Ambient light color (xyz) and power (w)",
-      {1.f, 1.f, 1.f, 0.01f}, CVarFlagBits::kEditColor);
   AutoCVar_Vec3 CVar_sunlight_dir("scene.sunlight_dir", "Sunlight direction",
                                   {-1.f, 1.f, -1.f});
   AutoCVar_Vec4 CVar_sunlight_color(
@@ -870,8 +867,13 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   main_light_.SetDirection(
       -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"));
-  main_light_.position = glm::vec3(0.f, 0.f, 0.f);
+  main_light_.SetPosition(glm::vec3(0.f));
   main_light_.shadow_extent = glm::vec3(32, 32, 32);
+
+  flashlight_.SetPosition(glm::vec3(0.f, 1.f, 15.f));
+  flashlight_.SetDirection(glm::vec3(0.f, -1.f, -2.f));
+  flashlight_.SetCutoff(10.f, 12.f);
+  flashlight_.SetColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
 
   point_lights_.emplace_back(glm::vec4(1.f, 0.75f, 0.25f, 1.f), 1.f, 0.09f, 0.032f);
   const glm::vec3 positions[] = {
@@ -1755,15 +1757,14 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   scene_data_.camera_data.projection = camera_.GetProjMat();
   scene_data_.camera_data.pos = camera_.GetPosition();
 
-  scene_data_.ambient_color =
-      *CVarSystem::Get()->GetVec4CVar("scene.ambient_light");
-  scene_data_.sunlight.view = main_light_.GetView();
-  scene_data_.sunlight.projection = main_light_.GetProjection();
-  scene_data_.sunlight.direction = glm::vec4(main_light_.direction, 1.f);
-  scene_data_.sunlight.color = main_light_.color;
-  point_lights_[0].SetPosition(glm::vec3(std::sin(glfwGetTime()) * 15.f, 1.f,
-                                         std::cos(glfwGetTime() * 7.5f) * 0.5f) +
-                               glm::vec3(0.f, 0.f, -3.f));
+  scene_data_.sunlight = main_light_.GetUniform();
+
+  scene_data_.spotlight = flashlight_.GetUniform();
+
+  point_lights_[0].SetPosition(
+      glm::vec3(std::sin(glfwGetTime()) * 15.f, 1.f,
+                std::cos(glfwGetTime() * 7.5f) * 0.5f) +
+      glm::vec3(0.f, 0.f, -3.f));
 
   scene_data_.point_lights_count = static_cast<uint32_t>(point_lights_.size());
   for (size_t i = 0; i < point_lights_.size(); ++i)

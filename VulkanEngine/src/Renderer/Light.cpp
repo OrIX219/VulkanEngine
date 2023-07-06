@@ -6,6 +6,29 @@
 
 namespace Renderer {
 
+Light::Light()
+    : color{1.f, 1.f, 1.f, 1.f},
+      ambient_factor(0.01f),
+      diffuse_factor(1.f),
+      specular_factor(1.f) {}
+
+Light::Light(glm::vec4 color, float ambient_factor, float diffuse_factor,
+             float specular_factor)
+    : color(color),
+      ambient_factor(ambient_factor),
+      diffuse_factor(diffuse_factor),
+      specular_factor(specular_factor) {}
+
+void Light::SetColor(const glm::vec4& col) { color = col; }
+
+void Light::SetColor(glm::vec4&& col) { color = std::move(col); }
+
+void Light::SetAmbient(float ambient) { ambient_factor = ambient; }
+
+void Light::SetDiffuse(float diffuse) { diffuse_factor = diffuse; }
+
+void Light::SetSpecular(float specular) { specular_factor = specular; }
+
 void DirectionalLight::SetPosition(const glm::vec3& pos) { position = pos; }
 
 void DirectionalLight::SetPosition(glm::vec3&& pos) {
@@ -20,10 +43,6 @@ void DirectionalLight::SetDirection(const glm::vec3& dir) {
 void DirectionalLight::SetDirection(glm::vec3&& dir) {
   direction = std::move(dir);
 }
-
-void DirectionalLight::SetColor(const glm::vec4& col) { color = col; }
-
-void DirectionalLight::SetColor(glm::vec4&& col) { color = std::move(col); }
 
 void DirectionalLight::SetShadowExtent(const glm::vec3& extent) {
   shadow_extent = extent;
@@ -43,20 +62,22 @@ glm::mat4 DirectionalLight::GetProjection() const {
 }
 
 GPUDirectionalLight DirectionalLight::GetUniform() const {
-  return {glm::vec4(direction, 1.f), color, GetView(), GetProjection()};
+  return {ambient_factor,  diffuse_factor,
+          specular_factor, glm::vec4(direction, 1.f),
+          color,           GetView(),
+          GetProjection()};
 }
 
 PointLight::PointLight()
     : position(0),
-      color(1),
       constant(1),
       linear(0.7f),
       quadratic(1.8f) {}
 
 PointLight::PointLight(glm::vec4 color, float constant, float linear,
                        float quadratic)
-    : position(0),
-      color(color),
+    : Light(color),
+      position(0),
       constant(constant),
       linear(linear),
       quadratic(quadratic) {}
@@ -65,10 +86,6 @@ void PointLight::SetPosition(const glm::vec3& pos) { position = pos; }
 
 void PointLight::SetPosition(glm::vec3&& pos) { position = std::move(pos); }
 
-void PointLight::SetColor(const glm::vec4& col) { color = col; }
-
-void PointLight::SetColor(glm::vec4&& col) { color = std::move(col); }
-
 void PointLight::SetConstant(float value) { constant = value; }
 
 void PointLight::SetLinear(float value) { linear = value; }
@@ -76,7 +93,32 @@ void PointLight::SetLinear(float value) { linear = value; }
 void PointLight::SetQuadratic(float value) { quadratic = value; }
 
 GPUPointLight PointLight::GetUniform() const {
-  return {position, color, constant, linear, quadratic};
+  return {ambient_factor, diffuse_factor, specular_factor, position,
+          color,          constant,       linear,          quadratic};
+}
+
+void SpotLight::SetPosition(const glm::vec3& pos) { position = pos; }
+
+void SpotLight::SetPosition(glm::vec3&& pos) { position = std::move(pos); }
+
+void SpotLight::SetDirection(const glm::vec3& dir) {
+  direction = dir;
+  if (abs(direction.x) < 0.01f && abs(direction.z) < 0.01f) direction.z = 0.01f;
+}
+
+void SpotLight::SetDirection(glm::vec3&& dir) {
+  direction = std::move(dir);
+  if (abs(direction.x) < 0.01f && abs(direction.z) < 0.01f) direction.z = 0.01f;
+}
+
+void SpotLight::SetCutoff(float inner, float outer) {
+  cut_off_inner = glm::min(inner, 90.f);
+  cut_off_outer = glm::min(glm::max(outer, inner), 90.f);
+}
+
+GPUSpotLight SpotLight::GetUniform() const {
+  return {ambient_factor, diffuse_factor, specular_factor, position,
+          direction,      color,          cut_off_inner,   cut_off_outer};
 }
 
 }  // namespace Renderer

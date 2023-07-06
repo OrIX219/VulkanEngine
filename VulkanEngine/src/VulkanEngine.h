@@ -47,10 +47,10 @@ constexpr uint32_t kMaxPointLights = 16;
 
 struct GPUSceneData {
   GPUCameraData camera_data;
-  glm::vec4 ambient_color;
   glm::vec4 fog_color;
   glm::vec4 fog_distances;
   GPUDirectionalLight sunlight;
+  GPUSpotLight spotlight;
   uint32_t point_lights_count;
   GPUPointLight point_lights[kMaxPointLights];
 };
@@ -252,6 +252,7 @@ class VulkanEngine {
   Renderer::RenderScene render_scene_;
   Renderer::Camera camera_;
   Renderer::DirectionalLight main_light_;
+  Renderer::SpotLight flashlight_;
   std::vector<Renderer::PointLight> point_lights_;
   Renderer::TextureCube skybox_texture_;
 
