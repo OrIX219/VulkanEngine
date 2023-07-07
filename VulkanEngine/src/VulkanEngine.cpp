@@ -865,22 +865,24 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 }
 
 void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
-  main_light_.SetDirection(
-      -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"));
-  main_light_.SetPosition(glm::vec3(0.f));
-  main_light_.shadow_extent = glm::vec3(32, 32, 32);
+  Renderer::DirectionalLight sunlight(
+      glm::vec4(1.f), glm::vec3(0.f),
+      -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"),
+      glm::vec3(32, 32, 32));
+  directional_lights_.emplace_back(std::move(sunlight));
 
-  flashlight_.SetPosition(glm::vec3(0.f, 1.f, 15.f));
-  flashlight_.SetDirection(glm::vec3(0.f, -1.f, -2.f));
-  flashlight_.SetCutoff(10.f, 12.f);
-  flashlight_.SetColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
+  Renderer::SpotLight spotlight(glm::vec4(1.f), glm::vec3(0.f, 1.f, 15.f),
+                                glm::vec3(0.f, -1.f, -2.f), 10.f, 12.f);
+  spot_lights_.emplace_back(std::move(spotlight));
 
-  point_lights_.emplace_back(glm::vec4(1.f, 0.75f, 0.25f, 1.f), 1.f, 0.09f, 0.032f);
+  point_lights_.emplace_back(glm::vec4(1.f, 0.75f, 0.25f, 1.f), 1.f, 0.09f,
+                             0.032f);
   const glm::vec3 positions[] = {
       glm::vec3(-10.f, 1.f, -10.f), glm::vec3(-10.f, 1.f, 10.f),
       glm::vec3(10.f, 1.f, -10.f), glm::vec3(10.f, 1.f, 10.f)};
   for (size_t i = 0; i < 4; ++i) {
-    point_lights_.emplace_back(glm::vec4(1.f, 0.5f, 0.5f, 1.f), 1.f, 0.22f, 0.20f);
+    point_lights_.emplace_back(glm::vec4(1.f, 0.5f, 0.5f, 1.f), 1.f, 0.22f,
+                               0.20f);
     point_lights_.back().SetPosition(positions[i]);
   }
 
@@ -1685,9 +1687,12 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer,
 
   if (pass.indirect_batches.size() > 0) {
     Renderer::GPUSceneData scene_data;
-    scene_data.camera_data.view = main_light_.GetView();
-    scene_data.camera_data.projection = main_light_.GetProjection();
-    scene_data.sunlight.direction = glm::vec4(main_light_.direction, 1.f);
+    scene_data.camera_data.view = directional_lights_[0].GetView();
+    scene_data.camera_data.projection = directional_lights_[0].GetProjection();
+    scene_data.directional_lights_count =
+        static_cast<uint32_t>(directional_lights_.size());
+    for (size_t i = 0; i < directional_lights_.size(); ++i)
+      scene_data.directional_lights[i] = directional_lights_.at(i).GetUniform();
 
     uint32_t scene_offset = frame.dynamic_data.Push(scene_data);
 
@@ -1757,9 +1762,14 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   scene_data_.camera_data.projection = camera_.GetProjMat();
   scene_data_.camera_data.pos = camera_.GetPosition();
 
-  scene_data_.sunlight = main_light_.GetUniform();
+  scene_data_.directional_lights_count =
+      static_cast<uint32_t>(directional_lights_.size());
+  for (size_t i = 0; i < directional_lights_.size(); ++i)
+    scene_data_.directional_lights[i] = directional_lights_.at(i).GetUniform();
 
-  scene_data_.spotlight = flashlight_.GetUniform();
+  scene_data_.spot_lights_count = static_cast<uint32_t>(spot_lights_.size());
+  for (size_t i = 0; i < spot_lights_.size(); ++i)
+    scene_data_.spot_lights[i] = spot_lights_.at(i).GetUniform();
 
   point_lights_[0].SetPosition(
       glm::vec3(std::sin(glfwGetTime()) * 15.f, 1.f,
@@ -2220,9 +2230,10 @@ void VulkanEngine::Run() {
 
     ProcessInput();
 
-    main_light_.SetDirection(
+    directional_lights_[0].SetDirection(
         -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"));
-    main_light_.SetColor(*CVarSystem::Get()->GetVec4CVar("scene.sunlight_color"));
+    directional_lights_[0].SetColor(
+        *CVarSystem::Get()->GetVec4CVar("scene.sunlight_color"));
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();

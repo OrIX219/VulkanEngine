@@ -39,9 +39,9 @@ void MaterialSystem::Init(Engine::VulkanEngine* engine) {
 
 void MaterialSystem::Cleanup() {}
 
-ShaderEffect* MaterialSystem::BuildEffect(std::string_view vertex_shader,
-                                          std::string_view fragment_shader,
-                                          std::string_view geometry_shader) {
+ShaderEffect* MaterialSystem::BuildEffect(ShaderEffectStage vertex_shader,
+                                          ShaderEffectStage fragment_shader,
+                                          ShaderEffectStage geometry_shader) {
   MaterialSystem& system = Get();
 
   std::array<ShaderEffect::ReflectionOverrides, 1> overrides = {
@@ -50,16 +50,16 @@ ShaderEffect* MaterialSystem::BuildEffect(std::string_view vertex_shader,
   ShaderEffect* effect = new ShaderEffect();
 
   effect->AddStage(system.engine_->shader_cache_.GetShader(
-                       "Shaders/" + std::string{vertex_shader}),
-                   VK_SHADER_STAGE_VERTEX_BIT);
-  if (fragment_shader.size() > 2)
+                       "Shaders/" + std::string{vertex_shader.shader_path}),
+                   VK_SHADER_STAGE_VERTEX_BIT, vertex_shader.constants);
+  if (fragment_shader.shader_path.size() > 2)
     effect->AddStage(system.engine_->shader_cache_.GetShader(
-                         "Shaders/" + std::string{fragment_shader}),
-                     VK_SHADER_STAGE_FRAGMENT_BIT);
-  if (geometry_shader.size() > 2)
+                         "Shaders/" + std::string{fragment_shader.shader_path}),
+                     VK_SHADER_STAGE_FRAGMENT_BIT, fragment_shader.constants);
+  if (geometry_shader.shader_path.size() > 2)
     effect->AddStage(system.engine_->shader_cache_.GetShader(
-                         "Shaders/" + std::string{geometry_shader}),
-                     VK_SHADER_STAGE_GEOMETRY_BIT);
+                         "Shaders/" + std::string{geometry_shader.shader_path}),
+                     VK_SHADER_STAGE_GEOMETRY_BIT, geometry_shader.constants);
 
   effect->ReflectLayout(&system.engine_->device_, overrides.data(),
                         overrides.size());
@@ -76,17 +76,16 @@ void MaterialSystem::BuildDefaultTemplates() {
   FillBuilders();
 
   ShaderEffect* default_effect =
-      BuildEffect("default.vert.spv", "default.frag.spv");
+      BuildEffect({"default.vert.spv"}, {"default.frag.spv"});
   ShaderEffect* textured_lit =
-      BuildEffect("mesh_instanced.vert.spv", "textured_lit.frag.spv");
+      BuildEffect({"mesh_instanced.vert.spv"}, {"textured_lit.frag.spv"});
   ShaderEffect* default_lit =
-      BuildEffect("mesh_instanced.vert.spv", "default_lit.frag.spv");
-  ShaderEffect* opaque_shadowcast =
-      BuildEffect("mesh_instanced_shadowcast.vert.spv", "shadowcast.frag.spv");
+      BuildEffect({"mesh_instanced.vert.spv"}, {"default_lit.frag.spv"});
+  ShaderEffect* opaque_shadowcast = BuildEffect(
+      {"mesh_instanced_shadowcast.vert.spv"}, {"shadowcast.frag.spv"});
   ShaderEffect* normals = BuildEffect(
-      "normals.vert.spv", "normals.frag.spv", "normals.geom.spv");
-  ShaderEffect* skybox =
-      BuildEffect("skybox.vert.spv", "skybox.frag.spv");
+      {"normals.vert.spv"}, {"normals.frag.spv"}, {"normals.geom.spv"});
+  ShaderEffect* skybox = BuildEffect({"skybox.vert.spv"}, {"skybox.frag.spv"});
 
   ShaderPass* default_pass = BuildShader(
       system.engine_->forward_pass_, system.forward_builder_, default_effect);

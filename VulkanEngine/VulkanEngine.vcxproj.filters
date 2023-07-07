@@ -152,6 +152,7 @@
     </ClInclude>
     <ClInclude Include="src\Renderer\TextureCube.h" />
     <ClInclude Include="src\Renderer\Light.h" />
+    <ClInclude Include="src\LimitedVector.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Libraries\include\fmt\src\format.cc">

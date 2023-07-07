@@ -11,6 +11,7 @@
 #include "Framebuffer.h"
 #include "Image.h"
 #include "Light.h"
+#include "LimitedVector.h"
 #include "LogicalDevice.h"
 #include "MaterialSystem.h"
 #include "Mesh.h"
@@ -43,16 +44,20 @@ struct GPUCameraData {
   alignas(16) glm::vec3 pos;
 };
 
+constexpr uint32_t kMaxDirectionalLights = 4;
 constexpr uint32_t kMaxPointLights = 16;
+constexpr uint32_t kMaxSpotLights = 8;
 
 struct GPUSceneData {
   GPUCameraData camera_data;
   glm::vec4 fog_color;
   glm::vec4 fog_distances;
-  GPUDirectionalLight sunlight;
-  GPUSpotLight spotlight;
+  uint32_t directional_lights_count;
+  GPUDirectionalLight directional_lights[kMaxDirectionalLights];
   uint32_t point_lights_count;
   GPUPointLight point_lights[kMaxPointLights];
+  uint32_t spot_lights_count;
+  GPUSpotLight spot_lights[kMaxSpotLights];
 };
 
 struct GPUObjectData {
@@ -251,9 +256,10 @@ class VulkanEngine {
 
   Renderer::RenderScene render_scene_;
   Renderer::Camera camera_;
-  Renderer::DirectionalLight main_light_;
-  Renderer::SpotLight flashlight_;
-  std::vector<Renderer::PointLight> point_lights_;
+  limited_vector<Renderer::DirectionalLight, Renderer::kMaxDirectionalLights>
+      directional_lights_;
+  limited_vector<Renderer::SpotLight, Renderer::kMaxSpotLights> spot_lights_;
+  limited_vector<Renderer::PointLight, Renderer::kMaxPointLights> point_lights_;
   Renderer::TextureCube skybox_texture_;
 
   std::unordered_map<std::string, Renderer::Material> materials_;

@@ -32,7 +32,8 @@ class ShaderEffect {
 
   void Destroy();
 
-  void AddStage(ShaderModule* module, VkShaderStageFlagBits stage);
+  void AddStage(ShaderModule* module, VkShaderStageFlagBits stage,
+                VkSpecializationInfo constants = {});
 
   void ReflectLayout(LogicalDevice* device,
                      ReflectionOverrides* overrides = nullptr,
@@ -55,6 +56,7 @@ class ShaderEffect {
   struct ShaderStage {
     ShaderModule* shader_module;
     VkShaderStageFlagBits stage;
+    VkSpecializationInfo constants;
   };
 
   std::vector<ShaderStage> stages_;

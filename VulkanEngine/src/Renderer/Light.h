@@ -28,7 +28,7 @@ struct alignas(16) GPULight {
 };
 
 struct alignas(16) GPUDirectionalLight : public GPULight {
-  alignas(16) glm::vec4 direction;
+  alignas(16) glm::vec3 direction;
   alignas(16) glm::vec4 color;
   alignas(16) glm::mat4 view;
   alignas(16) glm::mat4 projection;
@@ -38,6 +38,10 @@ struct DirectionalLight : public Light {
   glm::vec3 position;
   glm::vec3 direction;
   glm::vec3 shadow_extent;
+
+  DirectionalLight();
+  DirectionalLight(glm::vec4 color, glm::vec3 position, glm::vec3 direction,
+                   glm::vec3 shadow_extent);
 
   void SetPosition(const glm::vec3& pos);
   void SetPosition(glm::vec3&& pos);
@@ -61,14 +65,14 @@ struct alignas(16) GPUPointLight : public GPULight {
 };
 
 struct PointLight : public Light {
-  PointLight();
-  PointLight(glm::vec4 color, float constant, float linear, float quadratic);
-
   glm::vec3 position;
 
   float constant;
   float linear;
   float quadratic;
+
+  PointLight();
+  PointLight(glm::vec4 color, float constant, float linear, float quadratic);
 
   void SetPosition(const glm::vec3& pos);
   void SetPosition(glm::vec3&& pos);
@@ -92,6 +96,10 @@ struct SpotLight : public Light {
   glm::vec3 direction;
   float cut_off_inner;
   float cut_off_outer;
+
+  SpotLight();
+  SpotLight(glm::vec4 color, glm::vec3 position, glm::vec3 direction,
+            float cut_off_inner, float cut_off_outer);
 
   void SetPosition(const glm::vec3& pos);
   void SetPosition(glm::vec3&& pos);

@@ -91,9 +91,14 @@ class MaterialSystem {
   inline static MaterialSystem& Get();
 
  private:
-  static ShaderEffect* BuildEffect(std::string_view vertex_shader,
-                                   std::string_view fragment_shader = {},
-                                   std::string_view geometry_shader = {});
+  struct ShaderEffectStage {
+    std::string_view shader_path;
+    VkSpecializationInfo constants = {};
+  };
+
+  static ShaderEffect* BuildEffect(ShaderEffectStage vertex_shader,
+                                   ShaderEffectStage fragment_shader = {},
+                                   ShaderEffectStage geometry_shader = {});
 
   struct MaterialInfoHash {
     size_t operator()(const MaterialData& data) const { return data.hash(); }

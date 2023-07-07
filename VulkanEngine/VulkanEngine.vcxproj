@@ -103,6 +103,7 @@
   <ItemGroup>
     <ClInclude Include="src\Console\CVAR.h" />
     <ClInclude Include="src\DeletionQueue.h" />
+    <ClInclude Include="src\LimitedVector.h" />
     <ClInclude Include="src\Logger.h" />
     <ClInclude Include="src\Renderer\Buffer.h" />
     <ClInclude Include="src\Renderer\Camera.h" />

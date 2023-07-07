@@ -19,7 +19,7 @@ struct DirectionalLight {
 	float ambient;
 	float diffuse;
 	float specular;
-	vec4 direction;
+	vec3 direction;
 	vec4 color;
 	mat4 view;
 	mat4 projection;
@@ -51,10 +51,12 @@ layout(set = 0, binding = 0) uniform SceneData {
 	CameraData cameraData;
 	vec4 fogColor;
 	vec4 fogDistances;
-	DirectionalLight sunlight;
-	SpotLight spotlight;
+	uint directionalLightsCount;
+	DirectionalLight directionalLights[4];
 	uint pointLightsCount;
 	PointLight pointLights[16];
+	uint spotLightsCount;
+	SpotLight spotLights[8];
 } sceneData;
 
 void generateLine(int index) {

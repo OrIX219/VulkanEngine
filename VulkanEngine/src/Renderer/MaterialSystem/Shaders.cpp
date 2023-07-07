@@ -67,8 +67,9 @@ void ShaderEffect::Destroy() {
   }
 }
 
-void ShaderEffect::AddStage(ShaderModule* module, VkShaderStageFlagBits stage) {
-  stages_.push_back({module, stage});
+void ShaderEffect::AddStage(ShaderModule* module, VkShaderStageFlagBits stage,
+                            VkSpecializationInfo constants) {
+  stages_.push_back({module, stage, constants});
 }
 
 struct DescriptorSetLayoutData {
@@ -240,6 +241,8 @@ void ShaderEffect::FillStages(
     info.stage = stage.stage;
     info.module = stage.shader_module->module;
     info.pName = "main";
+    if (stage.constants.pData != nullptr)
+      info.pSpecializationInfo = &stage.constants;
     pipeline_stages.push_back(info);
   }
 }
