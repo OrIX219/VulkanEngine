@@ -131,6 +131,14 @@ void VulkanEngine::Init() {
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Image::Destroy, shadow_image_));
 
+  VK_CHECK(point_shadow_image_.Create(
+      allocator_, &device_, {512, 512, 1},
+      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT));
+  LOG_SUCCESS("Created point shadow image");
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Image::Destroy, point_shadow_image_));
+
   InitRenderPasses(samples_);
   LOG_SUCCESS("Initialized render passes");
   InitFramebuffers();
@@ -246,6 +254,8 @@ void VulkanEngine::InitCVars() {
   AutoCVar_Vec4 CVar_sunlight_color(
       "scene.sunlight_color", "Sunlight color (xyz) and power (w)",
       {1.f, 1.f, 1.f, 0.1f}, CVarFlagBits::kEditColor);
+
+  AutoCVar_Vec3 CVar_pointlight_pos("scene.point_light_pos", "asd", {0.f, 0.f, 0.f});
 
   AutoCVar_Int CVar_cull_enable("culling.enable", "Enable culling", 1,
                                 CVarFlagBits::kEditCheckbox);
@@ -430,10 +440,36 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
 
-    shadow_pass_ = render_pass_builder.Build();
+    directional_shadow_pass_ = render_pass_builder.Build();
 
     main_deletion_queue_.PushFunction(
-        std::bind(&Renderer::RenderPass::Destroy, shadow_pass_));
+        std::bind(&Renderer::RenderPass::Destroy, directional_shadow_pass_));
+  }
+  render_pass_builder.Clear();
+  {
+    Renderer::RenderPassAttachment depth_attachment;
+    depth_attachment
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetSamples(VK_SAMPLE_COUNT_1_BIT)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .SetFormat(VK_FORMAT_D32_SFLOAT);
+
+    Renderer::RenderPassSubpass subpass;
+    render_pass_builder.AddAttachment(&depth_attachment);
+    subpass.SetDepthStencilAttachmentRef(0);
+
+    render_pass_builder.AddSubpass(&subpass);
+    render_pass_builder.AddDependency(
+        VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+    point_shadow_pass_ = render_pass_builder.Build();
+
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::RenderPass::Destroy, point_shadow_pass_));
   }
 }
 
@@ -446,10 +482,18 @@ void VulkanEngine::InitFramebuffers() {
   VK_CHECK(forward_framebuffer_.Create(&device_, &forward_pass_, extent,
                                        attachments));
 
-  VK_CHECK(shadow_framebuffer_.Create(&device_, &shadow_pass_, shadow_extent_,
+  VK_CHECK(shadow_framebuffer_.Create(&device_, &directional_shadow_pass_,
+                                      shadow_extent_,
                                       {shadow_image_.GetView()}));
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Framebuffer::Destroy, shadow_framebuffer_));
+
+  VkExtent3D point_extent = point_shadow_image_.GetExtent();
+  VK_CHECK(point_shadow_framebuffer_.Create(
+      &device_, &point_shadow_pass_, {point_extent.width, point_extent.height},
+      {point_shadow_image_.GetView()}, point_shadow_image_.GetArrayLayers()));
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Framebuffer::Destroy, point_shadow_framebuffer_));
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(swapchain_framebuffers_[i].Create(&device_, &copy_pass_, extent,
@@ -492,7 +536,7 @@ void VulkanEngine::InitDescriptors() {
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     frames_[i].dynamic_data.Create(
-        allocator_, 8192,
+        allocator_, 64 * 1024,
         static_cast<uint32_t>(physical_device_.GetProperties()
                                   .limits.minUniformBufferOffsetAlignment));
     main_deletion_queue_.PushFunction(
@@ -875,16 +919,9 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
                                 glm::vec3(0.f, -1.f, -2.f), 10.f, 12.f);
   spot_lights_.emplace_back(std::move(spotlight));
 
-  point_lights_.emplace_back(glm::vec4(1.f, 0.75f, 0.25f, 1.f), 1.f, 0.09f,
-                             0.032f);
-  const glm::vec3 positions[] = {
-      glm::vec3(-10.f, 1.f, -10.f), glm::vec3(-10.f, 1.f, 10.f),
-      glm::vec3(10.f, 1.f, -10.f), glm::vec3(10.f, 1.f, 10.f)};
-  for (size_t i = 0; i < 4; ++i) {
-    point_lights_.emplace_back(glm::vec4(1.f, 0.5f, 0.5f, 1.f), 1.f, 0.22f,
-                               0.20f);
-    point_lights_.back().SetPosition(positions[i]);
-  }
+  Renderer::PointLight point_light(glm::vec4(1.f, 0.75f, 0.25f, 1.f),
+                                   glm::vec3(3.f, 1.f, -3.5f), 1.f, 0.09f, 0.032f);
+  point_lights_.emplace_back(std::move(point_light));
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin();
@@ -1171,7 +1208,8 @@ void VulkanEngine::Draw() {
 
       ReadyCullData(command_buffer, render_scene_.forward_pass);
       ReadyCullData(command_buffer, render_scene_.transparent_pass);
-      ReadyCullData(command_buffer, render_scene_.shadow_pass);
+      ReadyCullData(command_buffer, render_scene_.directional_shadow_pass);
+      ReadyCullData(command_buffer, render_scene_.point_shadow_pass);
 
       vkCmdPipelineBarrier(command_buffer.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr,
@@ -1199,7 +1237,10 @@ void VulkanEngine::Draw() {
       ExecuteCull(command_buffer, render_scene_.forward_pass, forward_cull);
       ExecuteCull(command_buffer, render_scene_.transparent_pass, forward_cull);
 
-      ExecuteCull(command_buffer, render_scene_.shadow_pass, shadow_cull);
+      ExecuteCull(command_buffer, render_scene_.directional_shadow_pass,
+                  shadow_cull);
+      ExecuteCull(command_buffer, render_scene_.point_shadow_pass,
+                  shadow_cull);
     
       vkCmdPipelineBarrier(command_buffer.Get(),
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -1208,7 +1249,7 @@ void VulkanEngine::Draw() {
                            post_cull_barriers_.data(), 0, nullptr);
     }
 
-    DrawShadows(command_buffer, render_scene_.shadow_pass);
+    DrawShadows(command_buffer);
 
     DrawForward(command_buffer, render_scene_.forward_pass);
 
@@ -1371,11 +1412,12 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
 
     render_scene_.ClearDirtyObjects();
 
-    Renderer::RenderScene::MeshPass* passes[3] = {
+    Renderer::RenderScene::MeshPass* passes[4] = {
         &render_scene_.forward_pass, &render_scene_.transparent_pass,
-        &render_scene_.shadow_pass};
+        &render_scene_.directional_shadow_pass,
+        &render_scene_.point_shadow_pass};
 
-    for (size_t i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < 4; ++i) {
       Renderer::RenderScene::MeshPass& pass = *passes[i];
 
       uint32_t count_size = static_cast<uint32_t>(
@@ -1437,7 +1479,7 @@ void VulkanEngine::ReadyMeshDraw(Renderer::CommandBuffer command_buffer) {
     std::vector<std::future<void>> async_calls;
     async_calls.reserve(9);
     
-    for (size_t i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < 4; ++i) {
       Renderer::RenderScene::MeshPass* pass = passes[i];
       Renderer::RenderScene* scene = &render_scene_;
 
@@ -1663,53 +1705,33 @@ void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
   post_cull_barriers_.push_back(barrier.Get());
 }
 
-void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer,
-                               Renderer::RenderScene::MeshPass& pass) {
+void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
   Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Shadow Draw");
 
+  Renderer::GPUSceneData scene_data;
+  scene_data.directional_lights_count =
+      static_cast<uint32_t>(directional_lights_.size());
+  for (size_t i = 0; i < directional_lights_.size(); ++i)
+    scene_data.directional_lights[i] = directional_lights_.at(i).GetUniform();
+  scene_data.point_lights_count = static_cast<uint32_t>(point_lights_.size());
+  for (size_t i = 0; i < point_lights_.size(); ++i)
+    scene_data.point_lights[i] = point_lights_[i].GetUniform();
+  scene_data.spot_lights_count = static_cast<uint32_t>(spot_lights_.size());
+  for (size_t i = 0; i < point_lights_.size(); ++i)
+    scene_data.spot_lights[i] = spot_lights_[i].GetUniform();
+
   VkClearValue depth_clear;
   depth_clear.depthStencil.depth = 1.f;
 
-  shadow_pass_.Begin(command_buffer, shadow_framebuffer_.Get(),
-                     {{0, 0}, shadow_extent_}, {depth_clear});
-
-  VkViewport viewport{0.f, 0.f,
-                      static_cast<float>(shadow_extent_.width),
-                      static_cast<float>(shadow_extent_.height),
-                      0.f, 1.f};
-  VkRect2D scissors{{0, 0}, shadow_extent_};
-
-  vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
-  vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
-
-  if (pass.indirect_batches.size() > 0) {
-    Renderer::GPUSceneData scene_data;
-    scene_data.camera_data.view = directional_lights_[0].GetView();
-    scene_data.camera_data.projection = directional_lights_[0].GetProjection();
-    scene_data.directional_lights_count =
-        static_cast<uint32_t>(directional_lights_.size());
-    for (size_t i = 0; i < directional_lights_.size(); ++i)
-      scene_data.directional_lights[i] = directional_lights_.at(i).GetUniform();
-
-    uint32_t scene_offset = frame.dynamic_data.Push(scene_data);
-
+  if (render_scene_.directional_shadow_pass.indirect_batches.size() > 0) {
+    Renderer::RenderScene::MeshPass& pass = render_scene_.directional_shadow_pass;
     VkDescriptorBufferInfo object_buffer_info =
         render_scene_.object_data_buffer.GetDescriptorInfo();
-    VkDescriptorBufferInfo scene_info = frame.dynamic_data.GetDescriptorInfo();
-    scene_info.range = sizeof(Renderer::GPUSceneData);
     VkDescriptorBufferInfo instance_info =
         pass.compacted_instance_buffer.GetDescriptorInfo();
-
-    VkDescriptorSet global_set;
-    Renderer::DescriptorBuilder::Begin(&layout_cache_,
-                                       &frame.dynamic_descriptor_allocator)
-        .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-        .Build(global_set);
-
     VkDescriptorSet object_set;
     Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                        &frame.dynamic_descriptor_allocator)
@@ -1719,15 +1741,97 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer,
                     VK_SHADER_STAGE_VERTEX_BIT)
         .Build(object_set);
 
+    directional_shadow_pass_.Begin(command_buffer, shadow_framebuffer_.Get(),
+                                   {{0, 0}, shadow_extent_}, {depth_clear});
+
+    VkViewport viewport{0.f, 0.f,
+                        static_cast<float>(shadow_extent_.width),
+                        static_cast<float>(shadow_extent_.height),
+                        0.f, 1.f};
+    VkRect2D scissors{{0, 0}, shadow_extent_};
+
+    vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
+    vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
+
+    scene_data.camera_data.view = directional_lights_[0].GetView();
+    scene_data.camera_data.projection = directional_lights_[0].GetProjection();
+    scene_data.camera_data.view_proj =
+        scene_data.camera_data.projection * scene_data.camera_data.view;
+
+    uint32_t scene_offset = frame.dynamic_data.Push(scene_data);
+
+    VkDescriptorBufferInfo scene_info = frame.dynamic_data.GetDescriptorInfo();
+    scene_info.range = sizeof(Renderer::GPUSceneData);
+
+    VkDescriptorSet global_set;
+    Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                       &frame.dynamic_descriptor_allocator)
+        .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                    VK_SHADER_STAGE_VERTEX_BIT)
+        .Build(global_set);
+
     vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 1.2f);
 
     std::vector<uint32_t> dynamic_offsets;
     dynamic_offsets.push_back(scene_offset);
 
     ExecuteDraw(command_buffer, pass, object_set, dynamic_offsets, global_set);
+
+    directional_shadow_pass_.End(command_buffer);
   }
 
-  shadow_pass_.End(command_buffer);
+  if (render_scene_.point_shadow_pass.indirect_batches.size() > 0) {
+    Renderer::RenderScene::MeshPass& pass = render_scene_.point_shadow_pass;
+    VkDescriptorBufferInfo object_buffer_info =
+        render_scene_.object_data_buffer.GetDescriptorInfo();
+    VkDescriptorBufferInfo instance_info =
+        pass.compacted_instance_buffer.GetDescriptorInfo();
+    VkDescriptorSet object_set;
+    Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                       &frame.dynamic_descriptor_allocator)
+        .BindBuffer(0, &object_buffer_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    VK_SHADER_STAGE_VERTEX_BIT)
+        .BindBuffer(1, &instance_info, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                    VK_SHADER_STAGE_VERTEX_BIT)
+        .Build(object_set);
+
+    VkExtent3D extent = point_shadow_image_.GetExtent();
+    point_shadow_pass_.Begin(command_buffer, point_shadow_framebuffer_.Get(),
+                             {{0, 0}, {extent.width, extent.height}},
+                             {depth_clear});
+
+    VkViewport viewport{0.f, 0.f,
+                        static_cast<float>(extent.width),
+                        static_cast<float>(extent.height),
+                        0.f, 1.f};
+    VkRect2D scissors{{0, 0}, {extent.width, extent.height}};
+
+    vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
+    vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
+
+    uint32_t scene_offset = frame.dynamic_data.Push(scene_data);
+
+    VkDescriptorBufferInfo scene_info = frame.dynamic_data.GetDescriptorInfo();
+    scene_info.range = sizeof(Renderer::GPUSceneData);
+
+    VkDescriptorSet global_set;
+    Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                       &frame.dynamic_descriptor_allocator)
+        .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT |
+                        VK_SHADER_STAGE_FRAGMENT_BIT)
+        .Build(global_set);
+
+    vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 0.f);
+
+    std::vector<uint32_t> dynamic_offsets;
+    dynamic_offsets.push_back(scene_offset);
+
+    ExecuteDraw(command_buffer, pass, object_set, dynamic_offsets, global_set);
+
+    point_shadow_pass_.End(command_buffer);
+  }
+
 }
 
 void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
@@ -1760,6 +1864,8 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
   scene_data_.camera_data.view = camera_.GetViewMat();
   scene_data_.camera_data.projection = camera_.GetProjMat();
+  scene_data_.camera_data.view_proj =
+      scene_data_.camera_data.projection * scene_data_.camera_data.view;
   scene_data_.camera_data.pos = camera_.GetPosition();
 
   scene_data_.directional_lights_count =
@@ -1771,10 +1877,10 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   for (size_t i = 0; i < spot_lights_.size(); ++i)
     scene_data_.spot_lights[i] = spot_lights_.at(i).GetUniform();
 
-  point_lights_[0].SetPosition(
+  /*point_lights_[0].SetPosition(
       glm::vec3(std::sin(glfwGetTime()) * 15.f, 1.f,
                 std::cos(glfwGetTime() * 7.5f) * 0.5f) +
-      glm::vec3(0.f, 0.f, -3.f));
+      glm::vec3(0.f, 0.f, -3.f));*/
 
   scene_data_.point_lights_count = static_cast<uint32_t>(point_lights_.size());
   for (size_t i = 0; i < point_lights_.size(); ++i)
@@ -1795,11 +1901,18 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   shadow_info.imageView = shadow_image_.GetView();
   shadow_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+  VkDescriptorImageInfo point_shadow_info;
+  point_shadow_info.sampler = shadow_sampler_.Get();
+  point_shadow_info.imageView = point_shadow_image_.GetView();
+  point_shadow_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
   Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                      &frame.dynamic_descriptor_allocator)
       .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
       .BindImage(1, &shadow_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                 VK_SHADER_STAGE_FRAGMENT_BIT)
+      .BindImage(2, &point_shadow_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                  VK_SHADER_STAGE_FRAGMENT_BIT)
       .Build(frame.global_descriptor);
 
@@ -2234,6 +2347,9 @@ void VulkanEngine::Run() {
         -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"));
     directional_lights_[0].SetColor(
         *CVarSystem::Get()->GetVec4CVar("scene.sunlight_color"));
+
+    point_lights_[0].SetPosition(
+        *CVarSystem::Get()->GetVec3CVar("scene.point_light_pos"));
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();

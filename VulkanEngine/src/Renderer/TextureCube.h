@@ -27,7 +27,7 @@ class TextureCube {
   static const std::array<const char*, 6> faces_;
 
   Buffer<true> staging_buffer_;
-  Image image_;
+  ImageCube image_;
 };
 
 }

@@ -72,8 +72,8 @@ glm::mat4 DirectionalLight::GetProjection() const {
 }
 
 GPUDirectionalLight DirectionalLight::GetUniform() const {
-  return {ambient_factor, diffuse_factor, specular_factor, direction,
-          color,          GetView(),      GetProjection()};
+  return {ambient_factor, diffuse_factor, specular_factor,
+          direction,      color,          GetProjection() * GetView()};
 }
 
 PointLight::PointLight()
@@ -82,10 +82,10 @@ PointLight::PointLight()
       linear(0.7f),
       quadratic(1.8f) {}
 
-PointLight::PointLight(glm::vec4 color, float constant, float linear,
-                       float quadratic)
+PointLight::PointLight(glm::vec4 color, glm::vec3 position, float constant,
+                       float linear, float quadratic)
     : Light(color),
-      position(0),
+      position(position),
       constant(constant),
       linear(linear),
       quadratic(quadratic) {}
@@ -101,8 +101,36 @@ void PointLight::SetLinear(float value) { linear = value; }
 void PointLight::SetQuadratic(float value) { quadratic = value; }
 
 GPUPointLight PointLight::GetUniform() const {
-  return {ambient_factor, diffuse_factor, specular_factor, position,
-          color,          constant,       linear,          quadratic};
+  float near = 0.01f;
+  float far = 10.f;
+  glm::mat4 proj = glm::perspective(glm::radians(90.f), 1.f, near, far);
+
+  GPUPointLight light{ambient_factor, diffuse_factor, specular_factor, position, color};
+  light.view_proj[0] =
+      proj * glm::lookAt(position, position + glm::vec3(1.f, 0.f, 0.f),
+                         glm::vec3(0.f, -1.f, 0.f));
+  light.view_proj[1] =
+      proj * glm::lookAt(position, position + glm::vec3(-1.f, 0.f, 0.f),
+                         glm::vec3(0.f, -1.f, 0.f));
+  light.view_proj[2] =
+      proj * glm::lookAt(position, position + glm::vec3(0.f, 1.f, 0.f),
+                         glm::vec3(0.f, 0.f, 1.f));
+  light.view_proj[3] =
+      proj * glm::lookAt(position, position + glm::vec3(0.f, -1.f, 0.f),
+                         glm::vec3(0.f, 0.f, -1.f));
+  light.view_proj[4] =
+      proj * glm::lookAt(position, position + glm::vec3(0.f, 0.f, 1.f),
+                         glm::vec3(0.f, -1.f, 0.f));
+  light.view_proj[5] =
+      proj * glm::lookAt(position, position + glm::vec3(0.f, 0.f, -1.f),
+                         glm::vec3(0.f, -1.f, 0.f));
+
+  light.constant = constant;
+  light.linear = linear;
+  light.quadratic = quadratic;
+  light.far_plane = far;
+
+  return light;
 }
 
 SpotLight::SpotLight()

@@ -118,4 +118,16 @@ class Image {
       VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
 };
 
+class ImageCube : public Image {
+ public:
+  ImageCube();
+  ImageCube(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
+            VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+
+  VkResult Create(
+      VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
+      VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
+      VkImageAspectFlagBits aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
+};
+
 }

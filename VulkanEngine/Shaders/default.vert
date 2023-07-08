@@ -16,6 +16,7 @@ layout(push_constant) uniform constants {
 struct CameraData {
 	mat4 view;
 	mat4 projection;
+	mat4 viewProj;
 	vec3 pos;
 };
 
@@ -25,8 +26,7 @@ struct DirectionalLight {
 	float specular;
 	vec3 direction;
 	vec4 color;
-	mat4 view;
-	mat4 projection;
+	mat4 viewProj;
 };
 
 struct PointLight {
@@ -35,9 +35,11 @@ struct PointLight {
 	float specular;
 	vec3 position;
 	vec4 color;
+	mat4 viewProj[6];
 	float constant;
 	float linear;
 	float quadratic;
+	float farPlane;
 };
 
 struct SpotLight {
@@ -64,7 +66,7 @@ layout(set = 0, binding = 0) uniform SceneData {
 } sceneData;
 
 void main() {
-	gl_Position = sceneData.cameraData.projection * sceneData.cameraData.view * model * vec4(pos, 1.f);
+	gl_Position = sceneData.cameraData.viewProj * model * vec4(pos, 1.f);
 	outColor = color;
 	outNormal = normalize(normal);
 	outTextureCoords = textureCoords;

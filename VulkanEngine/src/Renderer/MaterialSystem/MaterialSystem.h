@@ -29,7 +29,14 @@ struct SampledTexture {
   VkImageView view;
 };
 
-enum class MeshPassType { kForward, kTransparency, kDirectionalShadow, _Size };
+enum class MeshPassType {
+  kForward,
+  kTransparency,
+  kDirectionalShadow,
+  kPointShadow,
+  kSpotShadow,
+  _Size
+};
 
 template<typename T>
 class PerPassData {

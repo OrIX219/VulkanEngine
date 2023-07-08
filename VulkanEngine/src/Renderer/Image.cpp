@@ -158,4 +158,21 @@ VkResult Image::CreateImageView(VkImageAspectFlags aspect_flags) {
                            &image_view_);
 }
 
+ImageCube::ImageCube() : Image() { view_type_ = VK_IMAGE_VIEW_TYPE_CUBE; }
+
+ImageCube::ImageCube(VmaAllocator allocator, LogicalDevice* device,
+                     VkExtent3D extent, VkImageUsageFlags usage,
+                     VkFormat format) {
+  Create(allocator, device, extent, usage, format);
+}
+
+VkResult ImageCube::Create(VmaAllocator allocator, LogicalDevice* device,
+                           VkExtent3D extent, VkImageUsageFlags usage,
+                           VkFormat format,
+                           VkImageAspectFlagBits aspect_flags) {
+  return Image::Create(allocator, device, extent, usage, 1,
+                       VK_SAMPLE_COUNT_1_BIT, format, VK_IMAGE_TILING_OPTIMAL,
+                       aspect_flags, 6, VK_IMAGE_VIEW_TYPE_CUBE);
+}
+
 }  // namespace Renderer

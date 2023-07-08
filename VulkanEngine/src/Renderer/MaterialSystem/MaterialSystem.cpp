@@ -81,8 +81,11 @@ void MaterialSystem::BuildDefaultTemplates() {
       BuildEffect({"mesh_instanced.vert.spv"}, {"textured_lit.frag.spv"});
   ShaderEffect* default_lit =
       BuildEffect({"mesh_instanced.vert.spv"}, {"default_lit.frag.spv"});
-  ShaderEffect* opaque_shadowcast = BuildEffect(
-      {"mesh_instanced_shadowcast.vert.spv"}, {"shadowcast.frag.spv"});
+  ShaderEffect* opaque_shadowcast =
+      BuildEffect({"mesh_instanced_shadowcast.vert.spv"});
+  ShaderEffect* opaque_shadowcast_point =
+      BuildEffect({"mesh_instanced_shadowcast_point.vert.spv"}, {"shadowcast_point.frag.spv"},
+                  {"shadowcast_point.geom.spv"});
   ShaderEffect* normals = BuildEffect(
       {"normals.vert.spv"}, {"normals.frag.spv"}, {"normals.geom.spv"});
   ShaderEffect* skybox = BuildEffect({"skybox.vert.spv"}, {"skybox.frag.spv"});
@@ -95,8 +98,12 @@ void MaterialSystem::BuildDefaultTemplates() {
       system.engine_->forward_pass_, system.forward_builder_, textured_lit);
   ShaderPass* default_lit_pass = BuildShader(
       system.engine_->forward_pass_, system.forward_builder_, default_lit);
-  ShaderPass* opaque_shadowcast_pass = BuildShader(
-      system.engine_->shadow_pass_, system.shadow_builder_, opaque_shadowcast);
+  ShaderPass* opaque_shadowcast_pass =
+      BuildShader(system.engine_->directional_shadow_pass_,
+                  system.shadow_builder_, opaque_shadowcast);
+  ShaderPass* opaque_shadowcast_point_pass =
+      BuildShader(system.engine_->point_shadow_pass_, system.shadow_builder_,
+                  opaque_shadowcast_point);
   ShaderPass* normals_pass = BuildShader(system.engine_->forward_pass_,
                                          system.forward_builder_, normals);
   ShaderPass* skybox_pass = BuildShader(system.engine_->forward_pass_,
@@ -107,6 +114,8 @@ void MaterialSystem::BuildDefaultTemplates() {
     default_template.pass_shaders[MeshPassType::kForward] = default_pass;
     default_template.pass_shaders[MeshPassType::kTransparency] = nullptr;
     default_template.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+    default_template.pass_shaders[MeshPassType::kPointShadow] = nullptr;
+    default_template.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
 
     default_template.transparency = Assets::TransparencyMode::kOpaque;
 
@@ -118,6 +127,8 @@ void MaterialSystem::BuildDefaultTemplates() {
         default_wireframe_pass;
     default_wireframe.pass_shaders[MeshPassType::kTransparency] = nullptr;
     default_wireframe.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+    default_wireframe.pass_shaders[MeshPassType::kPointShadow] = nullptr;
+    default_wireframe.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
 
     default_wireframe.transparency = Assets::TransparencyMode::kOpaque;
 
@@ -128,6 +139,9 @@ void MaterialSystem::BuildDefaultTemplates() {
     default_textured.pass_shaders[MeshPassType::kForward] = textured_lit_pass;
     default_textured.pass_shaders[MeshPassType::kTransparency] = nullptr;
     default_textured.pass_shaders[MeshPassType::kDirectionalShadow] = opaque_shadowcast_pass;
+    default_textured.pass_shaders[MeshPassType::kPointShadow] =
+        opaque_shadowcast_point_pass;
+    default_textured.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
 
     default_textured.transparency = Assets::TransparencyMode::kOpaque;
 
@@ -155,6 +169,10 @@ void MaterialSystem::BuildDefaultTemplates() {
         transparent_lit_pass;
     default_textured_transparent
         .pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+    default_textured_transparent.pass_shaders[MeshPassType::kPointShadow] =
+        nullptr;
+    default_textured_transparent.pass_shaders[MeshPassType::kSpotShadow] =
+        nullptr;
 
     default_textured_transparent.transparency =
         Assets::TransparencyMode::kTransparent;
@@ -168,6 +186,9 @@ void MaterialSystem::BuildDefaultTemplates() {
     default_colored.pass_shaders[MeshPassType::kTransparency] = nullptr;
     default_colored.pass_shaders[MeshPassType::kDirectionalShadow] =
         opaque_shadowcast_pass;
+    default_colored.pass_shaders[MeshPassType::kPointShadow] =
+        opaque_shadowcast_point_pass;
+    default_colored.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
 
     default_colored.transparency = Assets::TransparencyMode::kOpaque;
 
@@ -179,6 +200,8 @@ void MaterialSystem::BuildDefaultTemplates() {
     normals_template.pass_shaders[MeshPassType::kTransparency] = nullptr;
     normals_template.pass_shaders[MeshPassType::kDirectionalShadow] =
         nullptr;
+    normals_template.pass_shaders[MeshPassType::kPointShadow] = nullptr;
+    normals_template.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
 
     normals_template.transparency = Assets::TransparencyMode::kOpaque;
 
@@ -189,6 +212,8 @@ void MaterialSystem::BuildDefaultTemplates() {
     skybox_template.pass_shaders[MeshPassType::kForward] = skybox_pass;
     skybox_template.pass_shaders[MeshPassType::kTransparency] = nullptr;
     skybox_template.pass_shaders[MeshPassType::kDirectionalShadow] = nullptr;
+    skybox_template.pass_shaders[MeshPassType::kPointShadow] = nullptr;
+    skybox_template.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
 
     skybox_template.transparency = Assets::TransparencyMode::kOpaque;
 

@@ -14,6 +14,7 @@ layout(location = 3) in vec2 textureCoords;
 struct CameraData {
 	mat4 view;
 	mat4 projection;
+	mat4 viewProj;
 	vec3 pos;
 };
 
@@ -23,8 +24,7 @@ struct DirectionalLight {
 	float specular;
 	vec3 direction;
 	vec4 color;
-	mat4 view;
-	mat4 projection;
+	mat4 viewProj;
 };
 
 struct PointLight {
@@ -33,9 +33,11 @@ struct PointLight {
 	float specular;
 	vec3 position;
 	vec4 color;
+	mat4 viewProj[6];
 	float constant;
 	float linear;
 	float quadratic;
+	float farPlane;
 };
 
 struct SpotLight {
@@ -79,7 +81,7 @@ layout(set = 1, binding = 1) readonly buffer InstanceBuffer {
 void main() {
 	uint index = instanceBuffer.ids[gl_InstanceIndex];
 	mat4 modelMatrix = objectBuffer.objects[index].model;
-	mat4 transformMatrix = sceneData.cameraData.projection * sceneData.cameraData.view * modelMatrix;
+	mat4 transformMatrix = sceneData.cameraData.viewProj * modelMatrix;
 	gl_Position = transformMatrix * vec4(pos, 1.f);
 	outColor = color;
 	mat3 normalMat = mat3(objectBuffer.objects[index].normalMat);
@@ -87,5 +89,5 @@ void main() {
 	outFragPos = vec3(modelMatrix * vec4(pos, 1.f));
 	outTextureCoords = textureCoords;
 
-	outShadowCoords = sceneData.directionalLights[0].projection * sceneData.directionalLights[0].view * modelMatrix * vec4(pos, 1.f);
+	outShadowCoords = sceneData.directionalLights[0].viewProj * modelMatrix * vec4(pos, 1.f);
 }

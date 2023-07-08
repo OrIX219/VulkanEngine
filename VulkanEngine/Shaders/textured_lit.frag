@@ -11,6 +11,7 @@ layout(location = 4) in vec4 inShadowCoords;
 struct CameraData {
 	mat4 view;
 	mat4 projection;
+	mat4 viewProj;
 	vec3 pos;
 };
 
@@ -20,8 +21,7 @@ struct DirectionalLight {
 	float specular;
 	vec3 direction;
 	vec4 color;
-	mat4 view;
-	mat4 projection;
+	mat4 viewProj;
 };
 
 struct PointLight {
@@ -30,9 +30,11 @@ struct PointLight {
 	float specular;
 	vec3 position;
 	vec4 color;
+	mat4 viewProj[6];
 	float constant;
 	float linear;
 	float quadratic;
+	float farPlane;
 };
 
 struct SpotLight {
@@ -60,6 +62,7 @@ layout(set = 0, binding = 0) uniform SceneData {
 
 // need samplers for all lights
 layout(set = 0, binding = 1) uniform sampler2D shadowSampler;
+layout(set = 0, binding = 2) uniform samplerCube pointShadowSampler;
 
 layout(set = 2, binding = 0) uniform sampler2D tex;
 
@@ -83,6 +86,35 @@ float CalcShadow(vec4 fragPos, vec3 lightDirection) {
 		}
 	}
 	shadow /= 9;
+
+	return 1 - shadow;
+}
+
+float CalcPointShadow(vec3 fragPos, vec3 lightPos, float farPlane) {
+	vec3 fragToLight = fragPos - lightPos;
+	vec3 lightDir = normalize(-fragToLight);
+	float bias = max(0.01, 0.1 * (1.0 - dot(inNormal, lightDir)));
+
+	float shadow = 0.0;
+	int samples = 20;
+	float viewDistance = length(sceneData.cameraData.pos - inFragPos);
+	float diskRadius = (1.0 + (viewDistance / farPlane)) / 100.0;
+	float currentDepth = length(fragToLight) - bias;
+	
+	vec3 sampleOffsetDirections[20] = vec3[] (
+	   vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+	   vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+	   vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+	   vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+	   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+	);
+
+	for(int i = 0; i < samples; i++) {
+		float closestDepth = texture(pointShadowSampler, fragToLight + sampleOffsetDirections[i] * diskRadius).r;
+		closestDepth *= farPlane;
+		shadow += currentDepth > closestDepth ? 1.0 : 0.0;
+	}
+	shadow /= float(samples);
 
 	return 1 - shadow;
 }
@@ -116,11 +148,14 @@ vec3 CalcPoint() {
 	for(int i = 0; i < sceneData.pointLightsCount; i++) {
 		PointLight light = sceneData.pointLights[i];
 		vec3 lightColor = light.color.xyz * light.color.w;
+		vec3 lightDir = normalize(light.position - inFragPos);
+		float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
+
+		float shadow = 0.f;
+		if (lightAngle > 0.01) shadow = CalcPointShadow(inFragPos, light.position, light.farPlane);
 
 		vec3 ambient = light.ambient * lightColor;
 
-		vec3 lightDir = normalize(light.position - inFragPos);
-		float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
 		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
 		vec3 viewDir = normalize(sceneData.cameraData.pos - inFragPos);
@@ -130,7 +165,7 @@ vec3 CalcPoint() {
 		float dist = distance(light.position, inFragPos);
 		float attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * pow(dist, 2));
 		
-		result += ambient + (diffuse + specular) * attenuation;
+		result += ambient + (diffuse + specular) * attenuation * shadow;
 	}
 	return result;
 }

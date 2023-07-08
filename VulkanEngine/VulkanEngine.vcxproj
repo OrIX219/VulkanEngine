@@ -196,10 +196,12 @@
     <None Include="Shaders\indirect_compute.comp" />
     <None Include="Shaders\mesh_instanced.vert" />
     <None Include="Shaders\mesh_instanced_shadowcast.vert" />
+    <None Include="Shaders\mesh_instanced_shadowcast_point.vert" />
     <None Include="Shaders\normals.frag" />
     <None Include="Shaders\normals.geom" />
     <None Include="Shaders\normals.vert" />
-    <None Include="Shaders\shadowcast.frag" />
+    <None Include="Shaders\shadowcast_point.frag" />
+    <None Include="Shaders\shadowcast_point.geom" />
     <None Include="Shaders\skybox.frag" />
     <None Include="Shaders\skybox.vert" />
     <None Include="Shaders\sparse_upload.comp" />

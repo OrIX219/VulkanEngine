@@ -10,6 +10,7 @@ const float magnitude = 0.1;
 struct CameraData {
 	mat4 view;
 	mat4 projection;
+	mat4 viewProj;
 	vec3 pos;
 };
 
@@ -19,8 +20,7 @@ struct DirectionalLight {
 	float specular;
 	vec3 direction;
 	vec4 color;
-	mat4 view;
-	mat4 projection;
+	mat4 viewProj;
 };
 
 struct PointLight {
@@ -29,9 +29,11 @@ struct PointLight {
 	float specular;
 	vec3 position;
 	vec4 color;
+	mat4 viewProj[6];
 	float constant;
 	float linear;
 	float quadratic;
+	float farPlane;
 };
 
 struct SpotLight {

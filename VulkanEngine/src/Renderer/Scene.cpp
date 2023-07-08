@@ -15,7 +15,8 @@ RenderScene::PassObject* RenderScene::MeshPass::Get(Handle<PassObject> handle) {
 void RenderScene::Init() {
   forward_pass.type = MeshPassType::kForward;
   transparent_pass.type = MeshPassType::kTransparency;
-  shadow_pass.type = MeshPassType::kDirectionalShadow;
+  directional_shadow_pass.type = MeshPassType::kDirectionalShadow;
+  point_shadow_pass.type = MeshPassType::kPointShadow;
 }
 
 void RenderScene::Destroy() {
@@ -25,7 +26,8 @@ void RenderScene::Destroy() {
 
   forward_pass.Destroy();
   transparent_pass.Destroy();
-  shadow_pass.Destroy();
+  directional_shadow_pass.Destroy();
+  point_shadow_pass.Destroy();
 }
 
 Handle<SceneObject> RenderScene::RegisterObject(RenderObject* object) {
@@ -50,7 +52,9 @@ Handle<SceneObject> RenderScene::RegisterObject(RenderObject* object) {
   if (object->draw_shadow_pass) {
     if (object->material->original
             ->pass_shaders[MeshPassType::kDirectionalShadow])
-      shadow_pass.unbatches_objects.push_back(handle);
+      directional_shadow_pass.unbatches_objects.push_back(handle);
+    if (object->material->original->pass_shaders[MeshPassType::kPointShadow])
+      point_shadow_pass.unbatches_objects.push_back(handle);
   }
 
   UpdateObject(handle);
@@ -95,10 +99,20 @@ void RenderScene::UpdateObject(Handle<SceneObject> object_id) {
     Handle<PassObject> obj;
     obj.handle = pass_indices[MeshPassType::kDirectionalShadow];
 
-    shadow_pass.objects_to_delete.push_back(obj);
-    shadow_pass.unbatches_objects.push_back(object_id);
+    directional_shadow_pass.objects_to_delete.push_back(obj);
+    directional_shadow_pass.unbatches_objects.push_back(object_id);
 
     pass_indices[MeshPassType::kDirectionalShadow] = -1;
+  }
+
+  if (pass_indices[MeshPassType::kPointShadow] != -1) {
+    Handle<PassObject> obj;
+    obj.handle = pass_indices[MeshPassType::kPointShadow];
+
+    point_shadow_pass.objects_to_delete.push_back(obj);
+    point_shadow_pass.unbatches_objects.push_back(object_id);
+
+    pass_indices[MeshPassType::kPointShadow] = -1;
   }
 
   if (GetObject(object_id)->update_index == static_cast<uint32_t>(-1)) {
@@ -182,11 +196,14 @@ void RenderScene::BuildBatches() {
   auto transparent =
       std::async(std::launch::async, [&]() { RefreshPass(&transparent_pass); });
   auto shadow =
-      std::async(std::launch::async, [&]() { RefreshPass(&shadow_pass); });
+      std::async(std::launch::async, [&]() { RefreshPass(&directional_shadow_pass); });
+  auto point_shadow = std::async(std::launch::async,
+                                 [&]() { RefreshPass(&point_shadow_pass); });
 
   forward.get();
   transparent.get();
   shadow.get();
+  point_shadow.get();
 }
 
 void RenderScene::BuildIndirectBatches(MeshPass* pass,
@@ -443,7 +460,9 @@ RenderScene::MeshPass* RenderScene::GetMeshPass(MeshPassType type) {
     case MeshPassType::kTransparency:
       return &transparent_pass;
     case MeshPassType::kDirectionalShadow:
-      return &shadow_pass;
+      return &directional_shadow_pass;
+    case MeshPassType::kPointShadow:
+      return &point_shadow_pass;
   }
   return nullptr;
 }

@@ -20,7 +20,8 @@ class Framebuffer {
 
   VkResult Create(LogicalDevice* device, RenderPass* render_pass,
                   VkExtent2D extent,
-                  const std::vector<VkImageView>& attachments);
+                  const std::vector<VkImageView>& attachments,
+                  uint32_t layers = 1);
   void Destroy();
 
   /*
@@ -32,7 +33,8 @@ class Framebuffer {
   - Used for handling window resize
   */
   VkResult Resize(VkExtent2D extent,
-                  const std::vector<VkImageView>& attachments);
+                  const std::vector<VkImageView>& attachments,
+                  uint32_t layers = 1);
 
  private:
   VkResult Create();
@@ -42,6 +44,7 @@ class Framebuffer {
   LogicalDevice* device_;
   RenderPass* render_pass_;
   VkExtent2D extent_;
+  uint32_t layers_;
   std::vector<VkImageView> attachments_;
 };
 

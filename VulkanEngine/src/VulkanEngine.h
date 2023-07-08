@@ -41,6 +41,7 @@ namespace Renderer {
 struct GPUCameraData {
   glm::mat4 view;
   glm::mat4 projection;
+  glm::mat4 view_proj;
   alignas(16) glm::vec3 pos;
 };
 
@@ -126,8 +127,7 @@ class VulkanEngine {
   void ExecuteCull(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderScene::MeshPass& pass,
                    const Renderer::CullParams& params);
-  void DrawShadows(Renderer::CommandBuffer command_buffer,
-                   Renderer::RenderScene::MeshPass& pass);
+  void DrawShadows(Renderer::CommandBuffer command_buffer);
   void DrawForward(Renderer::CommandBuffer command_buffer,
                    Renderer::RenderScene::MeshPass& pass);
   void ExecuteDraw(Renderer::CommandBuffer command_buffer,
@@ -209,6 +209,7 @@ class VulkanEngine {
   Renderer::Image depth_resolve_image_;
   Renderer::Image shadow_image_;
   VkExtent2D shadow_extent_{4096, 4096};
+  Renderer::ImageCube point_shadow_image_;
 
   Renderer::Image depth_pyramid_;
   uint32_t depth_pyramid_width_;
@@ -217,10 +218,12 @@ class VulkanEngine {
   VkImageView depth_pyramid_mips_[16] = {};
 
   Renderer::RenderPass forward_pass_;
-  Renderer::RenderPass shadow_pass_;
+  Renderer::RenderPass directional_shadow_pass_;
+  Renderer::RenderPass point_shadow_pass_;
   Renderer::RenderPass copy_pass_;
   Renderer::Framebuffer forward_framebuffer_;
   Renderer::Framebuffer shadow_framebuffer_;
+  Renderer::Framebuffer point_shadow_framebuffer_;
   std::array<Renderer::Framebuffer, kMaxFramesInFlight> swapchain_framebuffers_;
 
   Renderer::DescriptorAllocator descriptor_allocator_;

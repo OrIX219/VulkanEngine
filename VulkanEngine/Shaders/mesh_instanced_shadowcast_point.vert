@@ -1,10 +1,14 @@
 #version 460
 
-layout(location = 0) in vec3 inNormal;
+layout(location = 0) in vec3 pos;
+layout(location = 1) in vec3 normal;
+layout(location = 2) in vec3 color;
+layout(location = 3) in vec2 textureCoords;
 
 struct CameraData {
 	mat4 view;
 	mat4 projection;
+	mat4 viewProj;
 	vec3 pos;
 };
 
@@ -14,8 +18,7 @@ struct DirectionalLight {
 	float specular;
 	vec3 direction;
 	vec4 color;
-	mat4 view;
-	mat4 projection;
+	mat4 viewProj;
 };
 
 struct PointLight {
@@ -24,9 +27,11 @@ struct PointLight {
 	float specular;
 	vec3 position;
 	vec4 color;
+	mat4 viewProj[6];
 	float constant;
 	float linear;
 	float quadratic;
+	float farPlane;
 };
 
 struct SpotLight {
@@ -52,9 +57,23 @@ layout(set = 0, binding = 0) uniform SceneData {
 	SpotLight spotLights[8];
 } sceneData;
 
+struct ObjectData {
+	mat4 model;
+	mat4 normalMat;
+	vec4 bounds;
+	vec4 extents;
+};
+
+layout(std140, set = 1, binding = 0) readonly buffer ObjectBuffer {
+	ObjectData objects[];
+} objectBuffer;
+
+layout(set = 1, binding = 1) readonly buffer InstanceBuffer {
+	uint ids[];
+} instanceBuffer;
+
 void main() {
-	vec3 lightDir = normalize(-sceneData.directionalLights[0].direction.xyz);
-	float bias = max(0.0001, 0.001 * (1.0 - dot(inNormal, lightDir)));
-	gl_FragDepth = gl_FragCoord.z;
-	gl_FragDepth += gl_FrontFacing ? bias : 0.0;
+	uint index = instanceBuffer.ids[gl_InstanceIndex];
+	mat4 modelMatrix = objectBuffer.objects[index].model;
+	gl_Position = modelMatrix * vec4(pos, 1.f);
 }

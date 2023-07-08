@@ -63,8 +63,7 @@ bool TextureCube::LoadFromDirectory(VmaAllocator allocator,
   image_.Create(allocator, device, extent,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                    VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_IMAGE_VIEW_TYPE_CUBE, 6);
+                    VK_IMAGE_USAGE_SAMPLED_BIT);
 
   image_.TransitionLayout(command_buffer, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,

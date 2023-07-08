@@ -30,8 +30,7 @@ struct alignas(16) GPULight {
 struct alignas(16) GPUDirectionalLight : public GPULight {
   alignas(16) glm::vec3 direction;
   alignas(16) glm::vec4 color;
-  alignas(16) glm::mat4 view;
-  alignas(16) glm::mat4 projection;
+  alignas(16) glm::mat4 view_proj;
 };
 
 struct DirectionalLight : public Light {
@@ -59,9 +58,11 @@ struct DirectionalLight : public Light {
 struct alignas(16) GPUPointLight : public GPULight {
   alignas(16) glm::vec3 position;
   alignas(16) glm::vec4 color;
+  alignas(16) glm::mat4 view_proj[6];
   float constant;
   float linear;
   float quadratic;
+  float far_plane;
 };
 
 struct PointLight : public Light {
@@ -72,7 +73,8 @@ struct PointLight : public Light {
   float quadratic;
 
   PointLight();
-  PointLight(glm::vec4 color, float constant, float linear, float quadratic);
+  PointLight(glm::vec4 color, glm::vec3 position, float constant, float linear,
+             float quadratic);
 
   void SetPosition(const glm::vec3& pos);
   void SetPosition(glm::vec3&& pos);

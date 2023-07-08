@@ -15,9 +15,11 @@ VkResult Framebuffer::Resize(VkExtent2D extent) {
 }
 
 VkResult Framebuffer::Resize(VkExtent2D extent,
-                             const std::vector<VkImageView>& attachments) {
+                             const std::vector<VkImageView>& attachments,
+                             uint32_t layers) {
   attachments_ = attachments;
   extent_ = extent;
+  layers_ = layers;
   Destroy();
   return Create();
 }
@@ -31,7 +33,7 @@ VkResult Framebuffer::Create() {
   framebuffer_info.pAttachments = attachments_.data();
   framebuffer_info.width = extent_.width;
   framebuffer_info.height = extent_.height;
-  framebuffer_info.layers = 1;
+  framebuffer_info.layers = layers_;
 
   return vkCreateFramebuffer(device_->Get(), &framebuffer_info, nullptr,
                              &framebuffer_);
@@ -39,10 +41,12 @@ VkResult Framebuffer::Create() {
 
 VkResult Framebuffer::Create(LogicalDevice* device, RenderPass* render_pass,
                              VkExtent2D extent,
-                             const std::vector<VkImageView>& attachments) {
+                             const std::vector<VkImageView>& attachments,
+                             uint32_t layers) {
   device_ = device;
   render_pass_ = render_pass;
   extent_ = extent;
+  layers_ = layers;
   attachments_ = attachments;
   return Create();
 }

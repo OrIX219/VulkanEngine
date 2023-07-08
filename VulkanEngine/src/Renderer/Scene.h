@@ -176,7 +176,9 @@ class RenderScene {
 
   MeshPass forward_pass;
   MeshPass transparent_pass;
-  MeshPass shadow_pass;
+  // Should rework this. It duplicates buffers
+  MeshPass directional_shadow_pass;
+  MeshPass point_shadow_pass;
   
   std::vector<SceneObject> renderables;
   
