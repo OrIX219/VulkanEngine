@@ -255,7 +255,7 @@ void VulkanEngine::InitCVars() {
       "scene.sunlight_color", "Sunlight color (xyz) and power (w)",
       {1.f, 1.f, 1.f, 0.1f}, CVarFlagBits::kEditColor);
 
-  AutoCVar_Vec3 CVar_pointlight_pos("scene.point_light_pos", "asd", {0.f, 0.f, 0.f});
+  AutoCVar_Vec3 CVar_pointlight_pos("scene.point_light_pos", "asd", {-2.f, 1.f, -3.5f});
 
   AutoCVar_Int CVar_cull_enable("culling.enable", "Enable culling", 1,
                                 CVarFlagBits::kEditCheckbox);
@@ -368,16 +368,16 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetFormat(VK_FORMAT_D32_SFLOAT);
 
     Renderer::RenderPassSubpass subpass;
-    render_pass_builder.AddAttachment(&color_attachment)
-        .AddAttachment(&depth_attachment)
-        .AddAttachment(&color_resolve_attachment)
-        .AddAttachment(&depth_resolve_attachment);
+    render_pass_builder.AddAttachment(color_attachment)
+        .AddAttachment(depth_attachment)
+        .AddAttachment(color_resolve_attachment)
+        .AddAttachment(depth_resolve_attachment);
     subpass.AddColorAttachmentRef(0)
         .SetDepthStencilAttachmentRef(1)
         .AddResolveAttachmentRef(2)
         .SetDepthStencilResolveAttachmentRef(3);
 
-    render_pass_builder.AddSubpass(&subpass);
+    render_pass_builder.AddSubpass(subpass);
     render_pass_builder
         .AddDependency(VK_SUBPASS_EXTERNAL, 0,
                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
@@ -405,10 +405,10 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetFormat(swapchain_.GetImageFormat());
 
     Renderer::RenderPassSubpass subpass;
-    render_pass_builder.AddAttachment(&color_attachment);
+    render_pass_builder.AddAttachment(color_attachment);
     subpass.AddColorAttachmentRef(0);
 
-    render_pass_builder.AddSubpass(&subpass);
+    render_pass_builder.AddSubpass(subpass);
     render_pass_builder.AddDependency(
         VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -431,10 +431,10 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetFormat(VK_FORMAT_D32_SFLOAT);
 
     Renderer::RenderPassSubpass subpass;
-    render_pass_builder.AddAttachment(&depth_attachment);
+    render_pass_builder.AddAttachment(depth_attachment);
     subpass.SetDepthStencilAttachmentRef(0);
 
-    render_pass_builder.AddSubpass(&subpass);
+    render_pass_builder.AddSubpass(subpass);
     render_pass_builder.AddDependency(
         VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -457,10 +457,10 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetFormat(VK_FORMAT_D32_SFLOAT);
 
     Renderer::RenderPassSubpass subpass;
-    render_pass_builder.AddAttachment(&depth_attachment);
+    render_pass_builder.AddAttachment(depth_attachment);
     subpass.SetDepthStencilAttachmentRef(0);
 
-    render_pass_builder.AddSubpass(&subpass);
+    render_pass_builder.AddSubpass(subpass);
     render_pass_builder.AddDependency(
         VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -697,11 +697,14 @@ void VulkanEngine::InitDepthPyramid(Renderer::CommandPool& init_pool) {
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin(true);
-  depth_pyramid_.TransitionLayout(
-      command_buffer, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-      VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_IMAGE_ASPECT_COLOR_BIT,
-      VK_DEPENDENCY_BY_REGION_BIT);
+  Renderer::Image::LayoutTransitionInfo layout_info{};
+  layout_info.src_access = VK_ACCESS_SHADER_WRITE_BIT;
+  layout_info.dst_access = VK_ACCESS_SHADER_READ_BIT;
+  layout_info.new_layout = VK_IMAGE_LAYOUT_GENERAL;
+  layout_info.src_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  layout_info.dependency = VK_DEPENDENCY_BY_REGION_BIT;
+  depth_pyramid_.LayoutTransition(command_buffer, layout_info);
   command_buffer.End();
   command_buffer.Submit();
 }
@@ -1604,7 +1607,7 @@ void VulkanEngine::ReadyCullData(Renderer::CommandBuffer command_buffer,
 }
 
 void VulkanEngine::ExecuteCull(Renderer::CommandBuffer command_buffer,
-                               Renderer::RenderScene::MeshPass& pass,
+                               const Renderer::RenderScene::MeshPass& pass,
                                const Renderer::CullParams& params) {
   if (pass.indirect_batches.size() == 0) return;
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
@@ -1726,7 +1729,7 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
   VkClearValue depth_clear;
   depth_clear.depthStencil.depth = 1.f;
 
-  if (render_scene_.directional_shadow_pass.indirect_batches.size() > 0) {
+  {
     Renderer::RenderScene::MeshPass& pass = render_scene_.directional_shadow_pass;
     VkDescriptorBufferInfo object_buffer_info =
         render_scene_.object_data_buffer.GetDescriptorInfo();
@@ -1741,8 +1744,10 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
                     VK_SHADER_STAGE_VERTEX_BIT)
         .Build(object_set);
 
-    directional_shadow_pass_.Begin(command_buffer, shadow_framebuffer_.Get(),
-                                   {{0, 0}, shadow_extent_}, {depth_clear});
+    Renderer::RenderPass::BeginInfo begin_info{{depth_clear}};
+    begin_info.framebuffer = shadow_framebuffer_.Get();
+    begin_info.render_area = {{0, 0}, shadow_extent_};
+    directional_shadow_pass_.Begin(command_buffer, begin_info);
 
     VkViewport viewport{0.f, 0.f,
                         static_cast<float>(shadow_extent_.width),
@@ -1772,15 +1777,16 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
 
     vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 1.2f);
 
-    std::vector<uint32_t> dynamic_offsets;
-    dynamic_offsets.push_back(scene_offset);
+    Renderer::DrawData draw_data{};
+    draw_data.offsets.push_back(scene_offset);
+    draw_data.global_set = global_set;
+    draw_data.object_data_set = object_set;
 
-    ExecuteDraw(command_buffer, pass, object_set, dynamic_offsets, global_set);
+    ExecuteDraw(command_buffer, pass, draw_data);
 
     directional_shadow_pass_.End(command_buffer);
   }
-
-  if (render_scene_.point_shadow_pass.indirect_batches.size() > 0) {
+  {
     Renderer::RenderScene::MeshPass& pass = render_scene_.point_shadow_pass;
     VkDescriptorBufferInfo object_buffer_info =
         render_scene_.object_data_buffer.GetDescriptorInfo();
@@ -1796,9 +1802,10 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
         .Build(object_set);
 
     VkExtent3D extent = point_shadow_image_.GetExtent();
-    point_shadow_pass_.Begin(command_buffer, point_shadow_framebuffer_.Get(),
-                             {{0, 0}, {extent.width, extent.height}},
-                             {depth_clear});
+    Renderer::RenderPass::BeginInfo begin_info{{depth_clear}};
+    begin_info.framebuffer = point_shadow_framebuffer_.Get();
+    begin_info.render_area = {{0, 0}, {extent.width, extent.height}};
+    point_shadow_pass_.Begin(command_buffer, begin_info);
 
     VkViewport viewport{0.f, 0.f,
                         static_cast<float>(extent.width),
@@ -1824,10 +1831,21 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
 
     vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 0.f);
 
-    std::vector<uint32_t> dynamic_offsets;
-    dynamic_offsets.push_back(scene_offset);
+    Renderer::DrawData draw_data{};
+    draw_data.offsets.push_back(scene_offset);
+    draw_data.global_set = global_set;
+    draw_data.object_data_set = object_set;
+    
+    uint32_t light_index = 0;
+    Renderer::PushConstants constants{};
+    constants.data = &light_index;
+    constants.size = sizeof(light_index);
+    constants.stages =
+        VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    ExecuteDraw(command_buffer, pass, object_set, dynamic_offsets, global_set);
+    draw_data.push_constants = constants;
+
+    ExecuteDraw(command_buffer, pass, draw_data);
 
     point_shadow_pass_.End(command_buffer);
   }
@@ -1835,7 +1853,7 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
 }
 
 void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
-                               Renderer::RenderScene::MeshPass& pass) {
+                               const Renderer::RenderScene::MeshPass& pass) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
@@ -1848,9 +1866,11 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   VkClearValue depth_clear{};
   depth_clear.depthStencil.depth = 1.f;
 
-  forward_pass_.Begin(command_buffer, forward_framebuffer_.Get(),
-                      {{0, 0}, swapchain_.GetImageExtent()},
-                      {clear_value, depth_clear, clear_value, depth_clear});
+  Renderer::RenderPass::BeginInfo begin_info{
+      {clear_value, depth_clear, clear_value, depth_clear}};
+  begin_info.framebuffer = forward_framebuffer_.Get();
+  begin_info.render_area = {{0, 0}, swapchain_.GetImageExtent()};
+  forward_pass_.Begin(command_buffer, begin_info);
 
   VkExtent2D extent = swapchain_.GetImageExtent();
   VkViewport viewport{0.f, 0.f,
@@ -1926,11 +1946,12 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
   vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 0.f);
 
-  std::vector<uint32_t> dynamic_offsets;
-  dynamic_offsets.push_back(scene_data_offset);
+  Renderer::DrawData draw_data{};
+  draw_data.offsets.push_back(scene_data_offset);
+  draw_data.global_set = frame.global_descriptor;
+  draw_data.object_data_set = frame.object_descriptor;
 
-  ExecuteDraw(command_buffer, pass, frame.object_descriptor, dynamic_offsets,
-              frame.global_descriptor);
+  ExecuteDraw(command_buffer, pass, draw_data);
 
   DrawSkybox(command_buffer, scene_info, scene_data_offset);
 
@@ -1942,79 +1963,130 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 }
 
 void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
-                               Renderer::RenderScene::MeshPass& pass,
-                               VkDescriptorSet object_data_set,
-                               const std::vector<uint32_t>& offsets,
-                               VkDescriptorSet global_set) {
+                               const Renderer::RenderScene::MeshPass& pass,
+                               const Renderer::DrawData& draw_data) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
-  if (pass.indirect_batches.size() > 0) {
-    Renderer::Mesh* last_mesh = nullptr;
-    Renderer::Material* last_material = nullptr;
-    VkPipeline last_pipeline = nullptr;
-    VkDescriptorSet last_material_set = nullptr;
+  if (pass.indirect_batches.size() == 0) return;
 
-    VkDeviceSize offset = 0;
-    VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.Get();
-    vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, &vertex_buffer, &offset);
-    vkCmdBindIndexBuffer(command_buffer.Get(),
-                         render_scene_.merged_index_buffer.Get(), 0,
-                         VK_INDEX_TYPE_UINT32);
+  Renderer::Mesh* last_mesh = nullptr;
+  Renderer::Material* last_material = nullptr;
+  VkPipeline last_pipeline = nullptr;
+  VkDescriptorSet last_material_set = nullptr;
 
-    for (size_t i = 0; i < pass.multibatches.size(); ++i) {
-      auto& multibatch = pass.multibatches[i];
-      auto& instance = pass.indirect_batches[multibatch.first];
+  VkDeviceSize offset = 0;
+  VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.Get();
+  vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, &vertex_buffer, &offset);
+  vkCmdBindIndexBuffer(command_buffer.Get(),
+                        render_scene_.merged_index_buffer.Get(), 0,
+                        VK_INDEX_TYPE_UINT32);
 
-      Renderer::Pipeline new_pipeline = instance.material.shader_pass->pipeline;
-      VkDescriptorSet new_material_set = instance.material.material_set;
+  for (size_t i = 0; i < pass.multibatches.size(); ++i) {
+    auto& multibatch = pass.multibatches[i];
+    auto& instance = pass.indirect_batches[multibatch.first];
 
-      Renderer::Mesh* draw_mesh = render_scene_.GetMesh(instance.mesh_id)->mesh;
+    Renderer::Pipeline new_pipeline = instance.material.shader_pass->pipeline;
+    VkDescriptorSet new_material_set = instance.material.material_set;
 
-      if (new_pipeline.Get() != last_pipeline) {
-        last_pipeline = new_pipeline.Get();
-        new_pipeline.Bind(command_buffer);
-        vkCmdBindDescriptorSets(
-            command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-            new_pipeline.GetLayout(), 0, 1, &global_set,
-            static_cast<uint32_t>(offsets.size()), offsets.data());
-        vkCmdBindDescriptorSets(command_buffer.Get(),
-                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                new_pipeline.GetLayout(), 1, 1,
-                                &object_data_set, 0, nullptr);
-      }
+    Renderer::Mesh* draw_mesh = render_scene_.GetMesh(instance.mesh_id)->mesh;
 
-      if (new_material_set != last_material_set) {
-        last_material_set = new_material_set;
-        vkCmdBindDescriptorSets(
-            command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-            new_pipeline.GetLayout(), 2, 1, &new_material_set, 0, nullptr);
-      }
+    if (new_pipeline.Get() != last_pipeline) {
+      last_pipeline = new_pipeline.Get();
+      new_pipeline.Bind(command_buffer);
+      vkCmdBindDescriptorSets(
+          command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+          new_pipeline.GetLayout(), 0, 1, &draw_data.global_set,
+          static_cast<uint32_t>(draw_data.offsets.size()),
+          draw_data.offsets.data());
+      vkCmdBindDescriptorSets(command_buffer.Get(),
+                              VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              new_pipeline.GetLayout(), 1, 1,
+                              &draw_data.object_data_set, 0, nullptr);
+    }
 
-      bool merged = render_scene_.GetMesh(instance.mesh_id)->is_merged;
-      if (merged) {
-        if (last_mesh != nullptr) {
-          VkDeviceSize offset = 0;
-          VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.Get();
-          vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, &vertex_buffer,
-                                 &offset);
-          vkCmdBindIndexBuffer(command_buffer.Get(),
-                               render_scene_.merged_index_buffer.Get(), 0,
-                               VK_INDEX_TYPE_UINT32);
-          last_mesh = nullptr;
-        }
-      } else if (last_mesh != draw_mesh) {
+    if (new_material_set != last_material_set) {
+      last_material_set = new_material_set;
+      vkCmdBindDescriptorSets(
+          command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+          new_pipeline.GetLayout(), 2, 1, &new_material_set, 0, nullptr);
+    }
+
+    if (draw_data.push_constants.has_value()) {
+      const Renderer::PushConstants& constants =
+          draw_data.push_constants.value();
+      vkCmdPushConstants(command_buffer.Get(), new_pipeline.GetLayout(),
+                         constants.stages, constants.offset, constants.size,
+                         constants.data);
+    }
+
+    bool merged = render_scene_.GetMesh(instance.mesh_id)->is_merged;
+    if (merged) {
+      if (last_mesh != nullptr) {
         VkDeviceSize offset = 0;
-        VkBuffer vertex_buffer = draw_mesh->GetVertexBuffer().Get();
+        VkBuffer vertex_buffer = render_scene_.merged_vertex_buffer.Get();
         vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, &vertex_buffer,
-                               &offset);
+                                &offset);
         vkCmdBindIndexBuffer(command_buffer.Get(),
-                             draw_mesh->GetIndexBuffer().Get(), 0,
-                             VK_INDEX_TYPE_UINT32);
-        last_mesh = draw_mesh;
+                              render_scene_.merged_index_buffer.Get(), 0,
+                              VK_INDEX_TYPE_UINT32);
+        last_mesh = nullptr;
       }
+    } else if (last_mesh != draw_mesh) {
+      VkDeviceSize offset = 0;
+      VkBuffer vertex_buffer = draw_mesh->GetVertexBuffer().Get();
+      vkCmdBindVertexBuffers(command_buffer.Get(), 0, 1, &vertex_buffer,
+                              &offset);
+      vkCmdBindIndexBuffer(command_buffer.Get(),
+                            draw_mesh->GetIndexBuffer().Get(), 0,
+                            VK_INDEX_TYPE_UINT32);
+      last_mesh = draw_mesh;
+    }
 
-      bool has_indices = draw_mesh->GetIndicesCount() > 0;
+    bool has_indices = draw_mesh->GetIndicesCount() > 0;
+    if (!has_indices) {
+      vkCmdDraw(command_buffer.Get(), draw_mesh->GetVerticesCount(),
+                instance.count, 0, instance.first);
+    } else {
+      vkCmdDrawIndexedIndirectCount(
+          command_buffer.Get(), pass.draw_indirect_buffer.Get(),
+          multibatch.first * sizeof(Renderer::GPUIndirectObject),
+          pass.count_buffer.Get(), i * sizeof(uint32_t),
+          multibatch.count, sizeof(Renderer::GPUIndirectObject));
+    }
+
+    bool show_normals = *CVarSystem::Get()->GetIntCVar("show_normals");
+    if (show_normals && pass.type == Renderer::MeshPassType::kForward) {
+      Renderer::Material* material =
+          Renderer::MaterialSystem::GetMaterial("normals");
+      Renderer::Pipeline pipeline =
+          material->original->pass_shaders[Renderer::MeshPassType::kForward]
+              ->pipeline;
+
+      last_pipeline = pipeline.Get();
+
+      VkDescriptorBufferInfo scene_info =
+          frame.dynamic_data.GetDescriptorInfo();
+      scene_info.range = sizeof(Renderer::GPUSceneData);
+
+      VkDescriptorSet normals_global_set;
+      Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                          &frame.dynamic_descriptor_allocator)
+          .BindBuffer(
+              0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT)
+          .Build(normals_global_set);
+
+      pipeline.Bind(command_buffer);
+      vkCmdBindDescriptorSets(
+          command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+          pipeline.GetLayout(), 0, 1, &normals_global_set,
+                              static_cast<uint32_t>(draw_data.offsets.size()),
+                              draw_data.offsets.data());
+      vkCmdBindDescriptorSets(
+          command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+          pipeline.GetLayout(), 1, 1, &draw_data.object_data_set, 0, nullptr);
+
       if (!has_indices) {
         vkCmdDraw(command_buffer.Get(), draw_mesh->GetVerticesCount(),
                   instance.count, 0, instance.first);
@@ -2024,49 +2096,6 @@ void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
             multibatch.first * sizeof(Renderer::GPUIndirectObject),
             pass.count_buffer.Get(), i * sizeof(uint32_t),
             multibatch.count, sizeof(Renderer::GPUIndirectObject));
-      }
-
-      bool show_normals = *CVarSystem::Get()->GetIntCVar("show_normals");
-      if (show_normals && pass.type == Renderer::MeshPassType::kForward) {
-        Renderer::Material* material =
-            Renderer::MaterialSystem::GetMaterial("normals");
-        Renderer::Pipeline pipeline =
-            material->original->pass_shaders[Renderer::MeshPassType::kForward]
-                ->pipeline;
-
-        last_pipeline = pipeline.Get();
-
-        VkDescriptorBufferInfo scene_info =
-            frame.dynamic_data.GetDescriptorInfo();
-        scene_info.range = sizeof(Renderer::GPUSceneData);
-
-        VkDescriptorSet normals_global_set;
-        Renderer::DescriptorBuilder::Begin(&layout_cache_,
-                                           &frame.dynamic_descriptor_allocator)
-            .BindBuffer(
-                0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT)
-            .Build(normals_global_set);
-
-        pipeline.Bind(command_buffer);
-        vkCmdBindDescriptorSets(
-            command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipeline.GetLayout(), 0, 1, &normals_global_set,
-            static_cast<uint32_t>(offsets.size()), offsets.data());
-        vkCmdBindDescriptorSets(
-            command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipeline.GetLayout(), 1, 1, &object_data_set, 0, nullptr);
-
-        if (!has_indices) {
-          vkCmdDraw(command_buffer.Get(), draw_mesh->GetVerticesCount(),
-                    instance.count, 0, instance.first);
-        } else {
-          vkCmdDrawIndexedIndirectCount(
-              command_buffer.Get(), pass.draw_indirect_buffer.Get(),
-              multibatch.first * sizeof(Renderer::GPUIndirectObject),
-              pass.count_buffer.Get(), i * sizeof(uint32_t),
-              multibatch.count, sizeof(Renderer::GPUIndirectObject));
-        }
       }
     }
   }
@@ -2144,12 +2173,15 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
 
   Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Depth Reduce");
 
-  depth_resolve_image_.TransitionLayout(
-      command_buffer, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-      VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-      VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,
-      VK_DEPENDENCY_BY_REGION_BIT);
+  Renderer::Image::LayoutTransitionInfo layout_info{};
+  layout_info.src_access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+  layout_info.dst_access = VK_ACCESS_SHADER_READ_BIT;
+  layout_info.new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  layout_info.src_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  layout_info.aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT;
+  layout_info.dependency = VK_DEPENDENCY_BY_REGION_BIT;
+  depth_resolve_image_.LayoutTransition(command_buffer, layout_info);
 
   vkCmdBindPipeline(command_buffer.Get(), VK_PIPELINE_BIND_POINT_COMPUTE,
                     depth_reduce_pipeline_);
@@ -2196,21 +2228,27 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
     vkCmdDispatch(command_buffer.Get(), GetGroupCount(level_width, 32),
                   GetGroupCount(level_height, 32), 1);
 
-    depth_pyramid_.TransitionLayout(
-        command_buffer, VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-        VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT);
+    Renderer::Image::LayoutTransitionInfo mip_layout_info{};
+    mip_layout_info.src_access = VK_ACCESS_SHADER_WRITE_BIT;
+    mip_layout_info.dst_access = VK_ACCESS_SHADER_READ_BIT;
+    mip_layout_info.new_layout = VK_IMAGE_LAYOUT_GENERAL;
+    mip_layout_info.src_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    mip_layout_info.dst_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    mip_layout_info.aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
+    mip_layout_info.dependency = VK_DEPENDENCY_BY_REGION_BIT;
+    depth_pyramid_.LayoutTransition(command_buffer, mip_layout_info);
   }
 
-  depth_resolve_image_.TransitionLayout(
-      command_buffer, VK_ACCESS_SHADER_READ_BIT,
-      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-      VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_IMAGE_ASPECT_DEPTH_BIT,
-      VK_DEPENDENCY_BY_REGION_BIT);
+  layout_info.src_access = VK_ACCESS_SHADER_READ_BIT;
+  layout_info.dst_access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+  layout_info.new_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+  layout_info.src_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+  layout_info.aspect_flags = VK_IMAGE_ASPECT_DEPTH_BIT;
+  layout_info.dependency = VK_DEPENDENCY_BY_REGION_BIT;
+  depth_resolve_image_.LayoutTransition(
+      command_buffer, layout_info);
 }
 
 void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
@@ -2221,8 +2259,10 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
   Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Copy to Swapchain");
 
   VkClearValue clear_value = {{{0.f, 0.f, 0.f, 1.f}}};
-  copy_pass_.Begin(command_buffer, swapchain_framebuffers_[index].Get(),
-      {{0, 0}, swapchain_.GetImageExtent()}, {clear_value, clear_value});
+  Renderer::RenderPass::BeginInfo begin_info{{clear_value}};
+  begin_info.framebuffer = swapchain_framebuffers_[index].Get();
+  begin_info.render_area = {{0, 0}, swapchain_.GetImageExtent()};
+  copy_pass_.Begin(command_buffer, begin_info);
 
   VkExtent2D extent = swapchain_.GetImageExtent();
   VkViewport viewport{0.f, 0.f,

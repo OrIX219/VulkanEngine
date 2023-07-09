@@ -57,12 +57,16 @@ layout(set = 0, binding = 0) uniform SceneData {
 	SpotLight spotLights[8];
 } sceneData;
 
+layout(push_constant) uniform constants {
+	uint lightIndex;
+};
+
 void main() {
 	for(int face = 0; face < 6; face++) {
 		gl_Layer = face;
 		for(int i = 0; i < 3; i++) {
 			outFragPos = gl_in[i].gl_Position;
-			gl_Position = sceneData.pointLights[0].viewProj[face] * outFragPos;
+			gl_Position = sceneData.pointLights[lightIndex].viewProj[face] * outFragPos;
 			EmitVertex();
 		}
 		EndPrimitive();

@@ -65,17 +65,21 @@ bool TextureCube::LoadFromDirectory(VmaAllocator allocator,
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                     VK_IMAGE_USAGE_SAMPLED_BIT);
 
-  image_.TransitionLayout(command_buffer, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_TRANSFER_BIT);
+  Renderer::Image::LayoutTransitionInfo layout_info{};
+  layout_info.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+  layout_info.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  layout_info.src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  image_.LayoutTransition(command_buffer, layout_info);
 
   staging_buffer_.CopyTo(command_buffer, image_);
 
-  image_.TransitionLayout(
-      command_buffer, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+  layout_info.src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+  layout_info.dst_access = VK_ACCESS_SHADER_READ_BIT;
+  layout_info.new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  layout_info.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  image_.LayoutTransition(command_buffer, layout_info);
 
   return true;
 }

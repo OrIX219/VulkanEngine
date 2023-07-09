@@ -14,6 +14,8 @@ class BufferBase {
   BufferBase() : buffer_(VK_NULL_HANDLE), buffer_size_(0) {}
 
   VkBuffer Get() { return buffer_; }
+  const VkBuffer Get() const { return buffer_; }
+
   VkDeviceSize GetSize() const { return buffer_size_; }
 
   VkDescriptorBufferInfo GetDescriptorInfo() const {

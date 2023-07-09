@@ -12,19 +12,22 @@ namespace Renderer {
 
 class RenderPass {
  public:
+  struct BeginInfo {
+    std::vector<VkClearValue> clear_values;
+    VkFramebuffer framebuffer;
+    VkRect2D render_area;
+    VkSubpassContents subpass_contents = VK_SUBPASS_CONTENTS_INLINE;
+  };
+
   RenderPass();
   ~RenderPass();
 
-  VkResult CreateDefault(LogicalDevice* device, VkFormat image_format);
   VkResult Create(LogicalDevice* device, VkRenderPassCreateInfo2* create_info);
   void Destroy();
 
   VkRenderPass Get() const;
 
-  void Begin(CommandBuffer command_buffer, VkFramebuffer framebuffer,
-             VkRect2D render_area,
-             const std::vector<VkClearValue>& clear_values,
-             VkSubpassContents subpass_contents = VK_SUBPASS_CONTENTS_INLINE);
+  void Begin(CommandBuffer command_buffer, const BeginInfo& begin_info);
   void End(CommandBuffer command_buffer);
 
  private:
@@ -81,9 +84,9 @@ class RenderPassBuilder {
   RenderPass Build();
   void Clear();
 
-  RenderPassBuilder& AddAttachment(RenderPassAttachment* attachment);
+  RenderPassBuilder& AddAttachment(const RenderPassAttachment& attachment);
   RenderPassBuilder& AddSubpass(
-      RenderPassSubpass* subpass,
+      const RenderPassSubpass& subpass,
       VkPipelineBindPoint bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS);
   RenderPassBuilder& AddDependency(uint32_t src_subpass, uint32_t dst_subpass,
                                    VkPipelineStageFlags src_stage_mask,

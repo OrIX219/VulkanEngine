@@ -116,30 +116,26 @@ VkImageViewType Image::GetViewType() const { return view_type_; }
 
 VkImageLayout Image::GetLayout() const { return current_layout_; }
 
-void Image::TransitionLayout(CommandBuffer command_buffer,
-                             VkAccessFlags src_access, VkAccessFlags dst_access,
-                             VkImageLayout new_layout,
-                             VkPipelineStageFlags src_stage,
-                             VkPipelineStageFlags dst_stage,
-                             VkImageAspectFlags aspect_flags,
-                             VkDependencyFlags dependency) {
+void Image::LayoutTransition(CommandBuffer command_buffer,
+                             const LayoutTransitionInfo& transition_info) {
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.srcAccessMask = src_access;
-  barrier.dstAccessMask = dst_access;
+  barrier.srcAccessMask = transition_info.src_access;
+  barrier.dstAccessMask = transition_info.dst_access;
   barrier.oldLayout = current_layout_;
-  barrier.newLayout = new_layout;
+  barrier.newLayout = transition_info.new_layout;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.image = image_;
-  barrier.subresourceRange.aspectMask = aspect_flags;
+  barrier.subresourceRange.aspectMask = transition_info.aspect_flags;
   barrier.subresourceRange.baseMipLevel = 0;
   barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
   barrier.subresourceRange.baseArrayLayer = 0;
   barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-  vkCmdPipelineBarrier(command_buffer.Get(), src_stage, dst_stage,
-                       dependency, 0, nullptr, 0, nullptr, 1, &barrier);
+  vkCmdPipelineBarrier(command_buffer.Get(), transition_info.src_stage,
+                       transition_info.dst_stage, transition_info.dependency, 0,
+                       nullptr, 0, nullptr, 1, &barrier);
 }
 
 VkResult Image::CreateImageView(VkImageAspectFlags aspect_flags) {
@@ -162,8 +158,8 @@ ImageCube::ImageCube() : Image() { view_type_ = VK_IMAGE_VIEW_TYPE_CUBE; }
 
 ImageCube::ImageCube(VmaAllocator allocator, LogicalDevice* device,
                      VkExtent3D extent, VkImageUsageFlags usage,
-                     VkFormat format) {
-  Create(allocator, device, extent, usage, format);
+                     VkFormat format, VkImageAspectFlagBits aspect_flags) {
+  Create(allocator, device, extent, usage, format, aspect_flags);
 }
 
 VkResult ImageCube::Create(VmaAllocator allocator, LogicalDevice* device,

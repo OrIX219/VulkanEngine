@@ -54,7 +54,12 @@ layout(set = 0, binding = 0) uniform SceneData {
 	SpotLight spotLights[8];
 } sceneData;
 
+layout(push_constant) uniform constants {
+	uint lightIndex;
+};
+
 void main() {
-	float lightDistance = length(inFragPos.xyz - sceneData.pointLights[0].position) / sceneData.pointLights[0].farPlane;
+	float lightDistance = length(inFragPos.xyz - sceneData.pointLights[lightIndex].position) 
+		/ sceneData.pointLights[lightIndex].farPlane;
 	gl_FragDepth = lightDistance;
 }

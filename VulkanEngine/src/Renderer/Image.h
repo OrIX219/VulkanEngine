@@ -65,18 +65,24 @@ class Image {
   VkImageViewType GetViewType() const;
   VkImageLayout GetLayout() const;
 
+  struct LayoutTransitionInfo {
+    VkAccessFlags src_access;
+    VkAccessFlags dst_access;
+    VkImageLayout new_layout;
+    VkPipelineStageFlags src_stage;
+    VkPipelineStageFlags dst_stage;
+    VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT;
+    VkDependencyFlags dependency = 0;
+  };
+
+  void LayoutTransition(CommandBuffer command_buffer,
+                        const LayoutTransitionInfo& transition_info);
+
   static uint32_t CalculateMipLevels(uint32_t width, uint32_t height) {
     return static_cast<uint32_t>(
                std::floor(std::log2(std::max(width, height)))) +
            1;
   }
-
-  void TransitionLayout(
-      CommandBuffer command_buffer, VkAccessFlags src_access,
-      VkAccessFlags dst_access, VkImageLayout new_layout,
-      VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage,
-      VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
-      VkDependencyFlags dependency = 0);
 
   static VkFormat FindSupportedFormat(PhysicalDevice* physical_device,
                                       const std::vector<VkFormat>& candidates,
@@ -122,7 +128,8 @@ class ImageCube : public Image {
  public:
   ImageCube();
   ImageCube(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
-            VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+            VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
+            VkImageAspectFlagBits aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
 
   VkResult Create(
       VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,

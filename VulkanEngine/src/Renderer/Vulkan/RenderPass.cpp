@@ -6,76 +6,6 @@ RenderPass::RenderPass() {}
 
 RenderPass::~RenderPass() {}
 
-VkResult RenderPass::CreateDefault(LogicalDevice* device,
-                                   VkFormat image_format) {
-  device_ = device;
-
-  VkAttachmentDescription color_attachment{};
-  color_attachment.format = image_format;
-  color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-  VkAttachmentReference color_attachment_ref{};
-  color_attachment_ref.attachment = 0;
-  color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentDescription depth_attachment{};
-  depth_attachment.format = VK_FORMAT_D32_SFLOAT;
-  depth_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  depth_attachment.finalLayout =
-      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference depth_attachment_ref{};
-  depth_attachment_ref.attachment = 1;
-  depth_attachment_ref.layout =
-      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkSubpassDescription subpass{};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &color_attachment_ref;
-  subpass.pDepthStencilAttachment = &depth_attachment_ref;
-
-  VkSubpassDependency dependency{};
-  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass = 0;
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask = 0;
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  VkSubpassDependency depth_dependency{};
-  depth_dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  depth_dependency.dstSubpass = 0;
-  depth_dependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                                  VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-  depth_dependency.srcAccessMask = 0;
-  depth_dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-                                  VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-  depth_dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-  std::array<VkSubpassDependency, 2> dependencies = {dependency, depth_dependency};
-
-  std::array<VkAttachmentDescription, 2> attachments = {color_attachment, depth_attachment};
-  VkRenderPassCreateInfo render_pass_info{};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  render_pass_info.attachmentCount = static_cast<uint32_t>(attachments.size());
-  render_pass_info.pAttachments = attachments.data();
-  render_pass_info.subpassCount = 1;
-  render_pass_info.pSubpasses = &subpass;
-  render_pass_info.dependencyCount = static_cast<uint32_t>(dependencies.size());
-  render_pass_info.pDependencies = dependencies.data();
-
-  return vkCreateRenderPass(device_->Get(), &render_pass_info, nullptr,
-                            &render_pass_);
-}
-
 VkResult RenderPass::Create(LogicalDevice* device,
                             VkRenderPassCreateInfo2* create_info) {
   device_ = device;
@@ -90,20 +20,19 @@ void RenderPass::Destroy() {
 
 VkRenderPass RenderPass::Get() const { return render_pass_; }
 
-void RenderPass::Begin(CommandBuffer command_buffer, VkFramebuffer framebuffer,
-                       VkRect2D render_area,
-                       const std::vector<VkClearValue>& clear_values,
-                       VkSubpassContents subpass_contents) {
+void RenderPass::Begin(CommandBuffer command_buffer,
+                       const BeginInfo& begin_info) {
   VkRenderPassBeginInfo render_pass_info{};
   render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
   render_pass_info.renderPass = render_pass_;
-  render_pass_info.renderArea = std::move(render_area);
-  render_pass_info.framebuffer = framebuffer;
-  render_pass_info.clearValueCount = static_cast<uint32_t>(clear_values.size());
-  render_pass_info.pClearValues = clear_values.data();
+  render_pass_info.renderArea = begin_info.render_area;
+  render_pass_info.framebuffer = begin_info.framebuffer;
+  render_pass_info.clearValueCount =
+      static_cast<uint32_t>(begin_info.clear_values.size());
+  render_pass_info.pClearValues = begin_info.clear_values.data();
 
   vkCmdBeginRenderPass(command_buffer.Get(), &render_pass_info,
-                       subpass_contents);
+                       begin_info.subpass_contents);
 }
 
 void RenderPass::End(CommandBuffer command_buffer) {
@@ -215,25 +144,25 @@ void RenderPassBuilder::Clear() {
 RenderPassBuilder::RenderPassBuilder(LogicalDevice* device) : device_(device) {}
 
 RenderPassBuilder& RenderPassBuilder::AddAttachment(
-    RenderPassAttachment* attachment) {
-  attachments_.push_back(attachment->description);
+    const RenderPassAttachment& attachment) {
+  attachments_.push_back(attachment.description);
 
   return *this;
 }
 
 RenderPassBuilder& RenderPassBuilder::AddSubpass(
-    RenderPassSubpass* subpass, VkPipelineBindPoint bind_point) {
+    const RenderPassSubpass& subpass, VkPipelineBindPoint bind_point) {
   VkSubpassDescription2 subpass_info{VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2};
   subpass_info.pipelineBindPoint = bind_point;
   subpass_info.colorAttachmentCount =
-      static_cast<uint32_t>(subpass->color_attachments.size());
-  subpass_info.pColorAttachments = subpass->color_attachments.data();
-  if (subpass->resolve_attachments.size())
-    subpass_info.pResolveAttachments = subpass->resolve_attachments.data();
-  if (subpass->depth_stencil_attachment.has_value())
-    subpass_info.pDepthStencilAttachment = &subpass->depth_stencil_attachment.value();
-  if (subpass->depth_stencil_resolve_attachment.has_value())
-    subpass_info.pNext = &subpass->depth_stencil_resolve;
+      static_cast<uint32_t>(subpass.color_attachments.size());
+  subpass_info.pColorAttachments = subpass.color_attachments.data();
+  if (subpass.resolve_attachments.size())
+    subpass_info.pResolveAttachments = subpass.resolve_attachments.data();
+  if (subpass.depth_stencil_attachment.has_value())
+    subpass_info.pDepthStencilAttachment = &subpass.depth_stencil_attachment.value();
+  if (subpass.depth_stencil_resolve_attachment.has_value())
+    subpass_info.pNext = &subpass.depth_stencil_resolve;
 
   subpasses_.push_back(subpass_info);
 

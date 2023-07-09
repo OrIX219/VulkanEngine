@@ -89,6 +89,20 @@ struct DrawCullData {
   int dist_cull;
 };
 
+struct PushConstants {
+  VkShaderStageFlags stages;
+  uint32_t offset;
+  uint32_t size;
+  const void* data;
+};
+
+struct DrawData {
+  VkDescriptorSet object_data_set;
+  std::vector<uint32_t> offsets;
+  VkDescriptorSet global_set;
+  std::optional<PushConstants> push_constants;
+};
+
 }
 
 namespace Engine {
@@ -125,16 +139,14 @@ class VulkanEngine {
   void ReadyCullData(Renderer::CommandBuffer command_buffer,
                         Renderer::RenderScene::MeshPass& pass);
   void ExecuteCull(Renderer::CommandBuffer command_buffer,
-                   Renderer::RenderScene::MeshPass& pass,
+                   const Renderer::RenderScene::MeshPass& pass,
                    const Renderer::CullParams& params);
   void DrawShadows(Renderer::CommandBuffer command_buffer);
   void DrawForward(Renderer::CommandBuffer command_buffer,
-                   Renderer::RenderScene::MeshPass& pass);
+                   const Renderer::RenderScene::MeshPass& pass);
   void ExecuteDraw(Renderer::CommandBuffer command_buffer,
-                   Renderer::RenderScene::MeshPass& pass,
-                   VkDescriptorSet object_data_set,
-                   const std::vector<uint32_t>& offsets,
-                   VkDescriptorSet global_set);
+                   const Renderer::RenderScene::MeshPass& pass,
+                   const Renderer::DrawData& draw_data);
   void DrawSkybox(Renderer::CommandBuffer command_buffer,
                   VkDescriptorBufferInfo scene_info, uint32_t dynamic_offset);
   void DrawCoordAxes(Renderer::CommandBuffer command_buffer,
