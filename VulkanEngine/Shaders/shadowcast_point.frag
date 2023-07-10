@@ -1,6 +1,7 @@
 #version 460
 
 layout(location = 0) in vec4 inFragPos;
+layout(location = 1) flat in uint inLightIdx;
 
 struct CameraData {
 	mat4 view;
@@ -49,17 +50,13 @@ layout(set = 0, binding = 0) uniform SceneData {
 	uint directionalLightsCount;
 	DirectionalLight directionalLights[4];
 	uint pointLightsCount;
-	PointLight pointLights[16];
+	PointLight pointLights[8];
 	uint spotLightsCount;
 	SpotLight spotLights[8];
 } sceneData;
 
-layout(push_constant) uniform constants {
-	uint lightIndex;
-};
-
 void main() {
-	float lightDistance = length(inFragPos.xyz - sceneData.pointLights[lightIndex].position) 
-		/ sceneData.pointLights[lightIndex].farPlane;
+	float lightDistance = length(inFragPos.xyz - sceneData.pointLights[inLightIdx].position) 
+		/ sceneData.pointLights[inLightIdx].farPlane;
 	gl_FragDepth = lightDistance;
 }

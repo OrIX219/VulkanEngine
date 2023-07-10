@@ -200,6 +200,7 @@
     <None Include="Shaders\normals.frag" />
     <None Include="Shaders\normals.geom" />
     <None Include="Shaders\normals.vert" />
+    <None Include="Shaders\shadowcast.geom" />
     <None Include="Shaders\shadowcast_point.frag" />
     <None Include="Shaders\shadowcast_point.geom" />
     <None Include="Shaders\skybox.frag" />

@@ -1,11 +1,7 @@
 #version 460
 
-layout(location = 0) out vec3 outTextureCoords;
-
-layout(location = 0) in vec3 pos;
-layout(location = 1) in vec3 normal;
-layout(location = 2) in vec3 color;
-layout(location = 3) in vec2 textureCoords;
+layout(triangles) in;
+layout(triangle_strip, max_vertices = 12) out;
 
 struct CameraData {
 	mat4 view;
@@ -60,9 +56,12 @@ layout(set = 0, binding = 0) uniform SceneData {
 } sceneData;
 
 void main() {
-	outTextureCoords = pos;
-
-	mat4 transformMatrix = sceneData.cameraData.projection * mat4(mat3(sceneData.cameraData.view));
-	vec4 position = transformMatrix * vec4(pos, 1.0);
-	gl_Position = position.xyww;
+	for(int i = 0; i < sceneData.directionalLightsCount; i++) {
+		gl_Layer = i;
+		for(int j = 0; j < 3; j++) {
+			gl_Position = sceneData.directionalLights[i].viewProj * gl_in[j].gl_Position;
+			EmitVertex();
+		}
+		EndPrimitive();
+	}
 }

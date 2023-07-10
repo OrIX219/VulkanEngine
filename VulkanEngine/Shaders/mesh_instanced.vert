@@ -4,7 +4,7 @@ layout(location = 0) out vec3 outColor;
 layout(location = 1) out vec3 outNormal;
 layout(location = 2) out vec3 outFragPos;
 layout(location = 3) out vec2 outTextureCoords;
-layout(location = 4) out vec4 outShadowCoords;
+layout(location = 4) out vec4 outWorldCoords;
 
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 normal;
@@ -58,7 +58,7 @@ layout(set = 0, binding = 0) uniform SceneData {
 	uint directionalLightsCount;
 	DirectionalLight directionalLights[4];
 	uint pointLightsCount;
-	PointLight pointLights[16];
+	PointLight pointLights[8];
 	uint spotLightsCount;
 	SpotLight spotLights[8];
 } sceneData;
@@ -89,5 +89,5 @@ void main() {
 	outFragPos = vec3(modelMatrix * vec4(pos, 1.f));
 	outTextureCoords = textureCoords;
 
-	outShadowCoords = sceneData.directionalLights[0].viewProj * modelMatrix * vec4(pos, 1.f);
+	outWorldCoords = modelMatrix * vec4(pos, 1.f);
 }

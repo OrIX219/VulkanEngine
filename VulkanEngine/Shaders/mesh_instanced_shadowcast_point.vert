@@ -52,7 +52,7 @@ layout(set = 0, binding = 0) uniform SceneData {
 	uint directionalLightsCount;
 	DirectionalLight directionalLights[4];
 	uint pointLightsCount;
-	PointLight pointLights[16];
+	PointLight pointLights[8];
 	uint spotLightsCount;
 	SpotLight spotLights[8];
 } sceneData;

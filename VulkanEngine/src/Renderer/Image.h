@@ -22,6 +22,12 @@ class Image {
   Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
         VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
         VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
+        VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D,
+        uint32_t array_layers = 1,
+        VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
+  Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
+        VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
+        VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
         VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
   Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
         VkImageUsageFlags usage,
@@ -40,6 +46,13 @@ class Image {
                   VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
                   uint32_t array_layers = 1,
                   VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D);
+  VkResult Create(VmaAllocator allocator, LogicalDevice* device,
+                  VkExtent3D extent, VkImageUsageFlags usage,
+                  VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
+                  VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
+                  VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D,
+                  uint32_t array_layers = 1,
+                  VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
   VkResult Create(VmaAllocator allocator, LogicalDevice* device,
                   VkExtent3D extent, VkImageUsageFlags usage,
                   VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
@@ -129,12 +142,14 @@ class ImageCube : public Image {
   ImageCube();
   ImageCube(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
             VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
-            VkImageAspectFlagBits aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
+            VkImageAspectFlagBits aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
+            uint32_t array_size = 1);
 
   VkResult Create(
       VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
       VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
-      VkImageAspectFlagBits aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT);
+      VkImageAspectFlagBits aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
+      uint32_t array_size = 1);
 };
 
 }

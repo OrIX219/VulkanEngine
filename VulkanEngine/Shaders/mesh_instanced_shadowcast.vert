@@ -52,7 +52,7 @@ layout(set = 0, binding = 0) uniform SceneData {
 	uint directionalLightsCount;
 	DirectionalLight directionalLights[4];
 	uint pointLightsCount;
-	PointLight pointLights[16];
+	PointLight pointLights[8];
 	uint spotLightsCount;
 	SpotLight spotLights[8];
 } sceneData;
@@ -75,6 +75,5 @@ layout(set = 1, binding = 1) readonly buffer InstanceBuffer {
 void main() {
 	uint index = instanceBuffer.ids[gl_InstanceIndex];
 	mat4 modelMatrix = objectBuffer.objects[index].model;
-	mat4 transformMatrix = sceneData.cameraData.viewProj * modelMatrix;
-	gl_Position = transformMatrix * vec4(pos, 1.f);
+	gl_Position = modelMatrix * vec4(pos, 1.f);
 }

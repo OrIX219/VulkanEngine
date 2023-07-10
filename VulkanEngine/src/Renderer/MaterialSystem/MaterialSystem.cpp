@@ -81,11 +81,11 @@ void MaterialSystem::BuildDefaultTemplates() {
       BuildEffect({"mesh_instanced.vert.spv"}, {"textured_lit.frag.spv"});
   ShaderEffect* default_lit =
       BuildEffect({"mesh_instanced.vert.spv"}, {"default_lit.frag.spv"});
-  ShaderEffect* opaque_shadowcast =
-      BuildEffect({"mesh_instanced_shadowcast.vert.spv"});
+  ShaderEffect* opaque_shadowcast = BuildEffect(
+      {"mesh_instanced_shadowcast.vert.spv"}, {}, {"shadowcast.geom.spv"});
   ShaderEffect* opaque_shadowcast_point =
-      BuildEffect({"mesh_instanced_shadowcast_point.vert.spv"}, {"shadowcast_point.frag.spv"},
-                  {"shadowcast_point.geom.spv"});
+      BuildEffect({"mesh_instanced_shadowcast_point.vert.spv"},
+                  {"shadowcast_point.frag.spv"}, {"shadowcast_point.geom.spv"});
   ShaderEffect* normals = BuildEffect(
       {"normals.vert.spv"}, {"normals.frag.spv"}, {"normals.geom.spv"});
   ShaderEffect* skybox = BuildEffect({"skybox.vert.spv"}, {"skybox.frag.spv"});

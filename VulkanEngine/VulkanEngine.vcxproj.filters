@@ -307,5 +307,6 @@
     <None Include="Shaders\mesh_instanced_shadowcast_point.vert" />
     <None Include="Shaders\shadowcast_point.geom" />
     <None Include="Shaders\shadowcast_point.frag" />
+    <None Include="Shaders\shadowcast.geom" />
   </ItemGroup>
 </Project>

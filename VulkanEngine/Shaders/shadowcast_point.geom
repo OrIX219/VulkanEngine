@@ -1,9 +1,10 @@
 #version 460
 
 layout(triangles) in;
-layout(triangle_strip, max_vertices = 18) out;
+layout(triangle_strip, max_vertices = 144) out;
 
 layout(location = 0) out vec4 outFragPos;
+layout(location = 1) out uint outLightIdx;
 
 struct CameraData {
 	mat4 view;
@@ -52,23 +53,22 @@ layout(set = 0, binding = 0) uniform SceneData {
 	uint directionalLightsCount;
 	DirectionalLight directionalLights[4];
 	uint pointLightsCount;
-	PointLight pointLights[16];
+	PointLight pointLights[8];
 	uint spotLightsCount;
 	SpotLight spotLights[8];
 } sceneData;
 
-layout(push_constant) uniform constants {
-	uint lightIndex;
-};
-
 void main() {
-	for(int face = 0; face < 6; face++) {
-		gl_Layer = face;
-		for(int i = 0; i < 3; i++) {
-			outFragPos = gl_in[i].gl_Position;
-			gl_Position = sceneData.pointLights[lightIndex].viewProj[face] * outFragPos;
-			EmitVertex();
+	for (int i = 0; i < sceneData.pointLightsCount; i++) {
+		outLightIdx = i;
+		for(int face = 0; face < 6; face++) {
+			gl_Layer = 6 * i + face;
+			for(int j = 0; j < 3; j++) {
+				outFragPos = gl_in[j].gl_Position;
+				gl_Position = sceneData.pointLights[i].viewProj[face] * outFragPos;
+				EmitVertex();
+			}
+			EndPrimitive();
 		}
-		EndPrimitive();
 	}
 }

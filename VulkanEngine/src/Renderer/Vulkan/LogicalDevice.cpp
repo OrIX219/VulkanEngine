@@ -35,6 +35,7 @@ VkResult LogicalDevice::Init(PhysicalDevice* physical_device) {
   features.geometryShader = VK_TRUE;
   features.multiDrawIndirect = VK_TRUE;
   features.fillModeNonSolid = VK_TRUE;
+  features.imageCubeArray = VK_TRUE;
   VkPhysicalDeviceFeatures2 device_features{};
   device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   device_features.features = features;

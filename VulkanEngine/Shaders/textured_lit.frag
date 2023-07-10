@@ -6,7 +6,7 @@ layout(location = 0) in vec3 inColor;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec3 inFragPos;
 layout(location = 3) in vec2 inTextureCoords;
-layout(location = 4) in vec4 inShadowCoords;
+layout(location = 4) in vec4 inWorldCoords;
 
 struct CameraData {
 	mat4 view;
@@ -55,18 +55,18 @@ layout(set = 0, binding = 0) uniform SceneData {
 	uint directionalLightsCount;
 	DirectionalLight directionalLights[4];
 	uint pointLightsCount;
-	PointLight pointLights[16];
+	PointLight pointLights[8];
 	uint spotLightsCount;
 	SpotLight spotLights[8];
 } sceneData;
 
 // need samplers for all lights
-layout(set = 0, binding = 1) uniform sampler2D shadowSampler;
-layout(set = 0, binding = 2) uniform samplerCube pointShadowSampler;
+layout(set = 0, binding = 1) uniform sampler2DArray directionalShadowSampler;
+layout(set = 0, binding = 2) uniform samplerCubeArray pointShadowSampler;
 
 layout(set = 2, binding = 0) uniform sampler2D tex;
 
-float CalcShadow(vec4 fragPos, vec3 lightDirection) {
+float CalcShadow(vec4 fragPos, vec3 lightDirection, uint samplerIdx) {
 	vec3 projCoords = fragPos.xyz / fragPos.w;
 	projCoords.xy = projCoords.xy * 0.5 + 0.5;
 
@@ -75,13 +75,14 @@ float CalcShadow(vec4 fragPos, vec3 lightDirection) {
 	vec3 lightDir = normalize(-lightDirection);
 	float bias = max(0.0001, 0.001 * (1.0 - dot(inNormal, lightDir)));
 	float shadow = 0.0;
-	vec2 texelSize = 1.0 / textureSize(shadowSampler, 0);
+	vec2 texelSize = 1.0 / textureSize(directionalShadowSampler, 0).xy;
 
 	float currentDepth = projCoords.z - bias;
 
 	for(int x = -1; x <= 1; x++) {
 		for(int y = -1; y <= 1; y++) {
-			float pcfDepth = texture(shadowSampler, projCoords.xy + vec2(x, y) * texelSize).r;
+			vec2 coords = projCoords.xy + vec2(x, y) * texelSize;
+			float pcfDepth = texture(directionalShadowSampler, vec3(coords, samplerIdx)).r;
 			shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
 		}
 	}
@@ -90,7 +91,7 @@ float CalcShadow(vec4 fragPos, vec3 lightDirection) {
 	return 1 - shadow;
 }
 
-float CalcPointShadow(vec3 fragPos, vec3 lightPos, float farPlane) {
+float CalcPointShadow(vec3 fragPos, vec3 lightPos, float farPlane, uint lightIdx) {
 	vec3 fragToLight = fragPos - lightPos;
 	vec3 lightDir = normalize(-fragToLight);
 	float bias = max(0.01, 0.1 * (1.0 - dot(inNormal, lightDir)));
@@ -110,7 +111,8 @@ float CalcPointShadow(vec3 fragPos, vec3 lightPos, float farPlane) {
 	);
 
 	for(int i = 0; i < samples; i++) {
-		float closestDepth = texture(pointShadowSampler, fragToLight + sampleOffsetDirections[i] * diskRadius).r;
+		vec3 coords = fragToLight + sampleOffsetDirections[i] * diskRadius;
+		float closestDepth = texture(pointShadowSampler, vec4(coords, lightIdx)).r;
 		closestDepth *= farPlane;
 		shadow += currentDepth > closestDepth ? 1.0 : 0.0;
 	}
@@ -128,7 +130,8 @@ vec3 CalcDirectional() {
 		vec3 lightColor = light.color.xyz * light.color.w;
 
 		float shadow = 0.f;
-		if (lightAngle > 0.01) shadow = CalcShadow(inShadowCoords, light.direction);
+		if (lightAngle > 0.01) 
+			shadow = CalcShadow(sceneData.directionalLights[i].viewProj * inWorldCoords, light.direction, i);
 
 		vec3 ambient = light.ambient * lightColor;
 
@@ -152,7 +155,7 @@ vec3 CalcPoint() {
 		float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
 
 		float shadow = 0.f;
-		if (lightAngle > 0.01) shadow = CalcPointShadow(inFragPos, light.position, light.farPlane);
+		if (lightAngle > 0.01) shadow = CalcPointShadow(inFragPos, light.position, light.farPlane, i);
 
 		vec3 ambient = light.ambient * lightColor;
 

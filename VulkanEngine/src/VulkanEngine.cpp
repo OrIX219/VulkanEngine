@@ -126,15 +126,17 @@ void VulkanEngine::Init() {
   VK_CHECK(shadow_image_.Create(
       allocator_, &device_, {shadow_extent_.width, shadow_extent_.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, VK_SAMPLE_COUNT_1_BIT));
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT,
+      VK_IMAGE_VIEW_TYPE_2D_ARRAY, Renderer::kMaxDirectionalLights));
   LOG_SUCCESS("Created shadow image");
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Image::Destroy, shadow_image_));
 
   VK_CHECK(point_shadow_image_.Create(
-      allocator_, &device_, {512, 512, 1},
+      allocator_, &device_, {128, 128, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT));
+      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT,
+      Renderer::kMaxPointLights));
   LOG_SUCCESS("Created point shadow image");
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Image::Destroy, point_shadow_image_));
@@ -250,12 +252,10 @@ void VulkanEngine::InitCVars() {
                                  {0.f, 0.f, 0.f, 1.f},
                                  CVarFlagBits::kEditColor);
   AutoCVar_Vec3 CVar_sunlight_dir("scene.sunlight_dir", "Sunlight direction",
-                                  {-1.f, 1.f, -1.f});
+                                  {1.f, -1.f, 1.f});
   AutoCVar_Vec4 CVar_sunlight_color(
       "scene.sunlight_color", "Sunlight color (xyz) and power (w)",
       {1.f, 1.f, 1.f, 0.1f}, CVarFlagBits::kEditColor);
-
-  AutoCVar_Vec3 CVar_pointlight_pos("scene.point_light_pos", "asd", {-2.f, 1.f, -3.5f});
 
   AutoCVar_Int CVar_cull_enable("culling.enable", "Enable culling", 1,
                                 CVarFlagBits::kEditCheckbox);
@@ -914,16 +914,21 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   Renderer::DirectionalLight sunlight(
       glm::vec4(1.f), glm::vec3(0.f),
-      -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"),
+      *CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"),
       glm::vec3(32, 32, 32));
   directional_lights_.emplace_back(std::move(sunlight));
+
+  Renderer::DirectionalLight sunlight2(
+      glm::vec4(1.f, 1.f, 1.f, 0.2f), glm::vec3(0.f),
+      glm::vec3(-1.f, -1.f, 1.f), glm::vec3(32, 32, 32));
+  directional_lights_.emplace_back(std::move(sunlight2));
 
   Renderer::SpotLight spotlight(glm::vec4(1.f), glm::vec3(0.f, 1.f, 15.f),
                                 glm::vec3(0.f, -1.f, -2.f), 10.f, 12.f);
   spot_lights_.emplace_back(std::move(spotlight));
 
   Renderer::PointLight point_light(glm::vec4(1.f, 0.75f, 0.25f, 1.f),
-                                   glm::vec3(3.f, 1.f, -3.5f), 1.f, 0.09f, 0.032f);
+                                   glm::vec3(0.f, 1.f, -3.5f), 1.f, 0.09f, 0.032f);
   point_lights_.emplace_back(std::move(point_light));
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
@@ -1254,7 +1259,7 @@ void VulkanEngine::Draw() {
 
     DrawShadows(command_buffer);
 
-    DrawForward(command_buffer, render_scene_.forward_pass);
+    DrawForward(command_buffer);
 
     if (forward_cull.occlusion_cull) ReduceDepth(command_buffer);
 
@@ -1758,11 +1763,6 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
     vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
     vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
 
-    scene_data.camera_data.view = directional_lights_[0].GetView();
-    scene_data.camera_data.projection = directional_lights_[0].GetProjection();
-    scene_data.camera_data.view_proj =
-        scene_data.camera_data.projection * scene_data.camera_data.view;
-
     uint32_t scene_offset = frame.dynamic_data.Push(scene_data);
 
     VkDescriptorBufferInfo scene_info = frame.dynamic_data.GetDescriptorInfo();
@@ -1772,17 +1772,17 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
     Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                        &frame.dynamic_descriptor_allocator)
         .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                    VK_SHADER_STAGE_VERTEX_BIT)
+                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT)
         .Build(global_set);
 
     vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 1.2f);
 
-    Renderer::DrawData draw_data{};
-    draw_data.offsets.push_back(scene_offset);
-    draw_data.global_set = global_set;
-    draw_data.object_data_set = object_set;
+    Renderer::DrawParams draw_params{};
+    draw_params.offsets.push_back(scene_offset);
+    draw_params.global_set = global_set;
+    draw_params.object_data_set = object_set;
 
-    ExecuteDraw(command_buffer, pass, draw_data);
+    ExecuteDraw(command_buffer, pass, draw_params);
 
     directional_shadow_pass_.End(command_buffer);
   }
@@ -1829,33 +1829,24 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
                         VK_SHADER_STAGE_FRAGMENT_BIT)
         .Build(global_set);
 
-    vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 0.f);
+    vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 1.2f);
 
-    Renderer::DrawData draw_data{};
-    draw_data.offsets.push_back(scene_offset);
-    draw_data.global_set = global_set;
-    draw_data.object_data_set = object_set;
-    
-    uint32_t light_index = 0;
-    Renderer::PushConstants constants{};
-    constants.data = &light_index;
-    constants.size = sizeof(light_index);
-    constants.stages =
-        VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    Renderer::DrawParams draw_params{};
+    draw_params.offsets.push_back(scene_offset);
+    draw_params.global_set = global_set;
+    draw_params.object_data_set = object_set;
 
-    draw_data.push_constants = constants;
-
-    ExecuteDraw(command_buffer, pass, draw_data);
+    ExecuteDraw(command_buffer, pass, draw_params);
 
     point_shadow_pass_.End(command_buffer);
   }
 
 }
 
-void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
-                               const Renderer::RenderScene::MeshPass& pass) {
+void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
+  Renderer::RenderScene::MeshPass& pass = render_scene_.forward_pass;
 
   Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Forward Draw");
 
@@ -1896,11 +1887,6 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
   scene_data_.spot_lights_count = static_cast<uint32_t>(spot_lights_.size());
   for (size_t i = 0; i < spot_lights_.size(); ++i)
     scene_data_.spot_lights[i] = spot_lights_.at(i).GetUniform();
-
-  /*point_lights_[0].SetPosition(
-      glm::vec3(std::sin(glfwGetTime()) * 15.f, 1.f,
-                std::cos(glfwGetTime() * 7.5f) * 0.5f) +
-      glm::vec3(0.f, 0.f, -3.f));*/
 
   scene_data_.point_lights_count = static_cast<uint32_t>(point_lights_.size());
   for (size_t i = 0; i < point_lights_.size(); ++i)
@@ -1946,12 +1932,12 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
   vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 0.f);
 
-  Renderer::DrawData draw_data{};
-  draw_data.offsets.push_back(scene_data_offset);
-  draw_data.global_set = frame.global_descriptor;
-  draw_data.object_data_set = frame.object_descriptor;
+  Renderer::DrawParams draw_params{};
+  draw_params.offsets.push_back(scene_data_offset);
+  draw_params.global_set = frame.global_descriptor;
+  draw_params.object_data_set = frame.object_descriptor;
 
-  ExecuteDraw(command_buffer, pass, draw_data);
+  ExecuteDraw(command_buffer, pass, draw_params);
 
   DrawSkybox(command_buffer, scene_info, scene_data_offset);
 
@@ -1964,7 +1950,7 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer,
 
 void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
                                const Renderer::RenderScene::MeshPass& pass,
-                               const Renderer::DrawData& draw_data) {
+                               const Renderer::DrawParams& draw_params) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
@@ -1996,13 +1982,13 @@ void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
       new_pipeline.Bind(command_buffer);
       vkCmdBindDescriptorSets(
           command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-          new_pipeline.GetLayout(), 0, 1, &draw_data.global_set,
-          static_cast<uint32_t>(draw_data.offsets.size()),
-          draw_data.offsets.data());
+          new_pipeline.GetLayout(), 0, 1, &draw_params.global_set,
+          static_cast<uint32_t>(draw_params.offsets.size()),
+          draw_params.offsets.data());
       vkCmdBindDescriptorSets(command_buffer.Get(),
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
                               new_pipeline.GetLayout(), 1, 1,
-                              &draw_data.object_data_set, 0, nullptr);
+                              &draw_params.object_data_set, 0, nullptr);
     }
 
     if (new_material_set != last_material_set) {
@@ -2012,9 +1998,9 @@ void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
           new_pipeline.GetLayout(), 2, 1, &new_material_set, 0, nullptr);
     }
 
-    if (draw_data.push_constants.has_value()) {
+    if (draw_params.push_constants.has_value()) {
       const Renderer::PushConstants& constants =
-          draw_data.push_constants.value();
+          draw_params.push_constants.value();
       vkCmdPushConstants(command_buffer.Get(), new_pipeline.GetLayout(),
                          constants.stages, constants.offset, constants.size,
                          constants.data);
@@ -2081,11 +2067,11 @@ void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
       vkCmdBindDescriptorSets(
           command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
           pipeline.GetLayout(), 0, 1, &normals_global_set,
-                              static_cast<uint32_t>(draw_data.offsets.size()),
-                              draw_data.offsets.data());
+                              static_cast<uint32_t>(draw_params.offsets.size()),
+                              draw_params.offsets.data());
       vkCmdBindDescriptorSets(
           command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-          pipeline.GetLayout(), 1, 1, &draw_data.object_data_set, 0, nullptr);
+          pipeline.GetLayout(), 1, 1, &draw_params.object_data_set, 0, nullptr);
 
       if (!has_indices) {
         vkCmdDraw(command_buffer.Get(), draw_mesh->GetVerticesCount(),
@@ -2384,12 +2370,9 @@ void VulkanEngine::Run() {
     ProcessInput();
 
     directional_lights_[0].SetDirection(
-        -*CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"));
+        *CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"));
     directional_lights_[0].SetColor(
         *CVarSystem::Get()->GetVec4CVar("scene.sunlight_color"));
-
-    point_lights_[0].SetPosition(
-        *CVarSystem::Get()->GetVec3CVar("scene.point_light_pos"));
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();

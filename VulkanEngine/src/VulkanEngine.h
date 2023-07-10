@@ -46,7 +46,7 @@ struct GPUCameraData {
 };
 
 constexpr uint32_t kMaxDirectionalLights = 4;
-constexpr uint32_t kMaxPointLights = 16;
+constexpr uint32_t kMaxPointLights = 8;
 constexpr uint32_t kMaxSpotLights = 8;
 
 struct GPUSceneData {
@@ -96,7 +96,7 @@ struct PushConstants {
   const void* data;
 };
 
-struct DrawData {
+struct DrawParams {
   VkDescriptorSet object_data_set;
   std::vector<uint32_t> offsets;
   VkDescriptorSet global_set;
@@ -134,6 +134,14 @@ class VulkanEngine {
   void Init();
   void Cleanup();
 
+  void MousePosCallback(double x, double y);
+  void KeyCallback(int key, int action, int mods);
+
+  VmaAllocator GetAllocator();
+  
+  void Run();
+
+ private:
   void Draw();
   void ReadyMeshDraw(Renderer::CommandBuffer command_buffer);
   void ReadyCullData(Renderer::CommandBuffer command_buffer,
@@ -142,11 +150,10 @@ class VulkanEngine {
                    const Renderer::RenderScene::MeshPass& pass,
                    const Renderer::CullParams& params);
   void DrawShadows(Renderer::CommandBuffer command_buffer);
-  void DrawForward(Renderer::CommandBuffer command_buffer,
-                   const Renderer::RenderScene::MeshPass& pass);
+  void DrawForward(Renderer::CommandBuffer command_buffer);
   void ExecuteDraw(Renderer::CommandBuffer command_buffer,
                    const Renderer::RenderScene::MeshPass& pass,
-                   const Renderer::DrawData& draw_data);
+                   const Renderer::DrawParams& draw_params);
   void DrawSkybox(Renderer::CommandBuffer command_buffer,
                   VkDescriptorBufferInfo scene_info, uint32_t dynamic_offset);
   void DrawCoordAxes(Renderer::CommandBuffer command_buffer,
@@ -158,14 +165,7 @@ class VulkanEngine {
 
   void DrawMenu();
   void DrawToolbar();
-  void Run();
 
-  void MousePosCallback(double x, double y);
-  void KeyCallback(int key, int action, int mods);
-
-  VmaAllocator GetAllocator();
-
- private:
   void InitCVars();
   void InitRenderPasses(VkSampleCountFlagBits samples);
   void InitFramebuffers();
@@ -220,7 +220,7 @@ class VulkanEngine {
   Renderer::Image color_resolve_image_;
   Renderer::Image depth_resolve_image_;
   Renderer::Image shadow_image_;
-  VkExtent2D shadow_extent_{4096, 4096};
+  VkExtent2D shadow_extent_{2048, 2048};
   Renderer::ImageCube point_shadow_image_;
 
   Renderer::Image depth_pyramid_;

@@ -15,6 +15,14 @@ Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
 
 Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
              VkImageUsageFlags usage, VkFormat format,
+             VkImageAspectFlags aspect_flags, VkImageViewType view_type,
+             uint32_t array_layers, VkSampleCountFlagBits samples) {
+  Create(allocator, device, extent, usage, format, aspect_flags, view_type,
+         array_layers, samples);
+}
+
+Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
+             VkImageUsageFlags usage, VkFormat format,
              VkImageAspectFlags aspect_flags, VkSampleCountFlagBits samples) {
   Create(allocator, device, extent, usage, format, aspect_flags, samples);
 }
@@ -57,7 +65,8 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
   image_info.usage = usage;
   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   image_info.samples = samples;
-  if (view_type_ == VK_IMAGE_VIEW_TYPE_CUBE)
+  if (view_type_ == VK_IMAGE_VIEW_TYPE_CUBE ||
+      view_type_ == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY)
     image_info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
   VmaAllocationCreateInfo alloc_info{};
@@ -69,6 +78,15 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
   if (res != VK_SUCCESS) return res;
 
   return CreateImageView(aspect_flags);
+}
+
+VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
+                       VkExtent3D extent, VkImageUsageFlags usage,
+                       VkFormat format, VkImageAspectFlags aspect_flags,
+                       VkImageViewType view_type, uint32_t array_layers,
+                       VkSampleCountFlagBits samples) {
+  return Create(allocator, device, extent, usage, 1, samples, format,
+                VK_IMAGE_TILING_OPTIMAL, aspect_flags, array_layers, view_type);
 }
 
 VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
@@ -158,17 +176,20 @@ ImageCube::ImageCube() : Image() { view_type_ = VK_IMAGE_VIEW_TYPE_CUBE; }
 
 ImageCube::ImageCube(VmaAllocator allocator, LogicalDevice* device,
                      VkExtent3D extent, VkImageUsageFlags usage,
-                     VkFormat format, VkImageAspectFlagBits aspect_flags) {
-  Create(allocator, device, extent, usage, format, aspect_flags);
+                     VkFormat format, VkImageAspectFlagBits aspect_flags,
+                     uint32_t array_size) {
+  Create(allocator, device, extent, usage, format, aspect_flags, array_size);
 }
 
 VkResult ImageCube::Create(VmaAllocator allocator, LogicalDevice* device,
                            VkExtent3D extent, VkImageUsageFlags usage,
-                           VkFormat format,
-                           VkImageAspectFlagBits aspect_flags) {
+                           VkFormat format, VkImageAspectFlagBits aspect_flags,
+                           uint32_t array_size) {
+  VkImageViewType view_type =
+      array_size > 1 ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
   return Image::Create(allocator, device, extent, usage, 1,
                        VK_SAMPLE_COUNT_1_BIT, format, VK_IMAGE_TILING_OPTIMAL,
-                       aspect_flags, 6, VK_IMAGE_VIEW_TYPE_CUBE);
+                       aspect_flags, 6 * array_size, view_type);
 }
 
 }  // namespace Renderer
