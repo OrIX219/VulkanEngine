@@ -361,7 +361,7 @@ void CVarSystemImpl::EditParameter(CVarParameter* p, float text_width) {
               GetCVarArray<float>()->GetCurrentStorage(p->array_index)->initial;
           ImGui::DragFloat("",
                            GetCVarArray<Float>()->GetCurrentPtr(p->array_index),
-                           1.f, 0.f, default_val * 2);
+                           default_val * 0.1f, 0.f, default_val * 2);
         } else {
           ImGui::InputFloat(
               "", GetCVarArray<Float>()->GetCurrentPtr(p->array_index), 0, 0,

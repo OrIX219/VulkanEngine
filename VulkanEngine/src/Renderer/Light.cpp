@@ -102,7 +102,7 @@ void PointLight::SetQuadratic(float value) { quadratic = value; }
 
 GPUPointLight PointLight::GetUniform() const {
   float near = 0.01f;
-  float far = 10.f;
+  float far = 30.f;
   glm::mat4 proj = glm::perspective(glm::radians(90.f), 1.f, near, far);
 
   GPUPointLight light{ambient_factor, diffuse_factor, specular_factor, position, color};

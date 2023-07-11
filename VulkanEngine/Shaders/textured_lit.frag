@@ -96,6 +96,8 @@ float CalcPointShadow(vec3 fragPos, vec3 lightPos, float farPlane, uint lightIdx
 	vec3 lightDir = normalize(-fragToLight);
 	float bias = max(0.01, 0.1 * (1.0 - dot(inNormal, lightDir)));
 
+	if (length(fragToLight) >= farPlane) return 1;
+
 	float shadow = 0.0;
 	int samples = 20;
 	float viewDistance = length(sceneData.cameraData.pos - inFragPos);

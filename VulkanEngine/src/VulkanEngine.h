@@ -213,6 +213,8 @@ class VulkanEngine {
   VmaAllocator allocator_;
   DeletionQueue main_deletion_queue_;
 
+  VkFormat color_attachment_format_;
+  VkFormat depth_attachment_format_;
   VkSampleCountFlagBits samples_;
   Renderer::Swapchain swapchain_;
   Renderer::Image color_image_;

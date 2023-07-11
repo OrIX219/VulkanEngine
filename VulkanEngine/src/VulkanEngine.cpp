@@ -100,33 +100,37 @@ void VulkanEngine::Init() {
   VK_CHECK(swapchain_.Create(&device_, &surface_));
   LOG_SUCCESS("Created swapchain");
 
+  color_attachment_format_ = VK_FORMAT_R16G16B16A16_SFLOAT;
+  depth_attachment_format_ = VK_FORMAT_D32_SFLOAT;
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      samples_));
+      color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT, samples_));
   LOG_SUCCESS("Created backbuffer image");
   VK_CHECK(color_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
       VK_SAMPLE_COUNT_1_BIT));
   LOG_SUCCESS("Created backbuffer resolve image");
   VK_CHECK(depth_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
           VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, samples_));
+      depth_attachment_format_, VK_IMAGE_ASPECT_DEPTH_BIT, samples_));
   LOG_SUCCESS("Created depth image");
   VK_CHECK(depth_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, VK_SAMPLE_COUNT_1_BIT));
+      depth_attachment_format_, VK_IMAGE_ASPECT_DEPTH_BIT,
+      VK_SAMPLE_COUNT_1_BIT));
   LOG_SUCCESS("Created depth resolve image");
 
   VK_CHECK(shadow_image_.Create(
       allocator_, &device_, {shadow_extent_.width, shadow_extent_.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT,
+      depth_attachment_format_, VK_IMAGE_ASPECT_DEPTH_BIT,
       VK_IMAGE_VIEW_TYPE_2D_ARRAY, Renderer::kMaxDirectionalLights));
   LOG_SUCCESS("Created shadow image");
   main_deletion_queue_.PushFunction(
@@ -135,7 +139,7 @@ void VulkanEngine::Init() {
   VK_CHECK(point_shadow_image_.Create(
       allocator_, &device_, {128, 128, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT,
+      depth_attachment_format_, VK_IMAGE_ASPECT_DEPTH_BIT,
       Renderer::kMaxPointLights));
   LOG_SUCCESS("Created point shadow image");
   main_deletion_queue_.PushFunction(
@@ -248,6 +252,9 @@ void VulkanEngine::InitCVars() {
   AutoCVar_Int CVar_show_normals("show_normals", "Render vertex normals", 0,
                                  CVarFlagBits::kEditCheckbox);
 
+  AutoCVar_Float CVar_hdr_exposure("hdr_exposure", "HDR exposure value", 1.f,
+                                   CVarFlagBits::kEditFloatDrag);
+
   AutoCVar_Vec4 CVar_clear_color("scene.clear_color", "Background color",
                                  {0.f, 0.f, 0.f, 1.f},
                                  CVarFlagBits::kEditColor);
@@ -345,27 +352,27 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetSamples(samples)
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-        .SetFormat(swapchain_.GetImageFormat());
+        .SetFormat(color_attachment_format_);
     color_resolve_attachment
         .SetOperations(VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                        VK_ATTACHMENT_STORE_OP_STORE)
         .SetSamples(VK_SAMPLE_COUNT_1_BIT)
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        .SetFormat(swapchain_.GetImageFormat());
+        .SetFormat(color_attachment_format_);
     depth_attachment
         .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
                        VK_ATTACHMENT_STORE_OP_STORE)
         .SetSamples(samples)
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-        .SetFormat(VK_FORMAT_D32_SFLOAT);
+        .SetFormat(depth_attachment_format_);
     depth_resolve_attachment.SetDefaults()
         .SetOperations(VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                        VK_ATTACHMENT_STORE_OP_STORE)
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-        .SetFormat(VK_FORMAT_D32_SFLOAT);
+        .SetFormat(depth_attachment_format_);
 
     Renderer::RenderPassSubpass subpass;
     render_pass_builder.AddAttachment(color_attachment)
@@ -428,7 +435,7 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetSamples(VK_SAMPLE_COUNT_1_BIT)
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        .SetFormat(VK_FORMAT_D32_SFLOAT);
+        .SetFormat(depth_attachment_format_);
 
     Renderer::RenderPassSubpass subpass;
     render_pass_builder.AddAttachment(depth_attachment);
@@ -454,7 +461,7 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetSamples(VK_SAMPLE_COUNT_1_BIT)
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        .SetFormat(VK_FORMAT_D32_SFLOAT);
+        .SetFormat(depth_attachment_format_);
 
     Renderer::RenderPassSubpass subpass;
     render_pass_builder.AddAttachment(depth_attachment);
@@ -912,23 +919,16 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 }
 
 void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
-  Renderer::DirectionalLight sunlight(
+  /*Renderer::DirectionalLight sunlight(
       glm::vec4(1.f), glm::vec3(0.f),
       *CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"),
       glm::vec3(32, 32, 32));
-  directional_lights_.emplace_back(std::move(sunlight));
-
-  Renderer::DirectionalLight sunlight2(
-      glm::vec4(1.f, 1.f, 1.f, 0.2f), glm::vec3(0.f),
-      glm::vec3(-1.f, -1.f, 1.f), glm::vec3(32, 32, 32));
-  directional_lights_.emplace_back(std::move(sunlight2));
-
-  Renderer::SpotLight spotlight(glm::vec4(1.f), glm::vec3(0.f, 1.f, 15.f),
-                                glm::vec3(0.f, -1.f, -2.f), 10.f, 12.f);
-  spot_lights_.emplace_back(std::move(spotlight));
+  directional_lights_.emplace_back(std::move(sunlight));*/
 
   Renderer::PointLight point_light(glm::vec4(1.f, 0.75f, 0.25f, 1.f),
                                    glm::vec3(0.f, 1.f, -3.5f), 1.f, 0.09f, 0.032f);
+  point_light.SetDiffuse(10.f);
+  point_light.SetSpecular(10.f);
   point_lights_.emplace_back(std::move(point_light));
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
@@ -1020,9 +1020,9 @@ void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   init_info.DescriptorPool = imgui_pool_;
   init_info.MinImageCount = 3;
   init_info.ImageCount = 3;
-  init_info.MSAASamples = samples_;
+  init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
-  ImGui_ImplVulkan_Init(&init_info, forward_pass_.Get());
+  ImGui_ImplVulkan_Init(&init_info, copy_pass_.Get());
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin();
@@ -1128,12 +1128,13 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
   VK_CHECK(color_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      samples_));
+      color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT, samples_));
 
   color_resolve_image_.Destroy();
   VK_CHECK(color_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
       VK_SAMPLE_COUNT_1_BIT));
 
   depth_image_.Destroy();
@@ -1141,13 +1142,14 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
           VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, samples_));
+      depth_attachment_format_, VK_IMAGE_ASPECT_DEPTH_BIT, samples_));
 
   depth_resolve_image_.Destroy();
   VK_CHECK(depth_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-      VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, VK_SAMPLE_COUNT_1_BIT));
+      depth_attachment_format_, VK_IMAGE_ASPECT_DEPTH_BIT,
+      VK_SAMPLE_COUNT_1_BIT));
 
   std::vector<VkImageView> attachments = {
       color_image_.GetView(), depth_image_.GetView(),
@@ -1203,8 +1205,6 @@ void VulkanEngine::Draw() {
   profiler_.GrabQueries(command_buffer);
   {
     Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Full Frame");
-    Renderer::VulkanPipelineStatRecorder stats(command_buffer, &profiler_,
-                                               "Total Primitives");
 
     pre_cull_barriers_.clear();
     post_cull_barriers_.clear();
@@ -1772,7 +1772,7 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
     Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                        &frame.dynamic_descriptor_allocator)
         .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT)
+                    VK_SHADER_STAGE_GEOMETRY_BIT)
         .Build(global_set);
 
     vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 1.2f);
@@ -1825,8 +1825,7 @@ void VulkanEngine::DrawShadows(Renderer::CommandBuffer command_buffer) {
     Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                        &frame.dynamic_descriptor_allocator)
         .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT |
-                        VK_SHADER_STAGE_FRAGMENT_BIT)
+                    VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
         .Build(global_set);
 
     vkCmdSetDepthBias(command_buffer.Get(), 0.f, 0.f, 1.2f);
@@ -1849,6 +1848,8 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer) {
   Renderer::RenderScene::MeshPass& pass = render_scene_.forward_pass;
 
   Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Forward Draw");
+  Renderer::VulkanPipelineStatRecorder stats(command_buffer, &profiler_,
+                                             "Total Primitives");
 
   VkClearValue clear_value{};
   auto clear_color = CVarSystem::Get()->GetVec4CVar("scene.clear_color");
@@ -1942,8 +1943,6 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer) {
   DrawSkybox(command_buffer, scene_info, scene_data_offset);
 
   DrawCoordAxes(command_buffer, scene_info, scene_data_offset);
-
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer.Get());
 
   forward_pass_.End(command_buffer);
 }
@@ -2278,7 +2277,13 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                           blit_pipeline_.GetLayout(), 0, 1, &blit_set, 0,
                           nullptr);
 
+  float exposure = *CVarSystem::Get()->GetFloatCVar("hdr_exposure");
+  vkCmdPushConstants(command_buffer.Get(), blit_pipeline_.GetLayout(),
+                     VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float), &exposure);
+
   vkCmdDraw(command_buffer.Get(), 3, 1, 0, 0);
+
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer.Get());
 
   copy_pass_.End(command_buffer);
 }
