@@ -308,5 +308,6 @@
     <None Include="Shaders\shadowcast_point.geom" />
     <None Include="Shaders\shadowcast_point.frag" />
     <None Include="Shaders\shadowcast.geom" />
+    <None Include="Shaders\textured_lit_emissive.frag" />
   </ItemGroup>
 </Project>

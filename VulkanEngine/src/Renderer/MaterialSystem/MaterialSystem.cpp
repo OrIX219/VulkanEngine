@@ -79,6 +79,8 @@ void MaterialSystem::BuildDefaultTemplates() {
       BuildEffect({"default.vert.spv"}, {"default.frag.spv"});
   ShaderEffect* textured_lit =
       BuildEffect({"mesh_instanced.vert.spv"}, {"textured_lit.frag.spv"});
+  ShaderEffect* textured_lit_emissive = BuildEffect(
+      {"mesh_instanced.vert.spv"}, {"textured_lit_emissive.frag.spv"});
   ShaderEffect* default_lit =
       BuildEffect({"mesh_instanced.vert.spv"}, {"default_lit.frag.spv"});
   ShaderEffect* opaque_shadowcast = BuildEffect(
@@ -96,6 +98,9 @@ void MaterialSystem::BuildDefaultTemplates() {
       system.engine_->forward_pass_, system.wireframe_builder_, default_effect);
   ShaderPass* textured_lit_pass = BuildShader(
       system.engine_->forward_pass_, system.forward_builder_, textured_lit);
+  ShaderPass* textured_lit_emissive_pass =
+      BuildShader(system.engine_->forward_pass_, system.forward_builder_,
+                  textured_lit_emissive);
   ShaderPass* default_lit_pass = BuildShader(
       system.engine_->forward_pass_, system.forward_builder_, default_lit);
   ShaderPass* opaque_shadowcast_pass =
@@ -146,6 +151,22 @@ void MaterialSystem::BuildDefaultTemplates() {
     default_textured.transparency = Assets::TransparencyMode::kOpaque;
 
     system.template_cache_["texturedPBR_opaque"] = default_textured;
+  }
+  {
+    EffectTemplate default_textured_emissive;
+    default_textured_emissive.pass_shaders[MeshPassType::kForward] =
+        textured_lit_emissive_pass;
+    default_textured_emissive.pass_shaders[MeshPassType::kTransparency] =
+        nullptr;
+    default_textured_emissive.pass_shaders[MeshPassType::kDirectionalShadow] =
+        opaque_shadowcast_pass;
+    default_textured_emissive.pass_shaders[MeshPassType::kPointShadow] =
+        opaque_shadowcast_point_pass;
+    default_textured_emissive.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
+
+    default_textured_emissive.transparency = Assets::TransparencyMode::kOpaque;
+
+    system.template_cache_["texturedPBR_emissive"] = default_textured_emissive;
   }
   {
     PipelineBuilder transparend_forward = system.forward_builder_;

@@ -771,6 +771,8 @@ bool VulkanEngine::LoadMesh(Renderer::CommandBuffer command_buffer,
 
 bool VulkanEngine::LoadTexture(Renderer::CommandBuffer command_buffer,
                                const char* name, const char* path) {
+  if (textures_.find(name) != textures_.end()) return true;
+
   Renderer::Texture texture{};
   bool loaded =
       texture.LoadFromAsset(allocator_, &device_, command_buffer, path);
@@ -864,26 +866,38 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 
       Assets::MaterialInfo material_info =
           Assets::ReadMaterialInfo(&material_file);
+      Renderer::MaterialData info;
 
-      std::string texture;
-      if (material_info.textures.size() == 0)
+      std::string texture, emissive_texture;
+
+      if (material_info.textures.size() == 0) {
         texture = "white.tx";
-      else
+      } else {
         texture = material_info.textures["base_color"];
+        emissive_texture = material_info.textures["emissive"];
+      }
 
       LoadTexture(command_buffer, texture.c_str(), AssetPath(texture).c_str());
-
       Renderer::SampledTexture tex;
       tex.sampler = texture_sampler_.Get();
       tex.view = textures_[texture].GetView();
-
-      Renderer::MaterialData info;
-      if (material_info.transparency == Assets::TransparencyMode::kTransparent)
-        info.base_template = "texturedPBR_transparent";
-      else
-        info.base_template = "texturedPBR_opaque";
-
       info.textures.push_back(tex);
+
+      if (material_info.transparency ==
+          Assets::TransparencyMode::kTransparent) {
+        info.base_template = "texturedPBR_transparent";
+      } else if (!emissive_texture.empty()) {
+        info.base_template = "texturedPBR_emissive";
+
+        LoadTexture(command_buffer, emissive_texture.c_str(),
+                    AssetPath(emissive_texture).c_str());
+        Renderer::SampledTexture emissive_tex;
+        emissive_tex.sampler = texture_sampler_.Get();
+        emissive_tex.view = textures_[emissive_texture].GetView();
+        info.textures.push_back(emissive_tex);
+      } else {
+        info.base_template = "texturedPBR_opaque";
+      }
 
       material =
           Renderer::MaterialSystem::BuildMaterial(value.material_path, info);
@@ -919,17 +933,17 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
 }
 
 void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
-  /*Renderer::DirectionalLight sunlight(
+  Renderer::DirectionalLight sunlight(
       glm::vec4(1.f), glm::vec3(0.f),
       *CVarSystem::Get()->GetVec3CVar("scene.sunlight_dir"),
       glm::vec3(32, 32, 32));
-  directional_lights_.emplace_back(std::move(sunlight));*/
+  directional_lights_.emplace_back(std::move(sunlight));
 
-  Renderer::PointLight point_light(glm::vec4(1.f, 0.75f, 0.25f, 1.f),
+  /*Renderer::PointLight point_light(glm::vec4(1.f, 0.75f, 0.25f, 1.f),
                                    glm::vec3(0.f, 1.f, -3.5f), 1.f, 0.09f, 0.032f);
   point_light.SetDiffuse(10.f);
   point_light.SetSpecular(10.f);
-  point_lights_.emplace_back(std::move(point_light));
+  point_lights_.emplace_back(std::move(point_light));*/
 
   Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
   command_buffer.Begin();

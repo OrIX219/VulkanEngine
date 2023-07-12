@@ -207,6 +207,7 @@
     <None Include="Shaders\skybox.vert" />
     <None Include="Shaders\sparse_upload.comp" />
     <None Include="Shaders\textured_lit.frag" />
+    <None Include="Shaders\textured_lit_emissive.frag" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AssetLib\AssetLib.vcxproj">
