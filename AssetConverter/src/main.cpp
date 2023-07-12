@@ -281,9 +281,11 @@ void ExtractGltfMaterials(tinygltf::Model& model, const fs::path& input,
     tinygltf::PbrMetallicRoughness& pbr = glmat.pbrMetallicRoughness;
 
     Assets::MaterialInfo material_info;
-    material_info.base_effect = "defaultPBR";
+    material_info.base_effect = "defaultPBR_opaque";
 
     if (pbr.baseColorTexture.index >= 0) {
+      material_info.base_effect = "texturedPBR_opaque";
+
       tinygltf::Texture base_color = model.textures[pbr.baseColorTexture.index];
       tinygltf::Image base_image = model.images[base_color.source];
 
@@ -321,6 +323,8 @@ void ExtractGltfMaterials(tinygltf::Model& model, const fs::path& input,
     }
 
     if (glmat.emissiveTexture.index >= 0) {
+      material_info.base_effect = "texturedPBR_emissive";
+
       tinygltf::Texture texture = model.textures[glmat.emissiveTexture.index];
       tinygltf::Image image = model.images[texture.source];
 
@@ -334,10 +338,12 @@ void ExtractGltfMaterials(tinygltf::Model& model, const fs::path& input,
 
     fs::path material_path = output / (material_name + ".mat");
 
-    if (glmat.alphaMode == "BLEND")
+    if (glmat.alphaMode == "BLEND") {
+      material_info.base_effect = "texturedPBR_transparent";
       material_info.transparency = Assets::TransparencyMode::kTransparent;
-    else
+    } else {
       material_info.transparency = Assets::TransparencyMode::kOpaque;
+    }
 
     Assets::AssetFile file = Assets::PackMaterial(&material_info);
 

@@ -867,6 +867,7 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
       Assets::MaterialInfo material_info =
           Assets::ReadMaterialInfo(&material_file);
       Renderer::MaterialData info;
+      info.base_template = material_info.base_effect;
 
       std::string texture, emissive_texture;
 
@@ -883,20 +884,13 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
       tex.view = textures_[texture].GetView();
       info.textures.push_back(tex);
 
-      if (material_info.transparency ==
-          Assets::TransparencyMode::kTransparent) {
-        info.base_template = "texturedPBR_transparent";
-      } else if (!emissive_texture.empty()) {
-        info.base_template = "texturedPBR_emissive";
-
+      if (!emissive_texture.empty()) {
         LoadTexture(command_buffer, emissive_texture.c_str(),
                     AssetPath(emissive_texture).c_str());
         Renderer::SampledTexture emissive_tex;
         emissive_tex.sampler = texture_sampler_.Get();
         emissive_tex.view = textures_[emissive_texture].GetView();
         info.textures.push_back(emissive_tex);
-      } else {
-        info.base_template = "texturedPBR_opaque";
       }
 
       material =

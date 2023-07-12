@@ -213,7 +213,7 @@ void MaterialSystem::BuildDefaultTemplates() {
 
     default_colored.transparency = Assets::TransparencyMode::kOpaque;
 
-    system.template_cache_["colored_opaque"] = default_colored;
+    system.template_cache_["defaultPBR_opaque"] = default_colored;
   }
   {
     EffectTemplate normals_template;
