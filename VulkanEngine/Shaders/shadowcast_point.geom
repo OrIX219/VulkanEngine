@@ -51,11 +51,11 @@ layout(set = 0, binding = 0) uniform SceneData {
 	vec4 fogColor;
 	vec4 fogDistances;
 	uint directionalLightsCount;
-	DirectionalLight directionalLights[4];
+	DirectionalLight directionalLights[1];
 	uint pointLightsCount;
-	PointLight pointLights[8];
+	PointLight pointLights[2];
 	uint spotLightsCount;
-	SpotLight spotLights[8];
+	SpotLight spotLights[2];
 } sceneData;
 
 void main() {

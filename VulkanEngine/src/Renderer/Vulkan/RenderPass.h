@@ -27,11 +27,14 @@ class RenderPass {
 
   VkRenderPass Get() const;
 
+  uint32_t GetColorAttachmentCount() const;
+
   void Begin(CommandBuffer command_buffer, const BeginInfo& begin_info);
   void End(CommandBuffer command_buffer);
 
  private:
   VkRenderPass render_pass_;
+  uint32_t color_attachment_count_;
 
   LogicalDevice* device_;
 };

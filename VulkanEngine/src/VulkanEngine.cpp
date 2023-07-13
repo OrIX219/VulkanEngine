@@ -75,7 +75,7 @@ void VulkanEngine::Init() {
                              VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
                              VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME}));
   LOG_SUCCESS("Found GPU");
-  samples_ = physical_device_.GetMaxSamples();
+  samples_ = VK_SAMPLE_COUNT_4_BIT;
   VK_CHECK(device_.Init(&physical_device_));
   LOG_SUCCESS("Initialized logical device");
 
@@ -101,6 +101,7 @@ void VulkanEngine::Init() {
   LOG_SUCCESS("Created swapchain");
 
   color_attachment_format_ = VK_FORMAT_R16G16B16A16_SFLOAT;
+  normalized_color_format_ = VK_FORMAT_R8G8B8A8_SRGB;
   depth_attachment_format_ = VK_FORMAT_D32_SFLOAT;
   VkExtent2D extent = swapchain_.GetImageExtent();
   VK_CHECK(color_image_.Create(
@@ -126,6 +127,15 @@ void VulkanEngine::Init() {
       depth_attachment_format_, VK_IMAGE_ASPECT_DEPTH_BIT,
       VK_SAMPLE_COUNT_1_BIT));
   LOG_SUCCESS("Created depth resolve image");
+  VK_CHECK(bright_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT, samples_));
+  VK_CHECK(bright_resolve_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
+      VK_SAMPLE_COUNT_1_BIT));
 
   VK_CHECK(shadow_image_.Create(
       allocator_, &device_, {shadow_extent_.width, shadow_extent_.height, 1},
@@ -144,6 +154,14 @@ void VulkanEngine::Init() {
   LOG_SUCCESS("Created point shadow image");
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Image::Destroy, point_shadow_image_));
+
+  for (size_t i = 0; i < blur_images_.size(); ++i) {
+    VK_CHECK(blur_images_[i].Create(
+        allocator_, &device_, {extent.width, extent.height, 1},
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_SAMPLE_COUNT_1_BIT));
+  }
 
   InitRenderPasses(samples_);
   LOG_SUCCESS("Initialized render passes");
@@ -219,6 +237,14 @@ void VulkanEngine::Cleanup() {
     forward_framebuffer_.Destroy();
     for (size_t i = 0; i < kMaxFramesInFlight; ++i)
       swapchain_framebuffers_[i].Destroy();
+
+    for (size_t i = 0; i < blur_images_.size(); ++i) {
+      blur_images_[i].Destroy();
+      blur_framebuffers_[i].Destroy();
+    }
+
+    bright_resolve_image_.Destroy();
+    bright_image_.Destroy();
     depth_pyramid_.Destroy();
     depth_resolve_image_.Destroy();
     depth_image_.Destroy();
@@ -252,8 +278,12 @@ void VulkanEngine::InitCVars() {
   AutoCVar_Int CVar_show_normals("show_normals", "Render vertex normals", 0,
                                  CVarFlagBits::kEditCheckbox);
 
-  AutoCVar_Float CVar_hdr_exposure("hdr_exposure", "HDR exposure value", 1.f,
-                                   CVarFlagBits::kEditFloatDrag);
+  AutoCVar_Float CVar_gamma("post_proc.gamma", "Gamma for gamma correction",
+                            2.f, CVarFlagBits::kEditFloatDrag);
+  AutoCVar_Float CVar_hdr_exposure("post_proc.exposure", "HDR exposure value",
+                                   1.f, CVarFlagBits::kEditFloatDrag);
+  AutoCVar_Float CVar_bloom_strength("post_proc.bloom_strength", "Bloom strength", 1.f,
+                                     CVarFlagBits::kEditFloatDrag);
 
   AutoCVar_Vec4 CVar_clear_color("scene.clear_color", "Background color",
                                  {0.f, 0.f, 0.f, 1.f},
@@ -345,7 +375,8 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
   Renderer::RenderPassBuilder render_pass_builder(&device_);
   {
     Renderer::RenderPassAttachment color_attachment, color_resolve_attachment,
-        depth_attachment, depth_resolve_attachment;
+        depth_attachment, depth_resolve_attachment, bright_attachment,
+        bright_resolve_attachment;
     color_attachment
         .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
                        VK_ATTACHMENT_STORE_OP_STORE)
@@ -373,16 +404,34 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         .SetFormat(depth_attachment_format_);
+    bright_attachment
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_CLEAR,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetSamples(samples)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+        .SetFormat(color_attachment_format_);
+    bright_resolve_attachment
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetSamples(VK_SAMPLE_COUNT_1_BIT)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .SetFormat(color_attachment_format_);
 
     Renderer::RenderPassSubpass subpass;
     render_pass_builder.AddAttachment(color_attachment)
+        .AddAttachment(bright_attachment)
         .AddAttachment(depth_attachment)
         .AddAttachment(color_resolve_attachment)
+        .AddAttachment(bright_resolve_attachment)
         .AddAttachment(depth_resolve_attachment);
     subpass.AddColorAttachmentRef(0)
-        .SetDepthStencilAttachmentRef(1)
-        .AddResolveAttachmentRef(2)
-        .SetDepthStencilResolveAttachmentRef(3);
+        .AddColorAttachmentRef(1)
+        .SetDepthStencilAttachmentRef(2)
+        .AddResolveAttachmentRef(3)
+        .AddResolveAttachmentRef(4)
+        .SetDepthStencilResolveAttachmentRef(5);
 
     render_pass_builder.AddSubpass(subpass);
     render_pass_builder
@@ -402,6 +451,32 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
 
     main_deletion_queue_.PushFunction(
         std::bind(&Renderer::RenderPass::Destroy, forward_pass_));
+  }
+  render_pass_builder.Clear();
+  {
+    Renderer::RenderPassAttachment color_attachment;
+    color_attachment.SetDefaults()
+        .SetOperations(VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                       VK_ATTACHMENT_STORE_OP_STORE)
+        .SetSamples(VK_SAMPLE_COUNT_1_BIT)
+        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .SetFormat(color_attachment_format_);
+
+    Renderer::RenderPassSubpass subpass;
+    render_pass_builder.AddAttachment(color_attachment);
+    subpass.AddColorAttachmentRef(0);
+
+    render_pass_builder.AddSubpass(subpass);
+    render_pass_builder.AddDependency(
+        VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+
+    post_processing_pass_ = render_pass_builder.Build();
+
+    main_deletion_queue_.PushFunction(
+        std::bind(&Renderer::RenderPass::Destroy, post_processing_pass_));
   }
   render_pass_builder.Clear();
   {
@@ -483,8 +558,9 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
 void VulkanEngine::InitFramebuffers() {
   VkExtent2D extent = swapchain_.GetImageExtent();
   std::vector<VkImageView> attachments = {
-      color_image_.GetView(), depth_image_.GetView(),
-      color_resolve_image_.GetView(), depth_resolve_image_.GetView()};
+      color_image_.GetView(),          bright_image_.GetView(),
+      depth_image_.GetView(),          color_resolve_image_.GetView(),
+      bright_resolve_image_.GetView(), depth_resolve_image_.GetView()};
 
   VK_CHECK(forward_framebuffer_.Create(&device_, &forward_pass_, extent,
                                        attachments));
@@ -501,6 +577,11 @@ void VulkanEngine::InitFramebuffers() {
       {point_shadow_image_.GetView()}, point_shadow_image_.GetArrayLayers()));
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Framebuffer::Destroy, point_shadow_framebuffer_));
+
+  for (size_t i = 0; i < blur_framebuffers_.size(); ++i) {
+    VK_CHECK(blur_framebuffers_[i].Create(&device_, &post_processing_pass_,
+                                          extent, {blur_images_[i].GetView()}));
+  }
 
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(swapchain_framebuffers_[i].Create(&device_, &copy_pass_, extent,
@@ -552,6 +633,24 @@ void VulkanEngine::InitDescriptors() {
 }
 
 void VulkanEngine::InitPipelines() {
+  Renderer::ShaderEffect* blur_effect = new Renderer::ShaderEffect();
+  blur_effect->AddStage(shader_cache_.GetShader("Shaders/blit.vert.spv"),
+                        VK_SHADER_STAGE_VERTEX_BIT);
+  blur_effect->AddStage(shader_cache_.GetShader("Shaders/blur.frag.spv"),
+                        VK_SHADER_STAGE_FRAGMENT_BIT);
+  blur_effect->ReflectLayout(&device_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::ShaderEffect::Destroy, *blur_effect));
+
+  Renderer::PipelineBuilder blur_builder =
+      Renderer::PipelineBuilder::Begin(&device_);
+  blur_pipeline_ = blur_builder.SetDefaults()
+                       .SetDepthStencil(VK_FALSE)
+                       .SetShaders(blur_effect)
+                       .Build(post_processing_pass_);
+  main_deletion_queue_.PushFunction(
+      std::bind(&Renderer::Pipeline::Destroy, blur_pipeline_));
+
   Renderer::ShaderEffect* blit_effect = new Renderer::ShaderEffect();
   blit_effect->AddStage(shader_cache_.GetShader("Shaders/blit.vert.spv"),
                         VK_SHADER_STAGE_VERTEX_BIT);
@@ -601,10 +700,10 @@ void VulkanEngine::InitPipelines() {
       builder.SetDefaults()
           .SetShaders(axes_effect)
           .SetDepthStencil(VK_FALSE)
-          .SetMultisampling(samples_)
+          .SetMultisampling(VK_SAMPLE_COUNT_1_BIT)
           .SetVertexInputDescription(Renderer::Vertex::GetDescription())
           .SetInputAssembly(VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
-          .Build(forward_pass_);
+          .Build(copy_pass_);
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Pipeline::Destroy, axes_pipeline_));
 }
@@ -636,7 +735,13 @@ void VulkanEngine::InitSamplers() {
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::TextureSampler::Destroy, depth_sampler_));
 
-  smooth_sampler_.SetDefaults().SetAnisotropyEnable(true).Create(&device_);
+  smooth_sampler_
+      .SetDefaults()
+      .SetAddressMode({VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE})
+      .SetAnisotropyEnable(true)
+      .Create(&device_);
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::TextureSampler::Destroy, smooth_sampler_));
 
@@ -869,28 +974,13 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
       Renderer::MaterialData info;
       info.base_template = material_info.base_effect;
 
-      std::string texture, emissive_texture;
-
-      if (material_info.textures.size() == 0) {
-        texture = "white.tx";
-      } else {
-        texture = material_info.textures["base_color"];
-        emissive_texture = material_info.textures["emissive"];
-      }
-
-      LoadTexture(command_buffer, texture.c_str(), AssetPath(texture).c_str());
-      Renderer::SampledTexture tex;
-      tex.sampler = texture_sampler_.Get();
-      tex.view = textures_[texture].GetView();
-      info.textures.push_back(tex);
-
-      if (!emissive_texture.empty()) {
-        LoadTexture(command_buffer, emissive_texture.c_str(),
-                    AssetPath(emissive_texture).c_str());
-        Renderer::SampledTexture emissive_tex;
-        emissive_tex.sampler = texture_sampler_.Get();
-        emissive_tex.view = textures_[emissive_texture].GetView();
-        info.textures.push_back(emissive_tex);
+      for (const auto& [key, texture] : material_info.textures) {
+        LoadTexture(command_buffer, texture.c_str(),
+                    AssetPath(texture).c_str());
+        Renderer::SampledTexture tex;
+        tex.sampler = texture_sampler_.Get();
+        tex.view = textures_[texture].GetView();
+        info.textures.push_back(tex);
       }
 
       material =
@@ -989,7 +1079,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
 }
 
 void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
-  constexpr uint32_t kMaxCount = 128;
+  constexpr uint32_t kMaxCount = 16;
 
   std::vector<VkDescriptorPoolSize> sizes = {
       {VK_DESCRIPTOR_TYPE_SAMPLER, kMaxCount},
@@ -1008,7 +1098,7 @@ void VulkanEngine::InitImgui(Renderer::CommandPool& init_pool) {
   pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   pool_info.poolSizeCount = static_cast<uint32_t>(sizes.size());
   pool_info.pPoolSizes = sizes.data();
-  pool_info.maxSets = kMaxCount;
+  pool_info.maxSets = 4;
 
   VK_CHECK(
       vkCreateDescriptorPool(device_.Get(), &pool_info, nullptr, &imgui_pool_));
@@ -1159,6 +1249,29 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
       depth_attachment_format_, VK_IMAGE_ASPECT_DEPTH_BIT,
       VK_SAMPLE_COUNT_1_BIT));
 
+  bright_image_.Destroy();
+  VK_CHECK(bright_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT, samples_));
+
+  bright_resolve_image_.Destroy();
+  VK_CHECK(bright_resolve_image_.Create(
+      allocator_, &device_, {extent.width, extent.height, 1},
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
+      VK_SAMPLE_COUNT_1_BIT));
+
+  for (size_t i = 0; i < blur_images_.size(); ++i) {
+    blur_images_[i].Destroy();
+    VK_CHECK(blur_images_[i].Create(
+        allocator_, &device_, {extent.width, extent.height, 1},
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_SAMPLE_COUNT_1_BIT));
+    VK_CHECK(blur_framebuffers_[i].Resize(extent, {blur_images_[i].GetView()}));
+  }
+
   std::vector<VkImageView> attachments = {
       color_image_.GetView(), depth_image_.GetView(),
       color_resolve_image_.GetView(), depth_resolve_image_.GetView()};
@@ -1268,6 +1381,8 @@ void VulkanEngine::Draw() {
     DrawShadows(command_buffer);
 
     DrawForward(command_buffer);
+
+    PostProcessing(command_buffer);
 
     if (forward_cull.occlusion_cull) ReduceDepth(command_buffer);
 
@@ -1866,8 +1981,9 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer) {
   VkClearValue depth_clear{};
   depth_clear.depthStencil.depth = 1.f;
 
-  Renderer::RenderPass::BeginInfo begin_info{
-      {clear_value, depth_clear, clear_value, depth_clear}};
+  Renderer::RenderPass::BeginInfo begin_info{{clear_value, clear_value,
+                                              depth_clear, clear_value,
+                                              clear_value, depth_clear}};
   begin_info.framebuffer = forward_framebuffer_.Get();
   begin_info.render_area = {{0, 0}, swapchain_.GetImageExtent()};
   forward_pass_.Begin(command_buffer, begin_info);
@@ -1949,8 +2065,6 @@ void VulkanEngine::DrawForward(Renderer::CommandBuffer command_buffer) {
   ExecuteDraw(command_buffer, pass, draw_params);
 
   DrawSkybox(command_buffer, scene_info, scene_data_offset);
-
-  DrawCoordAxes(command_buffer, scene_info, scene_data_offset);
 
   forward_pass_.End(command_buffer);
 }
@@ -2244,6 +2358,80 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
       command_buffer, layout_info);
 }
 
+struct BloomParams {
+  int horizontal;
+  float strength;
+};
+
+void VulkanEngine::PostProcessing(Renderer::CommandBuffer command_buffer) {
+  const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
+  FrameData& frame = frames_[frame_index];
+
+  Renderer::VulkanScopeTimer timer(command_buffer, &profiler_,
+                                   "Post Processing");
+
+  VkClearValue clear_value = {{{0.f, 0.f, 0.f, 1.f}}};
+  VkExtent3D extent = blur_images_[0].GetExtent();
+  bool horizontal = true, first_pass = true;
+  size_t amount = 6;
+  Renderer::RenderPass::BeginInfo begin_info{{clear_value}};
+  begin_info.render_area = {{0, 0}, {extent.width, extent.height}};
+  VkViewport viewport{0.f, 0.f,
+                      static_cast<float>(extent.width),
+                      static_cast<float>(extent.height),
+                      0.f, 1.f};
+  VkRect2D scissors{{0, 0}, {extent.width, extent.height}};
+  for (size_t i = 0; i < amount; ++i) {
+    begin_info.framebuffer =
+        blur_framebuffers_[static_cast<size_t>(horizontal)].Get();
+    post_processing_pass_.Begin(command_buffer, begin_info);
+
+    vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
+    vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
+
+    blur_pipeline_.Bind(command_buffer);
+
+    VkDescriptorImageInfo source_image;
+    source_image.sampler = smooth_sampler_.Get();
+    source_image.imageView =
+        first_pass ? bright_resolve_image_.GetView()
+                   : blur_images_[static_cast<size_t>(!horizontal)].GetView();
+    source_image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorSet blur_set;
+    Renderer::DescriptorBuilder::Begin(&layout_cache_,
+                                       &frame.dynamic_descriptor_allocator)
+        .BindImage(0, &source_image, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                   VK_SHADER_STAGE_FRAGMENT_BIT)
+        .Build(blur_set);
+
+    vkCmdBindDescriptorSets(
+        command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+        blur_pipeline_.GetLayout(), 0, 1, &blur_set, 0, nullptr);
+
+    BloomParams params;
+    params.horizontal = static_cast<int>(horizontal);
+    params.strength =
+        *CVarSystem::Get()->GetFloatCVar("post_proc.bloom_strength");
+
+    vkCmdPushConstants(command_buffer.Get(), blur_pipeline_.GetLayout(),
+                       VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomParams),
+                       &params);
+
+    vkCmdDraw(command_buffer.Get(), 3, 1, 0, 0);
+
+    post_processing_pass_.End(command_buffer);
+    horizontal = !horizontal;
+    first_pass = false;
+  }
+
+}
+
+struct PostProcParams {
+  float gamma;
+  float exposure;
+};
+
 void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                                          uint32_t index) {
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
@@ -2274,10 +2462,17 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
   source_image.imageView = color_resolve_image_.GetView();
   source_image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+  VkDescriptorImageInfo blur_image;
+  blur_image.sampler = smooth_sampler_.Get();
+  blur_image.imageView = blur_images_[0].GetView();
+  blur_image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
   VkDescriptorSet blit_set;
   Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                      &frame.dynamic_descriptor_allocator)
       .BindImage(0, &source_image, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                 VK_SHADER_STAGE_FRAGMENT_BIT)
+      .BindImage(1, &blur_image, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                  VK_SHADER_STAGE_FRAGMENT_BIT)
       .Build(blit_set);
 
@@ -2285,11 +2480,24 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                           blit_pipeline_.GetLayout(), 0, 1, &blit_set, 0,
                           nullptr);
 
-  float exposure = *CVarSystem::Get()->GetFloatCVar("hdr_exposure");
+  PostProcParams params;
+  params.gamma = *CVarSystem::Get()->GetFloatCVar("post_proc.gamma");
+  params.exposure = *CVarSystem::Get()->GetFloatCVar("post_proc.exposure");
   vkCmdPushConstants(command_buffer.Get(), blit_pipeline_.GetLayout(),
-                     VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(float), &exposure);
+                     VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PostProcParams),
+                     &params);
 
   vkCmdDraw(command_buffer.Get(), 3, 1, 0, 0);
+
+  Renderer::GPUCameraData camera_data;
+  camera_data.view = camera_.GetViewMat();
+  camera_data.projection = camera_.GetProjMat();
+  uint32_t offset = frame.dynamic_data.Push(camera_data);
+
+  VkDescriptorBufferInfo scene_info = frame.dynamic_data.GetDescriptorInfo();
+  scene_info.range = sizeof(Renderer::GPUCameraData);
+
+  DrawCoordAxes(command_buffer, scene_info, offset);
 
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer.Get());
 

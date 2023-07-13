@@ -45,9 +45,9 @@ struct GPUCameraData {
   alignas(16) glm::vec3 pos;
 };
 
-constexpr uint32_t kMaxDirectionalLights = 4;
-constexpr uint32_t kMaxPointLights = 8;
-constexpr uint32_t kMaxSpotLights = 8;
+constexpr uint32_t kMaxDirectionalLights = 1;
+constexpr uint32_t kMaxPointLights = 2;
+constexpr uint32_t kMaxSpotLights = 2;
 
 struct GPUSceneData {
   GPUCameraData camera_data;
@@ -160,6 +160,7 @@ class VulkanEngine {
                      VkDescriptorBufferInfo scene_info,
                      uint32_t dynamic_offset);
   void ReduceDepth(Renderer::CommandBuffer command_buffer);
+  void PostProcessing(Renderer::CommandBuffer command_buffer);
   void CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
                              uint32_t index); 
 
@@ -214,16 +215,20 @@ class VulkanEngine {
   DeletionQueue main_deletion_queue_;
 
   VkFormat color_attachment_format_;
+  VkFormat normalized_color_format_;
   VkFormat depth_attachment_format_;
   VkSampleCountFlagBits samples_;
   Renderer::Swapchain swapchain_;
   Renderer::Image color_image_;
+  Renderer::Image bright_image_;
   Renderer::Image depth_image_;
   Renderer::Image color_resolve_image_;
+  Renderer::Image bright_resolve_image_;
   Renderer::Image depth_resolve_image_;
   Renderer::Image shadow_image_;
   VkExtent2D shadow_extent_{2048, 2048};
   Renderer::ImageCube point_shadow_image_;
+  std::array<Renderer::Image, 2> blur_images_;
 
   Renderer::Image depth_pyramid_;
   uint32_t depth_pyramid_width_;
@@ -234,10 +239,12 @@ class VulkanEngine {
   Renderer::RenderPass forward_pass_;
   Renderer::RenderPass directional_shadow_pass_;
   Renderer::RenderPass point_shadow_pass_;
+  Renderer::RenderPass post_processing_pass_;
   Renderer::RenderPass copy_pass_;
   Renderer::Framebuffer forward_framebuffer_;
   Renderer::Framebuffer shadow_framebuffer_;
   Renderer::Framebuffer point_shadow_framebuffer_;
+  std::array<Renderer::Framebuffer, 2> blur_framebuffers_; 
   std::array<Renderer::Framebuffer, kMaxFramesInFlight> swapchain_framebuffers_;
 
   Renderer::DescriptorAllocator descriptor_allocator_;
@@ -261,6 +268,8 @@ class VulkanEngine {
 
   VkPipeline depth_reduce_pipeline_;
   VkPipelineLayout depth_reduce_layout_;
+
+  Renderer::Pipeline blur_pipeline_;
 
   Renderer::Pipeline blit_pipeline_;
 

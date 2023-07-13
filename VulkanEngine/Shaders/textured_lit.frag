@@ -1,6 +1,7 @@
 #version 450
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outColorBright;
 
 layout(location = 0) in vec3 inColor;
 layout(location = 1) in vec3 inNormal;
@@ -53,11 +54,11 @@ layout(set = 0, binding = 0) uniform SceneData {
 	vec4 fogColor;
 	vec4 fogDistances;
 	uint directionalLightsCount;
-	DirectionalLight directionalLights[4];
+	DirectionalLight directionalLights[1];
 	uint pointLightsCount;
-	PointLight pointLights[8];
+	PointLight pointLights[2];
 	uint spotLightsCount;
-	SpotLight spotLights[8];
+	SpotLight spotLights[2];
 } sceneData;
 
 // need samplers for all lights
@@ -209,4 +210,10 @@ void main() {
 
 	vec3 color = tex_color * (directional + point + spot);
 	outColor = vec4(color, 1.f);
+	
+	float brightness = dot(outColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+	if (brightness > 1.0)
+		outColorBright = outColor;
+	else 
+		outColorBright = vec4(0.0, 0.0, 0.0, 1.0);
 }

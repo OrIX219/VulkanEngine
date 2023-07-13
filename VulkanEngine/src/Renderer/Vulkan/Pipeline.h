@@ -66,12 +66,14 @@ class PipelineBuilder {
       VkBool32 depth_bias_enable = VK_FALSE);
   PipelineBuilder& SetRasterizer(
       VkPipelineRasterizationStateCreateInfo* rasterizer);
-  PipelineBuilder& SetColorBlendAttachment(VkBool32 blend_enable = VK_FALSE,
+  PipelineBuilder& SetColorBlendAttachment(
+      uint32_t index, VkBool32 blend_enable = VK_FALSE,
       VkColorComponentFlags color_write_mask = VK_COLOR_COMPONENT_R_BIT |
                                                VK_COLOR_COMPONENT_G_BIT |
                                                VK_COLOR_COMPONENT_B_BIT |
                                                VK_COLOR_COMPONENT_A_BIT);
   PipelineBuilder& SetColorBlendAttachment(
+      uint32_t index,
       VkPipelineColorBlendAttachmentState* color_blend_attachment);
   PipelineBuilder& SetMultisampling(
       VkSampleCountFlagBits rasterization_samples = VK_SAMPLE_COUNT_1_BIT,
@@ -101,7 +103,7 @@ class PipelineBuilder {
   std::optional<VkViewport> viewport_;
   std::optional<VkRect2D> scissors_;
   VkPipelineRasterizationStateCreateInfo rasterizer_;
-  VkPipelineColorBlendAttachmentState color_blend_attachment_;
+  std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments_;
   VkPipelineMultisampleStateCreateInfo multisampling_;
   std::optional<VkPipelineDepthStencilStateCreateInfo> depth_stencil_;
   VkPipelineLayout pipeline_layout_;

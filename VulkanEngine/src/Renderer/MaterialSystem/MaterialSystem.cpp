@@ -177,7 +177,7 @@ void MaterialSystem::BuildDefaultTemplates() {
     blend.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
     blend.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                            VK_COLOR_COMPONENT_B_BIT;
-    transparend_forward.SetColorBlendAttachment(&blend)
+    transparend_forward.SetColorBlendAttachment(0, &blend)
         .SetDepthStencil(VK_TRUE, VK_FALSE)
         .SetRasterizer(VK_POLYGON_MODE_FILL, 1.f, VK_CULL_MODE_NONE);
 

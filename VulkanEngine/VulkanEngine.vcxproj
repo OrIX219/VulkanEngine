@@ -189,6 +189,7 @@
     <None Include="Shaders\axes.vert" />
     <None Include="Shaders\blit.frag" />
     <None Include="Shaders\blit.vert" />
+    <None Include="Shaders\blur.frag" />
     <None Include="Shaders\default.frag" />
     <None Include="Shaders\default.vert" />
     <None Include="Shaders\default_lit.frag" />

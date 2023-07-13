@@ -47,8 +47,6 @@ PipelineBuilder::PipelineBuilder()
       input_assembly_info_{
           VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO},
       rasterizer_{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO},
-      color_blend_attachment_{
-          VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO},
       multisampling_{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO},
       pipeline_layout_{} {}
 
@@ -61,6 +59,10 @@ PipelineBuilder PipelineBuilder::Begin(LogicalDevice* device) {
 }
 
 Pipeline PipelineBuilder::Build(RenderPass& render_pass) {
+  for (uint32_t i = color_blend_attachments_.size();
+       i < render_pass.GetColorAttachmentCount(); ++i)
+    SetColorBlendAttachment(i);
+
   std::vector<VkDynamicState> dynamic_states;
   if (!viewport_.has_value())
     dynamic_states.push_back(VK_DYNAMIC_STATE_VIEWPORT);
@@ -85,8 +87,9 @@ Pipeline PipelineBuilder::Build(RenderPass& render_pass) {
   color_blending.sType =
       VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
   color_blending.logicOpEnable = VK_FALSE;
-  color_blending.attachmentCount = 1;
-  color_blending.pAttachments = &color_blend_attachment_;
+  color_blending.attachmentCount =
+      static_cast<uint32_t>(color_blend_attachments_.size());
+  color_blending.pAttachments = color_blend_attachments_.data();
 
   if (!foreign_layout_) {
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
@@ -203,16 +206,28 @@ PipelineBuilder& PipelineBuilder::SetRasterizer(
 }
 
 PipelineBuilder& PipelineBuilder::SetColorBlendAttachment(
+    uint32_t index, 
     VkBool32 blend_enable, VkColorComponentFlags color_write_mask) {
-  color_blend_attachment_.blendEnable = blend_enable;
-  color_blend_attachment_.colorWriteMask = color_write_mask;
+  if (index >= color_blend_attachments_.size()) {
+    VkPipelineColorBlendAttachmentState attachment{};
+    attachment.blendEnable = blend_enable;
+    attachment.colorWriteMask = color_write_mask;
+    color_blend_attachments_.push_back(std::move(attachment));
+  } else {
+    color_blend_attachments_[index].blendEnable = blend_enable;
+    color_blend_attachments_[index].colorWriteMask = color_write_mask;
+  }
 
   return *this;
 }
 
 PipelineBuilder& PipelineBuilder::SetColorBlendAttachment(
+    uint32_t index, 
     VkPipelineColorBlendAttachmentState* color_blend_attachment) {
-  color_blend_attachment_ = *color_blend_attachment;
+  if (index >= color_blend_attachments_.size())
+    color_blend_attachments_.push_back(*color_blend_attachment);
+  else
+    color_blend_attachments_[index] = *color_blend_attachment;
 
   return *this;
 }
@@ -280,7 +295,6 @@ PipelineBuilder& PipelineBuilder::SetDefaults() {
   static const std::vector<VkPushConstantRange> empty_push_constants;
   SetInputAssembly()
       .SetRasterizer()
-      .SetColorBlendAttachment()
       .SetMultisampling()
       .SetLayout(empty_layouts, empty_push_constants);
 

@@ -9,6 +9,7 @@ RenderPass::~RenderPass() {}
 VkResult RenderPass::Create(LogicalDevice* device,
                             VkRenderPassCreateInfo2* create_info) {
   device_ = device;
+  color_attachment_count_ = create_info->pSubpasses[0].colorAttachmentCount;
 
   return vkCreateRenderPass2(device_->Get(), create_info, nullptr,
                              &render_pass_);
@@ -19,6 +20,8 @@ void RenderPass::Destroy() {
 }
 
 VkRenderPass RenderPass::Get() const { return render_pass_; }
+
+uint32_t RenderPass::GetColorAttachmentCount() const { return color_attachment_count_; }
 
 void RenderPass::Begin(CommandBuffer command_buffer,
                        const BeginInfo& begin_info) {
