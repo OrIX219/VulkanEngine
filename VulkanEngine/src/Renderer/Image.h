@@ -91,6 +91,10 @@ class Image {
   void LayoutTransition(CommandBuffer command_buffer,
                         const LayoutTransitionInfo& transition_info);
 
+  void GenerateMipMaps(CommandBuffer command_buffer,
+                       const LayoutTransitionInfo& transition_info,
+                       VkFilter filter = VK_FILTER_LINEAR);
+
   static uint32_t CalculateMipLevels(uint32_t width, uint32_t height) {
     return static_cast<uint32_t>(
                std::floor(std::log2(std::max(width, height)))) +

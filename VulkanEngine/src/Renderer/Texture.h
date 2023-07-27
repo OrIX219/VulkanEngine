@@ -24,8 +24,6 @@ class Texture {
   VkImageView GetView();
 
  private:
-  void GenerateMipmaps(CommandBuffer command_buffer);
-
   Buffer<true> staging_buffer_;
   Image image_;
 };

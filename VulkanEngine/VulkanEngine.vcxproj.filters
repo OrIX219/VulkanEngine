@@ -298,13 +298,12 @@
     <None Include="Shaders\blit.frag" />
     <None Include="Shaders\skybox.vert" />
     <None Include="Shaders\skybox.frag" />
-    <None Include="Shaders\mesh_instanced_shadowcast.vert" />
+    <None Include="Shaders\shadowcast.vert" />
     <None Include="Shaders\axes.vert" />
     <None Include="Shaders\axes.geom" />
     <None Include="Shaders\axes.frag" />
     <None Include="Shaders\default.vert" />
     <None Include="Shaders\default.frag" />
-    <None Include="Shaders\mesh_instanced_shadowcast_point.vert" />
     <None Include="Shaders\shadowcast_point.geom" />
     <None Include="Shaders\shadowcast_point.frag" />
     <None Include="Shaders\shadowcast.geom" />

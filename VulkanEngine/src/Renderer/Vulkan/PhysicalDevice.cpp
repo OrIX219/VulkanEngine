@@ -1,5 +1,7 @@
 #include "PhysicalDevice.h"
 
+#include "Logger.h"
+
 #include <unordered_set>
 
 namespace Renderer {
@@ -140,6 +142,9 @@ bool PhysicalDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 
   for (const auto& extension : available_extensions)
     required_extensions.erase(extension.extensionName);
+
+  for (const auto& extension : required_extensions)
+    LOG_ERROR("Device extension not supported: {}", extension.c_str());
 
   return required_extensions.empty();
 }

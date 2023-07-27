@@ -1039,7 +1039,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::VertexBuffer::Destroy, axes_buffer_));
 
-  LoadTexture(command_buffer, "white", AssetPath("white.tx").c_str());
+  LoadTexture(command_buffer, "white", AssetPath("default/white.tx").c_str());
   skybox_texture_.LoadFromDirectory(allocator_, &device_, command_buffer,
                                     AssetPath("skybox").c_str());
 
@@ -1070,7 +1070,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   skybox_info.textures.push_back(skybox_texture);
   Renderer::MaterialSystem::BuildMaterial("skybox", skybox_info);
 
-  LoadMesh(command_buffer, "cube", AssetPath("cube.mesh").c_str());
+  LoadMesh(command_buffer, "cube", AssetPath("cube_GLTF/MESH_0_Cube.mesh").c_str());
 
   LoadPrefab(command_buffer, AssetPath("Test.pfb").c_str());
 

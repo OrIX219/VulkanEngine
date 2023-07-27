@@ -196,8 +196,7 @@
     <None Include="Shaders\depth_reduce.comp" />
     <None Include="Shaders\indirect_compute.comp" />
     <None Include="Shaders\mesh_instanced.vert" />
-    <None Include="Shaders\mesh_instanced_shadowcast.vert" />
-    <None Include="Shaders\mesh_instanced_shadowcast_point.vert" />
+    <None Include="Shaders\shadowcast.vert" />
     <None Include="Shaders\normals.frag" />
     <None Include="Shaders\normals.geom" />
     <None Include="Shaders\normals.vert" />

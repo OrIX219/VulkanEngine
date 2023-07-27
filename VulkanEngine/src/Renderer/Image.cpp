@@ -156,6 +156,83 @@ void Image::LayoutTransition(CommandBuffer command_buffer,
                        nullptr, 0, nullptr, 1, &barrier);
 }
 
+void Image::GenerateMipMaps(CommandBuffer command_buffer,
+                            const LayoutTransitionInfo& transition_info,
+                            VkFilter filter) {
+  Renderer::Image::LayoutTransitionInfo layout_info{};
+  layout_info.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+  layout_info.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  layout_info.src_stage = transition_info.src_stage;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  LayoutTransition(command_buffer, layout_info);
+
+  VkImageMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.image = image_;
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.subresourceRange.aspectMask = transition_info.aspect_flags;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = array_layers_;
+
+  int32_t mip_width = image_extent_.width;
+  int32_t mip_height = image_extent_.height;
+
+  for (uint32_t i = 1; i < mip_levels_; ++i) {
+    barrier.subresourceRange.baseMipLevel = i - 1;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.srcAccessMask = transition_info.src_access;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+    vkCmdPipelineBarrier(command_buffer.Get(), transition_info.src_stage,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
+                         nullptr, 1, &barrier);
+
+    VkImageBlit blit{};
+    blit.srcOffsets[0] = {0, 0, 0};
+    blit.srcOffsets[1] = {mip_width, mip_height, 1};
+    blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blit.srcSubresource.mipLevel = i - 1;
+    blit.srcSubresource.baseArrayLayer = 0;
+    blit.srcSubresource.layerCount = 1;
+    blit.dstOffsets[0] = {0, 0, 0};
+    blit.dstOffsets[1] = {mip_width > 1 ? mip_width / 2 : 1,
+                          mip_height > 1 ? mip_height / 2 : 1, 1};
+    blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blit.dstSubresource.mipLevel = i;
+    blit.dstSubresource.baseArrayLayer = 0;
+    blit.dstSubresource.layerCount = 1;
+
+    vkCmdBlitImage(command_buffer.Get(), image_,
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image_,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, filter);
+
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.newLayout = transition_info.new_layout;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    barrier.dstAccessMask = transition_info.dst_access;
+
+    vkCmdPipelineBarrier(command_buffer.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         transition_info.dst_stage, 0, 0, nullptr,
+                         0, nullptr, 1, &barrier);
+
+    if (mip_width > 1) mip_width /= 2;
+    if (mip_height > 1) mip_height /= 2;
+  }
+
+  barrier.subresourceRange.baseMipLevel = mip_levels_ - 1;
+  barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  barrier.newLayout = transition_info.new_layout;
+  barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+  barrier.dstAccessMask = transition_info.dst_access;
+
+  vkCmdPipelineBarrier(command_buffer.Get(), VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       transition_info.dst_stage, 0, 0, nullptr, 0, nullptr, 1,
+                       &barrier);
+}
+
 VkResult Image::CreateImageView(VkImageAspectFlags aspect_flags) {
   VkImageViewCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;

@@ -62,7 +62,7 @@ Handle<SceneObject> RenderScene::RegisterObject(RenderObject* object) {
 }
 
 void RenderScene::RegisterObjectBatch(RenderObject* first, uint32_t count) {
-  renderables.reserve(count);
+  renderables.reserve(renderables.size() + count);
   for (size_t i = 0; i < count; ++i) RegisterObject(&first[i]);
 }
 
