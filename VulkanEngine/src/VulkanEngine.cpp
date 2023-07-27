@@ -96,6 +96,8 @@ void VulkanEngine::Init() {
   Renderer::CommandPool init_pool;
   VK_CHECK(init_pool.Create(
       &device_, device_.GetQueueFamilies().graphics_family.value()));
+  Renderer::Queue& init_queue = device_.GetQueue(init_pool.GetQueueFamily());
+  init_queue.BeginBatch();
 
   VK_CHECK(swapchain_.Create(&device_, &surface_));
   LOG_SUCCESS("Created swapchain");
@@ -133,7 +135,8 @@ void VulkanEngine::Init() {
       color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT, samples_));
   VK_CHECK(bright_resolve_image_.Create(
       allocator_, &device_, {extent.width, extent.height, 1},
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
       color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
       VK_SAMPLE_COUNT_1_BIT));
 
@@ -155,13 +158,25 @@ void VulkanEngine::Init() {
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Image::Destroy, point_shadow_image_));
 
+  Renderer::CommandBuffer command_buffer = init_pool.GetBuffer();
+  command_buffer.Begin();
   for (size_t i = 0; i < blur_images_.size(); ++i) {
     VK_CHECK(blur_images_[i].Create(
-        allocator_, &device_, {extent.width, extent.height, 1},
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        allocator_, &device_, {extent.width / 2, extent.height / 2, 1},
+        VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
         VK_SAMPLE_COUNT_1_BIT));
+
+    Renderer::Image::LayoutTransitionInfo layout_info{};
+    layout_info.new_layout = VK_IMAGE_LAYOUT_GENERAL;
+    layout_info.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+    layout_info.src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    layout_info.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    blur_images_[i].LayoutTransition(command_buffer, layout_info);
   }
+  command_buffer.End();
+  command_buffer.Submit();
 
   InitRenderPasses(samples_);
   LOG_SUCCESS("Initialized render passes");
@@ -201,10 +216,8 @@ void VulkanEngine::Init() {
   InitDepthPyramid(init_pool);
   LOG_SUCCESS("Created depth pyramid");
 
-  Renderer::Queue& init_queue = device_.GetQueue(init_pool.GetQueueFamily());
-
-  init_queue.BeginBatch();
   InitScene(init_pool);
+
   init_queue.EndBatch();
 
   InitImgui(init_pool);
@@ -238,10 +251,8 @@ void VulkanEngine::Cleanup() {
     for (size_t i = 0; i < kMaxFramesInFlight; ++i)
       swapchain_framebuffers_[i].Destroy();
 
-    for (size_t i = 0; i < blur_images_.size(); ++i) {
+    for (size_t i = 0; i < blur_images_.size(); ++i)
       blur_images_[i].Destroy();
-      blur_framebuffers_[i].Destroy();
-    }
 
     bright_resolve_image_.Destroy();
     bright_image_.Destroy();
@@ -284,6 +295,7 @@ void VulkanEngine::InitCVars() {
                                    1.f, CVarFlagBits::kEditFloatDrag);
   AutoCVar_Float CVar_bloom_strength("post_proc.bloom_strength", "Bloom strength", 1.f,
                                      CVarFlagBits::kEditFloatDrag);
+  AutoCVar_Int CVar_bloom_passes("post_proc.bloom_passes", "asd", 2);
 
   AutoCVar_Vec4 CVar_clear_color("scene.clear_color", "Background color",
                                  {0.f, 0.f, 0.f, 1.f},
@@ -416,7 +428,7 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
                        VK_ATTACHMENT_STORE_OP_STORE)
         .SetSamples(VK_SAMPLE_COUNT_1_BIT)
         .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
         .SetFormat(color_attachment_format_);
 
     Renderer::RenderPassSubpass subpass;
@@ -451,32 +463,6 @@ void VulkanEngine::InitRenderPasses(VkSampleCountFlagBits samples) {
 
     main_deletion_queue_.PushFunction(
         std::bind(&Renderer::RenderPass::Destroy, forward_pass_));
-  }
-  render_pass_builder.Clear();
-  {
-    Renderer::RenderPassAttachment color_attachment;
-    color_attachment.SetDefaults()
-        .SetOperations(VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                       VK_ATTACHMENT_STORE_OP_STORE)
-        .SetSamples(VK_SAMPLE_COUNT_1_BIT)
-        .SetLayouts(VK_IMAGE_LAYOUT_UNDEFINED,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        .SetFormat(color_attachment_format_);
-
-    Renderer::RenderPassSubpass subpass;
-    render_pass_builder.AddAttachment(color_attachment);
-    subpass.AddColorAttachmentRef(0);
-
-    render_pass_builder.AddSubpass(subpass);
-    render_pass_builder.AddDependency(
-        VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-
-    post_processing_pass_ = render_pass_builder.Build();
-
-    main_deletion_queue_.PushFunction(
-        std::bind(&Renderer::RenderPass::Destroy, post_processing_pass_));
   }
   render_pass_builder.Clear();
   {
@@ -578,11 +564,6 @@ void VulkanEngine::InitFramebuffers() {
   main_deletion_queue_.PushFunction(
       std::bind(&Renderer::Framebuffer::Destroy, point_shadow_framebuffer_));
 
-  for (size_t i = 0; i < blur_framebuffers_.size(); ++i) {
-    VK_CHECK(blur_framebuffers_[i].Create(&device_, &post_processing_pass_,
-                                          extent, {blur_images_[i].GetView()}));
-  }
-
   for (size_t i = 0; i < kMaxFramesInFlight; ++i) {
     VK_CHECK(swapchain_framebuffers_[i].Create(&device_, &copy_pass_, extent,
                                                {swapchain_.GetImageView(i)}));
@@ -633,24 +614,6 @@ void VulkanEngine::InitDescriptors() {
 }
 
 void VulkanEngine::InitPipelines() {
-  Renderer::ShaderEffect* blur_effect = new Renderer::ShaderEffect();
-  blur_effect->AddStage(shader_cache_.GetShader("Shaders/blit.vert.spv"),
-                        VK_SHADER_STAGE_VERTEX_BIT);
-  blur_effect->AddStage(shader_cache_.GetShader("Shaders/blur.frag.spv"),
-                        VK_SHADER_STAGE_FRAGMENT_BIT);
-  blur_effect->ReflectLayout(&device_);
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::ShaderEffect::Destroy, *blur_effect));
-
-  Renderer::PipelineBuilder blur_builder =
-      Renderer::PipelineBuilder::Begin(&device_);
-  blur_pipeline_ = blur_builder.SetDefaults()
-                       .SetDepthStencil(VK_FALSE)
-                       .SetShaders(blur_effect)
-                       .Build(post_processing_pass_);
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::Pipeline::Destroy, blur_pipeline_));
-
   Renderer::ShaderEffect* blit_effect = new Renderer::ShaderEffect();
   blit_effect->AddStage(shader_cache_.GetShader("Shaders/blit.vert.spv"),
                         VK_SHADER_STAGE_VERTEX_BIT);
@@ -675,6 +638,8 @@ void VulkanEngine::InitPipelines() {
                     depth_reduce_layout_);
   LoadComputeShader("Shaders/sparse_upload.comp.spv", sparse_upload_pipeline_,
                     sparse_upload_layout_);
+  LoadComputeShader("Shaders/blur.comp.spv", blur_pipeline_,
+                    blur_pipeline_layout_);
 
   Renderer::MaterialData normals;
   normals.base_template = "normals";
@@ -1070,7 +1035,7 @@ void VulkanEngine::InitScene(Renderer::CommandPool& init_pool) {
   skybox_info.textures.push_back(skybox_texture);
   Renderer::MaterialSystem::BuildMaterial("skybox", skybox_info);
 
-  LoadMesh(command_buffer, "cube", AssetPath("cube_GLTF/MESH_0_Cube.mesh").c_str());
+  LoadMesh(command_buffer, "cube", AssetPath("default/cube.mesh").c_str());
 
   LoadPrefab(command_buffer, AssetPath("Test.pfb").c_str());
 
@@ -1265,11 +1230,10 @@ void VulkanEngine::RecreateSwapchain(Renderer::CommandPool& command_pool) {
   for (size_t i = 0; i < blur_images_.size(); ++i) {
     blur_images_[i].Destroy();
     VK_CHECK(blur_images_[i].Create(
-        allocator_, &device_, {extent.width, extent.height, 1},
+        allocator_, &device_, {extent.width / 2, extent.height / 2, 1},
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         color_attachment_format_, VK_IMAGE_ASPECT_COLOR_BIT,
         VK_SAMPLE_COUNT_1_BIT));
-    VK_CHECK(blur_framebuffers_[i].Resize(extent, {blur_images_[i].GetView()}));
   }
 
   std::vector<VkImageView> attachments = {
@@ -2359,7 +2323,7 @@ void VulkanEngine::ReduceDepth(Renderer::CommandBuffer command_buffer) {
 }
 
 struct BloomParams {
-  int horizontal;
+  int32_t horizontal;
   float strength;
 };
 
@@ -2370,61 +2334,126 @@ void VulkanEngine::PostProcessing(Renderer::CommandBuffer command_buffer) {
   Renderer::VulkanScopeTimer timer(command_buffer, &profiler_,
                                    "Post Processing");
 
-  VkClearValue clear_value = {{{0.f, 0.f, 0.f, 1.f}}};
-  VkExtent3D extent = blur_images_[0].GetExtent();
-  bool horizontal = true, first_pass = true;
-  size_t amount = 6;
-  Renderer::RenderPass::BeginInfo begin_info{{clear_value}};
-  begin_info.render_area = {{0, 0}, {extent.width, extent.height}};
-  VkViewport viewport{0.f, 0.f,
-                      static_cast<float>(extent.width),
-                      static_cast<float>(extent.height),
-                      0.f, 1.f};
-  VkRect2D scissors{{0, 0}, {extent.width, extent.height}};
+  Renderer::Image::LayoutTransitionInfo layout_info{};
+  layout_info.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+  layout_info.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  layout_info.src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  blur_images_[0].LayoutTransition(command_buffer, layout_info);
+
+  VkExtent3D extent = bright_resolve_image_.GetExtent();
+  VkExtent3D blur_extent = blur_images_[0].GetExtent();
+  int32_t image_width = extent.width;
+  int32_t image_height = extent.height;
+  int32_t blur_width = blur_extent.width;
+  int32_t blur_height = blur_extent.height;
+
+  VkImageBlit blit{};
+  blit.srcOffsets[0] = {0, 0, 0};
+  blit.srcOffsets[1] = {image_width, image_height, 1};
+  blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  blit.srcSubresource.layerCount = 1;
+  blit.dstOffsets[0] = {0, 0, 0};
+  blit.dstOffsets[1] = {blur_width, blur_height, 1};
+  blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  blit.dstSubresource.layerCount = 1;
+  vkCmdBlitImage(command_buffer.Get(), bright_resolve_image_.Get(),
+                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, blur_images_[0].Get(),
+                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit,
+                 VK_FILTER_LINEAR);
+
+  layout_info.new_layout = VK_IMAGE_LAYOUT_GENERAL;
+  layout_info.src_access = VK_ACCESS_TRANSFER_READ_BIT;
+  layout_info.dst_access = VK_ACCESS_SHADER_READ_BIT;
+  layout_info.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  blur_images_[0].LayoutTransition(command_buffer, layout_info);
+
+  uint32_t amount = *CVarSystem::Get()->GetIntCVar("post_proc.bloom_passes");
+  bool horizontal = true;
+  vkCmdBindPipeline(command_buffer.Get(), VK_PIPELINE_BIND_POINT_COMPUTE,
+                    blur_pipeline_);
   for (size_t i = 0; i < amount; ++i) {
-    begin_info.framebuffer =
-        blur_framebuffers_[static_cast<size_t>(horizontal)].Get();
-    post_processing_pass_.Begin(command_buffer, begin_info);
+    VkDescriptorImageInfo src_image;
+    src_image.sampler = VK_NULL_HANDLE;
+    src_image.imageView =
+        blur_images_[static_cast<size_t>(!horizontal)].GetView();
+    src_image.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    vkCmdSetViewport(command_buffer.Get(), 0, 1, &viewport);
-    vkCmdSetScissor(command_buffer.Get(), 0, 1, &scissors);
-
-    blur_pipeline_.Bind(command_buffer);
-
-    VkDescriptorImageInfo source_image;
-    source_image.sampler = smooth_sampler_.Get();
-    source_image.imageView =
-        first_pass ? bright_resolve_image_.GetView()
-                   : blur_images_[static_cast<size_t>(!horizontal)].GetView();
-    source_image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    VkDescriptorImageInfo dst_image;
+    dst_image.sampler = VK_NULL_HANDLE;
+    dst_image.imageView =
+        blur_images_[static_cast<size_t>(horizontal)].GetView();
+    dst_image.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkDescriptorSet blur_set;
     Renderer::DescriptorBuilder::Begin(&layout_cache_,
                                        &frame.dynamic_descriptor_allocator)
-        .BindImage(0, &source_image, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                   VK_SHADER_STAGE_FRAGMENT_BIT)
+        .BindImage(0, &src_image, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                   VK_SHADER_STAGE_COMPUTE_BIT)
+        .BindImage(1, &dst_image, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                   VK_SHADER_STAGE_COMPUTE_BIT)
         .Build(blur_set);
 
-    vkCmdBindDescriptorSets(
-        command_buffer.Get(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-        blur_pipeline_.GetLayout(), 0, 1, &blur_set, 0, nullptr);
+    vkCmdBindDescriptorSets(command_buffer.Get(),
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            blur_pipeline_layout_, 0, 1, &blur_set, 0, nullptr);
 
     BloomParams params;
-    params.horizontal = static_cast<int>(horizontal);
+    params.horizontal = static_cast<int32_t>(horizontal);
     params.strength =
         *CVarSystem::Get()->GetFloatCVar("post_proc.bloom_strength");
 
-    vkCmdPushConstants(command_buffer.Get(), blur_pipeline_.GetLayout(),
-                       VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomParams),
+    vkCmdPushConstants(command_buffer.Get(), blur_pipeline_layout_,
+                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BloomParams),
                        &params);
 
-    vkCmdDraw(command_buffer.Get(), 3, 1, 0, 0);
+    vkCmdDispatch(command_buffer.Get(), ceil(blur_width / 16),
+                  ceil(blur_height / 16), 1);
 
-    post_processing_pass_.End(command_buffer);
     horizontal = !horizontal;
-    first_pass = false;
   }
 
+  layout_info.new_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+  layout_info.src_access = VK_ACCESS_SHADER_WRITE_BIT;
+  layout_info.dst_access = VK_ACCESS_TRANSFER_READ_BIT;
+  layout_info.src_stage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  blur_images_[0].LayoutTransition(command_buffer, layout_info);
+
+  layout_info.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+  layout_info.src_access = VK_ACCESS_TRANSFER_READ_BIT;
+  layout_info.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+  layout_info.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  bright_resolve_image_.LayoutTransition(command_buffer, layout_info);
+
+  blit.srcOffsets[0] = {0, 0, 0};
+  blit.srcOffsets[1] = {blur_width, blur_height, 1};
+  blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  blit.srcSubresource.layerCount = 1;
+  blit.dstOffsets[0] = {0, 0, 0};
+  blit.dstOffsets[1] = {image_width, image_height, 1};
+  blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  blit.dstSubresource.layerCount = 1;
+  vkCmdBlitImage(
+      command_buffer.Get(), blur_images_[0].Get(),
+      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bright_resolve_image_.Get(),
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+
+  layout_info.new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  layout_info.src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+  layout_info.dst_access = VK_ACCESS_SHADER_READ_BIT;
+  layout_info.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  bright_resolve_image_.LayoutTransition(command_buffer, layout_info);
+
+  layout_info.new_layout = VK_IMAGE_LAYOUT_GENERAL;
+  layout_info.src_access = VK_ACCESS_TRANSFER_READ_BIT;
+  layout_info.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
+  layout_info.src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  layout_info.dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  blur_images_[0].LayoutTransition(command_buffer, layout_info);
 }
 
 struct PostProcParams {
@@ -2437,7 +2466,8 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
   const uint32_t frame_index = frame_number_ % kMaxFramesInFlight;
   FrameData& frame = frames_[frame_index];
 
-  Renderer::VulkanScopeTimer timer(command_buffer, &profiler_, "Copy to Swapchain");
+  Renderer::VulkanScopeTimer timer(command_buffer, &profiler_,
+                                   "Copy to Swapchain");
 
   VkClearValue clear_value = {{{0.f, 0.f, 0.f, 1.f}}};
   Renderer::RenderPass::BeginInfo begin_info{{clear_value}};
@@ -2464,7 +2494,7 @@ void VulkanEngine::CopyRenderToSwapchain(Renderer::CommandBuffer command_buffer,
 
   VkDescriptorImageInfo blur_image;
   blur_image.sampler = smooth_sampler_.Get();
-  blur_image.imageView = blur_images_[0].GetView();
+  blur_image.imageView = bright_resolve_image_.GetView();
   blur_image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
   VkDescriptorSet blit_set;

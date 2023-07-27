@@ -239,12 +239,10 @@ class VulkanEngine {
   Renderer::RenderPass forward_pass_;
   Renderer::RenderPass directional_shadow_pass_;
   Renderer::RenderPass point_shadow_pass_;
-  Renderer::RenderPass post_processing_pass_;
   Renderer::RenderPass copy_pass_;
   Renderer::Framebuffer forward_framebuffer_;
   Renderer::Framebuffer shadow_framebuffer_;
   Renderer::Framebuffer point_shadow_framebuffer_;
-  std::array<Renderer::Framebuffer, 2> blur_framebuffers_; 
   std::array<Renderer::Framebuffer, kMaxFramesInFlight> swapchain_framebuffers_;
 
   Renderer::DescriptorAllocator descriptor_allocator_;
@@ -269,7 +267,8 @@ class VulkanEngine {
   VkPipeline depth_reduce_pipeline_;
   VkPipelineLayout depth_reduce_layout_;
 
-  Renderer::Pipeline blur_pipeline_;
+  VkPipeline blur_pipeline_;
+  VkPipelineLayout blur_pipeline_layout_;
 
   Renderer::Pipeline blit_pipeline_;
 

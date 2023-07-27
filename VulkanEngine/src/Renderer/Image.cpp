@@ -23,8 +23,10 @@ Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
 
 Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
              VkImageUsageFlags usage, VkFormat format,
-             VkImageAspectFlags aspect_flags, VkSampleCountFlagBits samples) {
-  Create(allocator, device, extent, usage, format, aspect_flags, samples);
+             VkImageAspectFlags aspect_flags, VkSampleCountFlagBits samples,
+             uint32_t mip_levels) {
+  Create(allocator, device, extent, usage, format, aspect_flags, samples,
+         mip_levels);
 }
 
 Image::Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
@@ -92,8 +94,8 @@ VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
 VkResult Image::Create(VmaAllocator allocator, LogicalDevice* device,
                        VkExtent3D extent, VkImageUsageFlags usage,
                        VkFormat format, VkImageAspectFlags aspect_flags,
-                       VkSampleCountFlagBits samples) {
-  return Create(allocator, device, extent, usage, 1, samples, format,
+                       VkSampleCountFlagBits samples, uint32_t mip_levels) {
+  return Create(allocator, device, extent, usage, mip_levels, samples, format,
                 VK_IMAGE_TILING_OPTIMAL, aspect_flags);
 }
 
@@ -159,7 +161,7 @@ void Image::LayoutTransition(CommandBuffer command_buffer,
 void Image::GenerateMipMaps(CommandBuffer command_buffer,
                             const LayoutTransitionInfo& transition_info,
                             VkFilter filter) {
-  Renderer::Image::LayoutTransitionInfo layout_info{};
+  LayoutTransitionInfo layout_info{};
   layout_info.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
   layout_info.new_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
   layout_info.src_stage = transition_info.src_stage;

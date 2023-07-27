@@ -28,7 +28,8 @@ class Image {
   Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
         VkImageUsageFlags usage, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
         VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
-        VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
+        VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+        uint32_t mip_levels = 1);
   Image(VmaAllocator allocator, LogicalDevice* device, VkExtent3D extent,
         VkImageUsageFlags usage,
         VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D,
@@ -57,7 +58,8 @@ class Image {
                   VkExtent3D extent, VkImageUsageFlags usage,
                   VkFormat format = VK_FORMAT_R8G8B8A8_SRGB,
                   VkImageAspectFlags aspect_flags = VK_IMAGE_ASPECT_COLOR_BIT,
-                  VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
+                  VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT,
+                  uint32_t mip_levels = 1);
   VkResult Create(VmaAllocator allocator, LogicalDevice* device,
                   VkExtent3D extent, VkImageUsageFlags usage,
                   VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D,
