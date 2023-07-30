@@ -89,66 +89,91 @@ void UnpackGltfBuffer(tinygltf::Model& model, tinygltf::Accessor& accessor,
 }
 
 void ExtractGltfVertices(tinygltf::Primitive& primitive, tinygltf::Model& model,
-                         std::vector<Assets::Vertex_f32_PNCV>& vertices) {
+                         std::vector<Assets::Vertex_f32_PNCVT>& vertices) {
   tinygltf::Accessor& pos_accessor =
       model.accessors[primitive.attributes["POSITION"]];
+  assert(pos_accessor.type == TINYGLTF_TYPE_VEC3 && "Unsupported position type");
+  assert(pos_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT &&
+         "Unsupported position type");
 
   vertices.resize(pos_accessor.count);
 
   std::vector<uint8_t> pos_data;
   UnpackGltfBuffer(model, pos_accessor, pos_data);
 
-  for (size_t i = 0; i < vertices.size(); ++i) {
-    if (pos_accessor.type != TINYGLTF_TYPE_VEC3) assert(false && "Unsupported position type");
-    if (pos_accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
-      assert(false && "Unsupported position type");
-
-    float* data = reinterpret_cast<float*>(pos_data.data());
-
-    vertices[i].position[0] = *(data + (i * 3) + 0);
-    vertices[i].position[1] = *(data + (i * 3) + 1);
-    vertices[i].position[2] = *(data + (i * 3) + 2);
-  }
-
   tinygltf::Accessor& normal_accessor =
       model.accessors[primitive.attributes["NORMAL"]];
+  assert(normal_accessor.type == TINYGLTF_TYPE_VEC3 &&
+         "Unsupported normal type");
+  assert(normal_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT &&
+         "Unsupported normal type");
 
   std::vector<uint8_t> normal_data;
   UnpackGltfBuffer(model, normal_accessor, normal_data);
 
-  for (size_t i = 0; i < vertices.size(); ++i) {
-    if (normal_accessor.type != TINYGLTF_TYPE_VEC3)
-      assert(false && "Unsupported normal type");
-    if (normal_accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
-      assert(false && "Unsupported normal type");
-
-    float* data = reinterpret_cast<float*>(normal_data.data());
-
-    vertices[i].normal[0] = *(data + (i * 3) + 0);
-    vertices[i].normal[1] = *(data + (i * 3) + 1);
-    vertices[i].normal[2] = *(data + (i * 3) + 2);
-
-    vertices[i].color[0] = *(data + (i * 3) + 0);
-    vertices[i].color[1] = *(data + (i * 3) + 1);
-    vertices[i].color[2] = *(data + (i * 3) + 2);
-  }
-
   tinygltf::Accessor& uv_accessor =
       model.accessors[primitive.attributes["TEXCOORD_0"]];
+  assert(uv_accessor.type == TINYGLTF_TYPE_VEC2 && "Unsupported UV type");
+  assert(uv_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT &&
+         "Unsupported UV type");
 
   std::vector<uint8_t> uv_data;
   UnpackGltfBuffer(model, uv_accessor, uv_data);
 
+  bool has_tangent =
+      primitive.attributes.find("TANGENT") != primitive.attributes.end();
+  tinygltf::Accessor tangent_accessor;
+  std::vector<uint8_t> tangent_data;
+  if (has_tangent) {
+    tangent_accessor = model.accessors[primitive.attributes["TANGENT"]];
+    assert((tangent_accessor.type == TINYGLTF_TYPE_VEC3 ||
+            tangent_accessor.type == TINYGLTF_TYPE_VEC4) &&
+           "Unsupported tangent type");
+    assert(uv_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT &&
+           "Unsupported tangent type");
+
+    UnpackGltfBuffer(model, tangent_accessor, tangent_data);
+  }
+
   for (size_t i = 0; i < vertices.size(); ++i) {
-    if (uv_accessor.type != TINYGLTF_TYPE_VEC2)
-      assert(false && "Unsupported UV type");
-    if (uv_accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT)
-      assert(false && "Unsupported UV type");
 
-    float* data = reinterpret_cast<float*>(uv_data.data());
+    // Inverting X axis because Blender has it in 'wrong' direction smh 
+    {
+      float* data = reinterpret_cast<float*>(pos_data.data());
 
-    vertices[i].uv[0] = *(data + (i * 2) + 0);
-    vertices[i].uv[1] = *(data + (i * 2) + 1);
+      vertices[i].position[0] = -*(data + (i * 3) + 0);
+      vertices[i].position[1] = *(data + (i * 3) + 1);
+      vertices[i].position[2] = *(data + (i * 3) + 2);
+    }
+
+    {
+      float* data = reinterpret_cast<float*>(normal_data.data());
+
+      vertices[i].normal[0] = -*(data + (i * 3) + 0);
+      vertices[i].normal[1] = *(data + (i * 3) + 1);
+      vertices[i].normal[2] = *(data + (i * 3) + 2);
+
+      vertices[i].color[0] = *(data + (i * 3) + 0);
+      vertices[i].color[1] = *(data + (i * 3) + 1);
+      vertices[i].color[2] = *(data + (i * 3) + 2);
+    }
+
+    {
+      float* data = reinterpret_cast<float*>(uv_data.data());
+
+      vertices[i].uv[0] = *(data + (i * 2) + 0);
+      vertices[i].uv[1] = *(data + (i * 2) + 1);
+    }
+
+    if (has_tangent) {
+      float* data = reinterpret_cast<float*>(tangent_data.data());
+
+      bool vec4 = tangent_accessor.type == TINYGLTF_TYPE_VEC4;
+      vertices[i].tangent[0] = -*(data + (i * 4) + 0);
+      vertices[i].tangent[1] = *(data + (i * 4) + 1);
+      vertices[i].tangent[2] = *(data + (i * 4) + 2);
+      vertices[i].tangent[3] = vec4 ? *(data + (i * 4) + 3) : 1.f;
+    }
   }
 }
 
@@ -194,10 +219,48 @@ void ExtractGltfIndices(tinygltf::Primitive& primitive, tinygltf::Model& model,
     }
     indices.push_back(index);
   }
+}
 
-  for (size_t i = 0; i < indices.size() / 3; ++i) {
-    // Flip triangle
-    std::swap(indices[i * 3 + 1], indices[i * 3 + 2]);
+void CalculateTangents(const std::vector<uint32_t>& indices,
+                       std::vector<Assets::Vertex_f32_PNCVT>& vertices) {
+  for (size_t i = 0; i < indices.size(); i += 3) {
+    size_t idx0 = indices[i];
+    size_t idx1 = indices[i + 1];
+    size_t idx2 = indices[i + 2];
+
+    glm::vec3 p0 = {vertices[idx0].position[0], vertices[idx0].position[1],
+                    vertices[idx0].position[2]};
+    glm::vec3 p1 = {vertices[idx1].position[0], vertices[idx1].position[1],
+                    vertices[idx1].position[2]};
+    glm::vec3 p2 = {vertices[idx2].position[0], vertices[idx2].position[1],
+                    vertices[idx2].position[2]};
+
+    glm::vec2 uv0 = {vertices[idx0].uv[0], vertices[idx0].uv[1]};
+    glm::vec2 uv1 = {vertices[idx1].uv[0], vertices[idx1].uv[1]};
+    glm::vec2 uv2 = {vertices[idx2].uv[0], vertices[idx2].uv[1]};
+
+    glm::vec3 delta_p0 = p1 - p0;
+    glm::vec3 delta_p1 = p2 - p0;
+
+    glm::vec2 delta_uv0 = uv1 - uv0;
+    glm::vec2 delta_uv1 = uv2 - uv0;
+
+    float f = 1.f / (delta_uv0.x * delta_uv1.y - delta_uv1.x * delta_uv0.y);
+
+    glm::vec3 tangent = glm::normalize((delta_p0 * delta_uv1.y - delta_p1 * delta_uv0.y) * f);
+
+    vertices[idx0].tangent[0] = tangent.x;
+    vertices[idx0].tangent[1] = tangent.y;
+    vertices[idx0].tangent[2] = tangent.z;
+    vertices[idx0].tangent[3] = 1.f;
+    vertices[idx1].tangent[0] = tangent.x;
+    vertices[idx1].tangent[1] = tangent.y;
+    vertices[idx1].tangent[2] = tangent.z;
+    vertices[idx1].tangent[3] = 1.f;
+    vertices[idx2].tangent[0] = tangent.x;
+    vertices[idx2].tangent[1] = tangent.y;
+    vertices[idx2].tangent[2] = tangent.z;
+    vertices[idx2].tangent[3] = 1.f;
   }
 }
 
@@ -222,8 +285,8 @@ bool ExtractGltfMeshes(tinygltf::Model& model, const fs::path& input,
   for (size_t mesh_idx = 0; mesh_idx < model.meshes.size(); ++mesh_idx) {
     tinygltf::Mesh& glmesh = model.meshes[mesh_idx];
 
-    using VertexFormat = Assets::Vertex_f32_PNCV;
-    auto VertexFormatEnum = Assets::VertexFormat::PNCV_F32;
+    using VertexFormat = Assets::Vertex_f32_PNCVT;
+    auto VertexFormatEnum = Assets::VertexFormat::PNCVT_F32;
 
     std::vector<VertexFormat> vertices;
     std::vector<uint32_t> indices;
@@ -238,6 +301,8 @@ bool ExtractGltfMeshes(tinygltf::Model& model, const fs::path& input,
 
       ExtractGltfIndices(primitive, model, indices);
       ExtractGltfVertices(primitive, model, vertices);
+      if (primitive.attributes.find("TANGENT") == primitive.attributes.end())
+        CalculateTangents(indices, vertices);
 
       Assets::MeshInfo mesh_info;
       mesh_info.vertex_format = VertexFormatEnum;
@@ -297,9 +362,15 @@ void ExtractGltfMaterials(tinygltf::Model& model, const fs::path& input,
       material_info.textures["base_color"] = base_color_path.string();
     }
 
-    if (pbr.metallicRoughnessTexture.index >= 0) {
-      tinygltf::Texture texture =
-          model.textures[pbr.metallicRoughnessTexture.index];
+    if (pbr.metallicRoughnessTexture.index >= 0 ||
+        glmat.normalTexture.index >= 0) {
+      int idx = pbr.metallicRoughnessTexture.index >= 0
+                    ? pbr.metallicRoughnessTexture.index
+                    : glmat.normalTexture.index;
+      if (idx == glmat.normalTexture.index)
+        material_info.base_effect = "texturedNormals";
+
+      tinygltf::Texture texture = model.textures[idx];
       tinygltf::Image image = model.images[texture.source];
 
       fs::path image_path = output.parent_path() / image.uri;

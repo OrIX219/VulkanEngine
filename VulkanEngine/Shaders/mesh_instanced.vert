@@ -1,15 +1,19 @@
 #version 460
 
-layout(location = 0) out vec3 outColor;
-layout(location = 1) out vec3 outNormal;
-layout(location = 2) out vec3 outFragPos;
-layout(location = 3) out vec2 outTextureCoords;
-layout(location = 4) out vec4 outWorldCoords;
+layout(location = 0) out VS_OUT {
+	vec3 color;
+	vec3 normal;
+	vec3 fragPos;
+	vec2 textureCoords;
+	vec4 worldCoords;
+	mat3 TBN;
+} vs_out;
 
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec3 color;
 layout(location = 3) in vec2 textureCoords;
+layout(location = 4) in vec4 tangent;
 
 struct CameraData {
 	mat4 view;
@@ -42,11 +46,17 @@ void main() {
 	mat4 modelMatrix = objectBuffer.objects[index].model;
 	mat4 transformMatrix = sceneData.cameraData.viewProj * modelMatrix;
 	gl_Position = transformMatrix * vec4(pos, 1.f);
-	outColor = color;
+	vs_out.color = color;
 	mat3 normalMat = mat3(objectBuffer.objects[index].normalMat);
-	outNormal = normalize(normalMat * normal);
-	outFragPos = vec3(modelMatrix * vec4(pos, 1.f));
-	outTextureCoords = textureCoords;
+	vs_out.normal = normalize(normalMat * normal);
+	vs_out.fragPos = vec3(modelMatrix * vec4(pos, 1.f));
+	vs_out.textureCoords = textureCoords;
 
-	outWorldCoords = modelMatrix * vec4(pos, 1.f);
+	vs_out.worldCoords = modelMatrix * vec4(pos, 1.f);
+
+	vec3 T = normalize(normalMat * tangent.xyz);
+	vec3 N = vs_out.normal;
+	T = normalize(T - dot(T, N) * N);
+	vec3 B = normalize(cross(N, T) * tangent.w);
+	vs_out.TBN = mat3(T, B, N);
 }

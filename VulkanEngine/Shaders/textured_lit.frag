@@ -3,11 +3,14 @@
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outColorBright;
 
-layout(location = 0) in vec3 inColor;
-layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec3 inFragPos;
-layout(location = 3) in vec2 inTextureCoords;
-layout(location = 4) in vec4 inWorldCoords;
+layout(location = 0)  in VS_OUT {
+	vec3 color;
+	vec3 normal;
+	vec3 fragPos;
+	vec2 textureCoords;
+	vec4 worldCoords;
+	mat3 TBN;
+} fs_in;
 
 struct CameraData {
 	mat4 view;
@@ -61,7 +64,6 @@ layout(set = 0, binding = 0) uniform SceneData {
 	SpotLight spotLights[2];
 } sceneData;
 
-// need samplers for all lights
 layout(set = 0, binding = 1) uniform sampler2DArray directionalShadowSampler;
 layout(set = 0, binding = 2) uniform samplerCubeArray pointShadowSampler;
 
@@ -74,7 +76,7 @@ float CalcShadow(vec4 fragPos, vec3 lightDirection, uint samplerIdx) {
 	if (projCoords.z >= 1) return 1;
 
 	vec3 lightDir = normalize(-lightDirection);
-	float bias = max(0.0001, 0.001 * (1.0 - dot(inNormal, lightDir)));
+	float bias = max(0.0001, 0.001 * (1.0 - dot(fs_in.normal, lightDir)));
 	float shadow = 0.0;
 	vec2 texelSize = 1.0 / textureSize(directionalShadowSampler, 0).xy;
 
@@ -95,13 +97,13 @@ float CalcShadow(vec4 fragPos, vec3 lightDirection, uint samplerIdx) {
 float CalcPointShadow(vec3 fragPos, vec3 lightPos, float farPlane, uint lightIdx) {
 	vec3 fragToLight = fragPos - lightPos;
 	vec3 lightDir = normalize(-fragToLight);
-	float bias = max(0.01, 0.1 * (1.0 - dot(inNormal, lightDir)));
+	float bias = max(0.01, 0.1 * (1.0 - dot(fs_in.normal, lightDir)));
 
 	if (length(fragToLight) >= farPlane) return 1;
 
 	float shadow = 0.0;
 	int samples = 20;
-	float viewDistance = length(sceneData.cameraData.pos - inFragPos);
+	float viewDistance = length(sceneData.cameraData.pos - fs_in.fragPos);
 	float diskRadius = (1.0 + (viewDistance / farPlane)) / 100.0;
 	float currentDepth = length(fragToLight) - bias;
 	
@@ -129,20 +131,20 @@ vec3 CalcDirectional() {
 	for(int i = 0; i < sceneData.directionalLightsCount; i++) {
 		DirectionalLight light = sceneData.directionalLights[i];
 		vec3 lightDir = normalize(-light.direction);
-		float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
+		float lightAngle = clamp(dot(fs_in.normal, lightDir), 0.0, 1.0);
 		vec3 lightColor = light.color.xyz * light.color.w;
 
 		float shadow = 0.f;
 		if (lightAngle > 0.01) 
-			shadow = CalcShadow(sceneData.directionalLights[i].viewProj * inWorldCoords, light.direction, i);
+			shadow = CalcShadow(sceneData.directionalLights[i].viewProj * fs_in.worldCoords, light.direction, i);
 
 		vec3 ambient = light.ambient * lightColor;
 
 		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
-		vec3 viewDir = normalize(sceneData.cameraData.pos - inFragPos);
+		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
-		vec3 specular = light.specular * pow(max(0.0, dot(inNormal, halfwayDir)), 32) * lightColor;
+		vec3 specular = light.specular * pow(max(0.0, dot(fs_in.normal, halfwayDir)), 32) * lightColor;
 
 		result += ambient + shadow * (diffuse + specular);
 	}
@@ -154,21 +156,21 @@ vec3 CalcPoint() {
 	for(int i = 0; i < sceneData.pointLightsCount; i++) {
 		PointLight light = sceneData.pointLights[i];
 		vec3 lightColor = light.color.xyz * light.color.w;
-		vec3 lightDir = normalize(light.position - inFragPos);
-		float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
+		vec3 lightDir = normalize(light.position - fs_in.fragPos);
+		float lightAngle = clamp(dot(fs_in.normal, lightDir), 0.0, 1.0);
 
 		float shadow = 0.f;
-		if (lightAngle > 0.01) shadow = CalcPointShadow(inFragPos, light.position, light.farPlane, i);
+		if (lightAngle > 0.01) shadow = CalcPointShadow(fs_in.fragPos, light.position, light.farPlane, i);
 
 		vec3 ambient = light.ambient * lightColor;
 
 		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
-		vec3 viewDir = normalize(sceneData.cameraData.pos - inFragPos);
+		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
-		vec3 specular = light.specular * pow(max(0.0, dot(inNormal, halfwayDir)), 32) * lightColor;
+		vec3 specular = light.specular * pow(max(0.0, dot(fs_in.normal, halfwayDir)), 32) * lightColor;
 
-		float dist = distance(light.position, inFragPos);
+		float dist = distance(light.position, fs_in.fragPos);
 		float attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * pow(dist, 2));
 		
 		result += ambient + (diffuse + specular) * attenuation * shadow;
@@ -181,7 +183,7 @@ vec3 CalcSpot() {
 	for(int i = 0; i < sceneData.spotLightsCount; i++) {
 		SpotLight light = sceneData.spotLights[i];
 		vec3 lightColor = light.color.xyz * light.color.w;
-		vec3 lightDir = normalize(light.position - inFragPos);
+		vec3 lightDir = normalize(light.position - fs_in.fragPos);
 		float phi = cos(radians(light.cutOffInner));
 		float gamma = cos(radians(light.cutOffOuter));
 		float theta = dot(lightDir, normalize(-light.direction));
@@ -189,12 +191,12 @@ vec3 CalcSpot() {
 
 		vec3 ambient = light.ambient * lightColor;
 
-		float lightAngle = clamp(dot(inNormal, lightDir), 0.0, 1.0);
+		float lightAngle = clamp(dot(fs_in.normal, lightDir), 0.0, 1.0);
 		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
-		vec3 viewDir = normalize(sceneData.cameraData.pos - inFragPos);
+		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
-		vec3 specular = light.specular * pow(max(0.0, dot(inNormal, halfwayDir)), 32) * lightColor;
+		vec3 specular = light.specular * pow(max(0.0, dot(fs_in.normal, halfwayDir)), 32) * lightColor;
 
 		result += ambient + (diffuse + specular) * intensity;
 	}
@@ -202,7 +204,7 @@ vec3 CalcSpot() {
 }
 
 void main() {
-	vec3 tex_color = texture(tex, inTextureCoords).xyz;
+	vec3 tex_color = texture(tex, fs_in.textureCoords).xyz;
 
 	vec3 directional = CalcDirectional();
 	vec3 point = CalcPoint();

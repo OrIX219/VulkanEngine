@@ -64,12 +64,13 @@ layout(set = 0, binding = 0) uniform SceneData {
 	SpotLight spotLights[2];
 } sceneData;
 
-// need samplers for all lights
 layout(set = 0, binding = 1) uniform sampler2DArray directionalShadowSampler;
 layout(set = 0, binding = 2) uniform samplerCubeArray pointShadowSampler;
 
 layout(set = 2, binding = 0) uniform sampler2D tex;
-layout(set = 2, binding = 1) uniform sampler2D emissive;
+layout(set = 2, binding = 1) uniform sampler2D normalMap;
+
+vec3 fragNormal = fs_in.normal;
 
 float CalcShadow(vec4 fragPos, vec3 lightDirection, uint samplerIdx) {
 	vec3 projCoords = fragPos.xyz / fragPos.w;
@@ -78,7 +79,7 @@ float CalcShadow(vec4 fragPos, vec3 lightDirection, uint samplerIdx) {
 	if (projCoords.z >= 1) return 1;
 
 	vec3 lightDir = normalize(-lightDirection);
-	float bias = max(0.0001, 0.001 * (1.0 - dot(fs_in.normal, lightDir)));
+	float bias = max(0.0001, 0.001 * (1.0 - dot(fragNormal, lightDir)));
 	float shadow = 0.0;
 	vec2 texelSize = 1.0 / textureSize(directionalShadowSampler, 0).xy;
 
@@ -99,7 +100,7 @@ float CalcShadow(vec4 fragPos, vec3 lightDirection, uint samplerIdx) {
 float CalcPointShadow(vec3 fragPos, vec3 lightPos, float farPlane, uint lightIdx) {
 	vec3 fragToLight = fragPos - lightPos;
 	vec3 lightDir = normalize(-fragToLight);
-	float bias = max(0.01, 0.1 * (1.0 - dot(fs_in.normal, lightDir)));
+	float bias = max(0.01, 0.1 * (1.0 - dot(fragNormal, lightDir)));
 
 	if (length(fragToLight) >= farPlane) return 1;
 
@@ -133,7 +134,7 @@ vec3 CalcDirectional() {
 	for(int i = 0; i < sceneData.directionalLightsCount; i++) {
 		DirectionalLight light = sceneData.directionalLights[i];
 		vec3 lightDir = normalize(-light.direction);
-		float lightAngle = clamp(dot(fs_in.normal, lightDir), 0.0, 1.0);
+		float lightAngle = clamp(dot(fragNormal, lightDir), 0.0, 1.0);
 		vec3 lightColor = light.color.xyz * light.color.w;
 
 		float shadow = 0.f;
@@ -146,7 +147,7 @@ vec3 CalcDirectional() {
 
 		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
-		vec3 specular = light.specular * pow(max(0.0, dot(fs_in.normal, halfwayDir)), 32) * lightColor;
+		vec3 specular = light.specular * pow(max(0.0, dot(fragNormal, halfwayDir)), 32) * lightColor;
 
 		result += ambient + shadow * (diffuse + specular);
 	}
@@ -159,7 +160,7 @@ vec3 CalcPoint() {
 		PointLight light = sceneData.pointLights[i];
 		vec3 lightColor = light.color.xyz * light.color.w;
 		vec3 lightDir = normalize(light.position - fs_in.fragPos);
-		float lightAngle = clamp(dot(fs_in.normal, lightDir), 0.0, 1.0);
+		float lightAngle = clamp(dot(fragNormal, lightDir), 0.0, 1.0);
 
 		float shadow = 0.f;
 		if (lightAngle > 0.01) shadow = CalcPointShadow(fs_in.fragPos, light.position, light.farPlane, i);
@@ -170,7 +171,7 @@ vec3 CalcPoint() {
 
 		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
-		vec3 specular = light.specular * pow(max(0.0, dot(fs_in.normal, halfwayDir)), 32) * lightColor;
+		vec3 specular = light.specular * pow(max(0.0, dot(fragNormal, halfwayDir)), 32) * lightColor;
 
 		float dist = distance(light.position, fs_in.fragPos);
 		float attenuation = 1.0 / (light.constant + light.linear * dist + light.quadratic * pow(dist, 2));
@@ -193,12 +194,12 @@ vec3 CalcSpot() {
 
 		vec3 ambient = light.ambient * lightColor;
 
-		float lightAngle = clamp(dot(fs_in.normal, lightDir), 0.0, 1.0);
+		float lightAngle = clamp(dot(fragNormal, lightDir), 0.0, 1.0);
 		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
 		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
-		vec3 specular = light.specular * pow(max(0.0, dot(fs_in.normal, halfwayDir)), 32) * lightColor;
+		vec3 specular = light.specular * pow(max(0.0, dot(fragNormal, halfwayDir)), 32) * lightColor;
 
 		result += ambient + (diffuse + specular) * intensity;
 	}
@@ -207,15 +208,18 @@ vec3 CalcSpot() {
 
 void main() {
 	vec3 tex_color = texture(tex, fs_in.textureCoords).xyz;
-	vec3 emissive_color = texture(emissive, fs_in.textureCoords).xyz;
+
+	vec3 normal = texture(normalMap, fs_in.textureCoords).xyz;
+	normal = (normal * 2.0 - 1.0);
+	fragNormal = normalize(fs_in.TBN * normal);
 
 	vec3 directional = CalcDirectional();
 	vec3 point = CalcPoint();
 	vec3 spot = CalcSpot();
 
-	vec3 color = tex_color * (directional + point + spot) + emissive_color * 4;
+	vec3 color = tex_color * (directional + point + spot);
 	outColor = vec4(color, 1.f);
-
+	
 	float brightness = dot(outColor.rgb, vec3(0.2126, 0.7152, 0.0722));
 	if (brightness > 1.0)
 		outColorBright = outColor;

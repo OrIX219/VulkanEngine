@@ -58,8 +58,8 @@ bool Mesh::LoadFromAsset(VmaAllocator allocator, CommandBuffer command_buffer,
   std::vector<uint32_t> indices;
 
   size_t size = mesh_info.vertex_buffer_size;
-  if (mesh_info.vertex_format == Assets::VertexFormat::PNCV_F32)
-    size /= sizeof(Assets::Vertex_f32_PNCV);
+  if (mesh_info.vertex_format == Assets::VertexFormat::PNCVT_F32)
+    size /= sizeof(Assets::Vertex_f32_PNCVT);
   else if (mesh_info.vertex_format == Assets::VertexFormat::P32N8C8V16)
     size /= sizeof(Assets::Vertex_P32N8C8V16);
   vertices.resize(size);

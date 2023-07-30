@@ -190,10 +190,8 @@
     <None Include="Shaders\blit.frag" />
     <None Include="Shaders\blit.vert" />
     <None Include="Shaders\blur.comp" />
-    <None Include="Shaders\blur.frag" />
     <None Include="Shaders\default.frag" />
     <None Include="Shaders\default.vert" />
-    <None Include="Shaders\default_lit.frag" />
     <None Include="Shaders\depth_reduce.comp" />
     <None Include="Shaders\indirect_compute.comp" />
     <None Include="Shaders\mesh_instanced.vert" />
@@ -209,6 +207,7 @@
     <None Include="Shaders\sparse_upload.comp" />
     <None Include="Shaders\textured_lit.frag" />
     <None Include="Shaders\textured_lit_emissive.frag" />
+    <None Include="Shaders\textured_lit_normals.frag" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\AssetLib\AssetLib.vcxproj">

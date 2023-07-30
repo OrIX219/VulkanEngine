@@ -279,9 +279,6 @@
     <ClCompile Include="src\Renderer\Light.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\default_lit.frag">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="Shaders\mesh_instanced.vert">
       <Filter>Shaders</Filter>
     </None>
@@ -308,7 +305,7 @@
     <None Include="Shaders\shadowcast_point.frag" />
     <None Include="Shaders\shadowcast.geom" />
     <None Include="Shaders\textured_lit_emissive.frag" />
-    <None Include="Shaders\blur.frag" />
     <None Include="Shaders\blur.comp" />
+    <None Include="Shaders\textured_lit_normals.frag" />
   </ItemGroup>
 </Project>

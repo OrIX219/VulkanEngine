@@ -1,5 +1,6 @@
 #pragma once
 
+#include <glm\vec4.hpp>
 #include <glm\vec3.hpp>
 #include <glm\vec2.hpp>
 #include "vulkan/vulkan.hpp"
@@ -16,6 +17,7 @@ struct Vertex {
   glm::vec3 normal;
   glm::vec3 color;
   glm::vec2 texture_coords;
+  glm::vec4 tangent;
 
   static std::vector<VkVertexInputBindingDescription> GetBindingDescriptions() {
     std::vector<VkVertexInputBindingDescription> binding_descriptions(1);
@@ -28,7 +30,7 @@ struct Vertex {
 
   static std::vector<VkVertexInputAttributeDescription>
   GetAttributeDescriptions() {
-    std::vector<VkVertexInputAttributeDescription> attribute_descriptions(4);
+    std::vector<VkVertexInputAttributeDescription> attribute_descriptions(5);
 
     attribute_descriptions[0].binding = 0;
     attribute_descriptions[0].location = 0;
@@ -49,6 +51,11 @@ struct Vertex {
     attribute_descriptions[3].location = 3;
     attribute_descriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
     attribute_descriptions[3].offset = offsetof(Vertex, texture_coords);
+
+    attribute_descriptions[4].binding = 0;
+    attribute_descriptions[4].location = 4;
+    attribute_descriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    attribute_descriptions[4].offset = offsetof(Vertex, tangent);
 
     return attribute_descriptions;
   }

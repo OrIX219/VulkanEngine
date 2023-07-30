@@ -45,7 +45,8 @@ bool Texture::LoadFromAsset(VmaAllocator allocator, LogicalDevice* device,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                     VK_IMAGE_USAGE_SAMPLED_BIT,
-                mip_levels);
+                VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT,
+                VK_SAMPLE_COUNT_1_BIT, mip_levels);
 
   Renderer::Image::LayoutTransitionInfo layout_info{};
   layout_info.dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;

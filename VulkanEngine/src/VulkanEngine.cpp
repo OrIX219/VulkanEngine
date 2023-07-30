@@ -2142,10 +2142,9 @@ void VulkanEngine::ExecuteDraw(Renderer::CommandBuffer command_buffer,
 
       VkDescriptorSet normals_global_set;
       Renderer::DescriptorBuilder::Begin(&layout_cache_,
-                                          &frame.dynamic_descriptor_allocator)
-          .BindBuffer(
-              0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-              VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_GEOMETRY_BIT)
+                                         &frame.dynamic_descriptor_allocator)
+          .BindBuffer(0, &scene_info, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+                      VK_SHADER_STAGE_GEOMETRY_BIT)
           .Build(normals_global_set);
 
       pipeline.Bind(command_buffer);

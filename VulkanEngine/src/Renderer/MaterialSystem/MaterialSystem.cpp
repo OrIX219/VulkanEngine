@@ -81,8 +81,8 @@ void MaterialSystem::BuildDefaultTemplates() {
       BuildEffect({"mesh_instanced.vert.spv"}, {"textured_lit.frag.spv"});
   ShaderEffect* textured_lit_emissive = BuildEffect(
       {"mesh_instanced.vert.spv"}, {"textured_lit_emissive.frag.spv"});
-  ShaderEffect* default_lit =
-      BuildEffect({"mesh_instanced.vert.spv"}, {"default_lit.frag.spv"});
+  ShaderEffect* textured_lit_normals = BuildEffect(
+      {"mesh_instanced.vert.spv"}, {"textured_lit_normals.frag.spv"});
   ShaderEffect* opaque_shadowcast =
       BuildEffect({"shadowcast.vert.spv"}, {}, {"shadowcast.geom.spv"});
   ShaderEffect* opaque_shadowcast_point =
@@ -101,8 +101,9 @@ void MaterialSystem::BuildDefaultTemplates() {
   ShaderPass* textured_lit_emissive_pass =
       BuildShader(system.engine_->forward_pass_, system.forward_builder_,
                   textured_lit_emissive);
-  ShaderPass* default_lit_pass = BuildShader(
-      system.engine_->forward_pass_, system.forward_builder_, default_lit);
+  ShaderPass* textured_lit_normals_pass =
+      BuildShader(system.engine_->forward_pass_, system.forward_builder_,
+                  textured_lit_normals);
   ShaderPass* opaque_shadowcast_pass =
       BuildShader(system.engine_->directional_shadow_pass_,
                   system.shadow_builder_, opaque_shadowcast);
@@ -153,20 +154,34 @@ void MaterialSystem::BuildDefaultTemplates() {
     system.template_cache_["texturedPBR_opaque"] = default_textured;
   }
   {
-    EffectTemplate default_textured_emissive;
-    default_textured_emissive.pass_shaders[MeshPassType::kForward] =
+    EffectTemplate textured_emissive;
+    textured_emissive.pass_shaders[MeshPassType::kForward] =
         textured_lit_emissive_pass;
-    default_textured_emissive.pass_shaders[MeshPassType::kTransparency] =
+    textured_emissive.pass_shaders[MeshPassType::kTransparency] =
         nullptr;
-    default_textured_emissive.pass_shaders[MeshPassType::kDirectionalShadow] =
+    textured_emissive.pass_shaders[MeshPassType::kDirectionalShadow] =
         opaque_shadowcast_pass;
-    default_textured_emissive.pass_shaders[MeshPassType::kPointShadow] =
+    textured_emissive.pass_shaders[MeshPassType::kPointShadow] =
         opaque_shadowcast_point_pass;
-    default_textured_emissive.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
+    textured_emissive.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
 
-    default_textured_emissive.transparency = Assets::TransparencyMode::kOpaque;
+    textured_emissive.transparency = Assets::TransparencyMode::kOpaque;
 
-    system.template_cache_["texturedPBR_emissive"] = default_textured_emissive;
+    system.template_cache_["texturedPBR_emissive"] = textured_emissive;
+  }
+  {
+    EffectTemplate textured_normals;
+    textured_normals.pass_shaders[MeshPassType::kForward] = textured_lit_normals_pass;
+    textured_normals.pass_shaders[MeshPassType::kTransparency] = nullptr;
+    textured_normals.pass_shaders[MeshPassType::kDirectionalShadow] =
+        opaque_shadowcast_pass;
+    textured_normals.pass_shaders[MeshPassType::kPointShadow] =
+        opaque_shadowcast_point_pass;
+    textured_normals.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
+
+    textured_normals.transparency = Assets::TransparencyMode::kOpaque;
+
+    system.template_cache_["texturedNormals"] = textured_normals;
   }
   {
     PipelineBuilder transparend_forward = system.forward_builder_;
@@ -200,20 +215,6 @@ void MaterialSystem::BuildDefaultTemplates() {
 
     system.template_cache_["texturedPBR_transparent"] =
         default_textured_transparent;
-  }
-  {
-    EffectTemplate default_colored;
-    default_colored.pass_shaders[MeshPassType::kForward] = default_lit_pass;
-    default_colored.pass_shaders[MeshPassType::kTransparency] = nullptr;
-    default_colored.pass_shaders[MeshPassType::kDirectionalShadow] =
-        opaque_shadowcast_pass;
-    default_colored.pass_shaders[MeshPassType::kPointShadow] =
-        opaque_shadowcast_point_pass;
-    default_colored.pass_shaders[MeshPassType::kSpotShadow] = nullptr;
-
-    default_colored.transparency = Assets::TransparencyMode::kOpaque;
-
-    system.template_cache_["defaultPBR_opaque"] = default_colored;
   }
   {
     EffectTemplate normals_template;
@@ -280,12 +281,14 @@ Material* MaterialSystem::BuildMaterial(const std::string& name,
     DescriptorBuilder builder = DescriptorBuilder::Begin(
         &system.engine_->layout_cache_, &system.engine_->descriptor_allocator_);
 
+    std::vector<VkDescriptorImageInfo> image_infos(info.textures.size());
     for (uint32_t i = 0; i < info.textures.size(); ++i) {
       VkDescriptorImageInfo image_info{};
       image_info.sampler = info.textures[i].sampler;
       image_info.imageView = info.textures[i].view;
       image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      builder.BindImage(i, &image_info,
+      image_infos[i] = image_info;
+      builder.BindImage(i, &image_infos[i],
                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                         VK_SHADER_STAGE_FRAGMENT_BIT);
     }

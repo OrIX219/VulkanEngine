@@ -8,8 +8,8 @@
 namespace Assets {
 
 VertexFormat ParseFormat(const char* format) {
-  if (strcmp(format, "PNCV_F32") == 0)
-    return VertexFormat::PNCV_F32;
+  if (strcmp(format, "PNCVT_F32") == 0)
+    return VertexFormat::PNCVT_F32;
   else if (strcmp(format, "P32N8C8V16") == 0)
     return VertexFormat::P32N8C8V16;
   else
@@ -72,8 +72,8 @@ AssetFile PackMesh(MeshInfo* info, char* vertex_data, char* index_data) {
   file.version = 1;
 
   nlohmann::json metadata;
-  if (info->vertex_format == VertexFormat::PNCV_F32)
-    metadata["vertex_format"] = "PNCV_F32";
+  if (info->vertex_format == VertexFormat::PNCVT_F32)
+    metadata["vertex_format"] = "PNCVT_F32";
   else if (info->vertex_format == VertexFormat::P32N8C8V16)
     metadata["vertex_format"] = "P32N8C8V16";
 
@@ -122,7 +122,7 @@ AssetFile PackMesh(MeshInfo* info, char* vertex_data, char* index_data) {
   return file;
 }
 
-MeshBounds CalculateBounds(Vertex_f32_PNCV* vertices, size_t count) {
+MeshBounds CalculateBounds(Vertex_f32_PNCVT* vertices, size_t count) {
   MeshBounds bounds;
 
   float min[3] = {std::numeric_limits<float>::max(),
