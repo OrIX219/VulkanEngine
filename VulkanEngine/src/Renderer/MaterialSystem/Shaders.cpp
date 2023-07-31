@@ -58,6 +58,8 @@ uint32_t HashDescriptorLayoutInfo(VkDescriptorSetLayoutCreateInfo* info) {
   return fnv1a_32(str.c_str(), str.length());
 }
 
+ShaderEffect::~ShaderEffect() { Destroy(); }
+
 void ShaderEffect::Destroy() {
   vkDestroyPipelineLayout(device_->Get(), built_layout, nullptr);
   for (size_t i = 0; i < 4; ++i) {

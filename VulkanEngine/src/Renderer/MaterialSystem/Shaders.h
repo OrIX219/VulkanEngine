@@ -30,6 +30,8 @@ class ShaderEffect {
     VkDescriptorType overriden_type;
   };
 
+  ~ShaderEffect();
+
   void Destroy();
 
   void AddStage(ShaderModule* module, VkShaderStageFlagBits stage,

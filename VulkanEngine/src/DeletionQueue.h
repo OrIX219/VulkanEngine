@@ -12,6 +12,11 @@ class DeletionQueue {
     deletors_.push_back(func);
   }
 
+  template<typename T>
+  void PushPointer(T* pointer) {
+    deletors_.push_back([pointer]() { delete pointer; });
+  }
+
   void Flush() {
     for (auto iter = deletors_.rbegin(); iter != deletors_.rend(); ++iter) {
       (*iter)();

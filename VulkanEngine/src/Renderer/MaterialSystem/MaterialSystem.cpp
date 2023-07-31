@@ -64,8 +64,7 @@ ShaderEffect* MaterialSystem::BuildEffect(ShaderEffectStage vertex_shader,
   effect->ReflectLayout(&system.engine_->device_, overrides.data(),
                         overrides.size());
 
-  system.engine_->main_deletion_queue_.PushFunction(
-      std::bind(&ShaderEffect::Destroy, effect));
+  system.engine_->main_deletion_queue_.PushPointer(effect);
 
   return effect;
 }
@@ -255,8 +254,10 @@ ShaderPass* MaterialSystem::BuildShader(RenderPass& render_pass,
   pipline_builder.SetShaders(effect);
   pass->pipeline = pipline_builder.Build(render_pass);
 
-  system.engine_->main_deletion_queue_.PushFunction([=]() {
-    vkDestroyPipeline(system.engine_->device_.Get(), pass->pipeline.Get(),
+  system.engine_->main_deletion_queue_.PushPointer(pass);
+  system.engine_->main_deletion_queue_.PushFunction(
+      [=, pipeline = pass->pipeline.Get()]() {
+    vkDestroyPipeline(system.engine_->device_.Get(), pipeline,
                       nullptr);
   });
 
@@ -277,6 +278,7 @@ Material* MaterialSystem::BuildMaterial(const std::string& name,
     new_material->original = &system.template_cache_[info.base_template];
     new_material->pass_sets[MeshPassType::kDirectionalShadow] = VK_NULL_HANDLE;
     new_material->textures = info.textures;
+    system.engine_->main_deletion_queue_.PushPointer(new_material);
 
     DescriptorBuilder builder = DescriptorBuilder::Begin(
         &system.engine_->layout_cache_, &system.engine_->descriptor_allocator_);

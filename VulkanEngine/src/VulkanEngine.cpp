@@ -620,8 +620,7 @@ void VulkanEngine::InitPipelines() {
   blit_effect->AddStage(shader_cache_.GetShader("Shaders/blit.frag.spv"),
                         VK_SHADER_STAGE_FRAGMENT_BIT);
   blit_effect->ReflectLayout(&device_);
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::ShaderEffect::Destroy, *blit_effect));
+  main_deletion_queue_.PushPointer(blit_effect);
 
   Renderer::PipelineBuilder builder = Renderer::PipelineBuilder::Begin(&device_);
   blit_pipeline_ =
@@ -657,8 +656,7 @@ void VulkanEngine::InitPipelines() {
   axes_effect->AddStage(shader_cache_.GetShader("Shaders/axes.geom.spv"),
                         VK_SHADER_STAGE_GEOMETRY_BIT);
   axes_effect->ReflectLayout(&device_, overrides.data(), overrides.size());
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::ShaderEffect::Destroy, *axes_effect));
+  main_deletion_queue_.PushPointer(axes_effect);
 
   builder = Renderer::PipelineBuilder::Begin(&device_);
   axes_pipeline_ =
@@ -797,9 +795,7 @@ bool VulkanEngine::LoadComputeShader(const char* path, VkPipeline& pipeline,
   Renderer::ShaderEffect* effect = new Renderer::ShaderEffect();
   effect->AddStage(&compute_module, VK_SHADER_STAGE_COMPUTE_BIT);
   effect->ReflectLayout(&device_);
-
-  main_deletion_queue_.PushFunction(
-      std::bind(&Renderer::ShaderEffect::Destroy, effect));
+  main_deletion_queue_.PushPointer(effect);
 
   Renderer::ComputePipelineBuilder builder =
       Renderer::ComputePipelineBuilder::Begin(&device_);
@@ -872,8 +868,10 @@ bool VulkanEngine::LoadPrefab(Renderer::CommandBuffer command_buffer,
       LOG_SUCCESS("Loaded prefab '{}'", path);
     }
 
-    prefab_cache_[path] = new Assets::PrefabInfo;
+    Assets::PrefabInfo* prefab_info = new Assets::PrefabInfo;
+    prefab_cache_[path] = prefab_info;
     *prefab_cache_[path] = Assets::ReadPrefabInfo(&file);
+    main_deletion_queue_.PushPointer(prefab_info);
   }
 
   Assets::PrefabInfo* info = prefab_cache_[path];
