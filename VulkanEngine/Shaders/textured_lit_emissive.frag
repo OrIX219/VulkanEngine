@@ -1,5 +1,9 @@
 #version 450
 
+#define MAX_DIR_LIGHT 1
+#define MAX_POINT_LIGHT 2
+#define MAX_SPOT_LIGHT 2
+
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outColorBright;
 
@@ -9,7 +13,6 @@ layout(location = 0)  in VS_OUT {
 	vec3 fragPos;
 	vec2 textureCoords;
 	vec4 worldCoords;
-	mat3 TBN;
 } fs_in;
 
 struct CameraData {
@@ -57,11 +60,11 @@ layout(set = 0, binding = 0) uniform SceneData {
 	vec4 fogColor;
 	vec4 fogDistances;
 	uint directionalLightsCount;
-	DirectionalLight directionalLights[1];
+	DirectionalLight directionalLights[MAX_DIR_LIGHT];
 	uint pointLightsCount;
-	PointLight pointLights[2];
+	PointLight pointLights[MAX_POINT_LIGHT];
 	uint spotLightsCount;
-	SpotLight spotLights[2];
+	SpotLight spotLights[MAX_SPOT_LIGHT];
 } sceneData;
 
 // need samplers for all lights
@@ -138,7 +141,7 @@ vec3 CalcDirectional() {
 
 		float shadow = 0.f;
 		if (lightAngle > 0.01) 
-			shadow = CalcShadow(sceneData.directionalLights[i].viewProj * fs_in.worldCoords, light.direction, i);
+			shadow = CalcShadow(light.viewProj * fs_in.worldCoords, light.direction, i);
 
 		vec3 ambient = light.ambient * lightColor;
 

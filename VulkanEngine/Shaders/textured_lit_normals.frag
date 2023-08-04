@@ -1,5 +1,9 @@
 #version 450
 
+#define MAX_DIR_LIGHT 1
+#define MAX_POINT_LIGHT 2
+#define MAX_SPOT_LIGHT 2
+
 layout(location = 0) out vec4 outColor;
 layout(location = 1) out vec4 outColorBright;
 
@@ -9,7 +13,11 @@ layout(location = 0)  in VS_OUT {
 	vec3 fragPos;
 	vec2 textureCoords;
 	vec4 worldCoords;
-	mat3 TBN;
+	vec3 tangentViewPos;
+	vec3 tangentFragPos;
+	vec3 tangentDirLightDirection[MAX_DIR_LIGHT];
+	vec3 tangentPointLightPos[MAX_POINT_LIGHT];
+	vec3 tangentSpotLightPos[MAX_SPOT_LIGHT];
 } fs_in;
 
 struct CameraData {
@@ -57,11 +65,11 @@ layout(set = 0, binding = 0) uniform SceneData {
 	vec4 fogColor;
 	vec4 fogDistances;
 	uint directionalLightsCount;
-	DirectionalLight directionalLights[1];
+	DirectionalLight directionalLights[MAX_DIR_LIGHT];
 	uint pointLightsCount;
-	PointLight pointLights[2];
+	PointLight pointLights[MAX_POINT_LIGHT];
 	uint spotLightsCount;
-	SpotLight spotLights[2];
+	SpotLight spotLights[MAX_SPOT_LIGHT];
 } sceneData;
 
 layout(set = 0, binding = 1) uniform sampler2DArray directionalShadowSampler;
@@ -133,19 +141,19 @@ vec3 CalcDirectional() {
 	vec3 result = vec3(0.f);
 	for(int i = 0; i < sceneData.directionalLightsCount; i++) {
 		DirectionalLight light = sceneData.directionalLights[i];
-		vec3 lightDir = normalize(-light.direction);
+		vec3 lightDir = normalize(fs_in.tangentDirLightDirection[i]);
 		float lightAngle = clamp(dot(fragNormal, lightDir), 0.0, 1.0);
 		vec3 lightColor = light.color.xyz * light.color.w;
 
 		float shadow = 0.f;
 		if (lightAngle > 0.01) 
-			shadow = CalcShadow(sceneData.directionalLights[i].viewProj * fs_in.worldCoords, light.direction, i);
+			shadow = CalcShadow(light.viewProj * fs_in.worldCoords, light.direction, i);
 
 		vec3 ambient = light.ambient * lightColor;
 
 		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
-		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
+		vec3 viewDir = normalize(fs_in.tangentViewPos - fs_in.tangentFragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
 		vec3 specular = light.specular * pow(max(0.0, dot(fragNormal, halfwayDir)), 32) * lightColor;
 
@@ -159,7 +167,7 @@ vec3 CalcPoint() {
 	for(int i = 0; i < sceneData.pointLightsCount; i++) {
 		PointLight light = sceneData.pointLights[i];
 		vec3 lightColor = light.color.xyz * light.color.w;
-		vec3 lightDir = normalize(light.position - fs_in.fragPos);
+		vec3 lightDir = normalize(fs_in.tangentPointLightPos[i] - fs_in.tangentFragPos);
 		float lightAngle = clamp(dot(fragNormal, lightDir), 0.0, 1.0);
 
 		float shadow = 0.f;
@@ -169,7 +177,7 @@ vec3 CalcPoint() {
 
 		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
-		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
+		vec3 viewDir =normalize(fs_in.tangentViewPos - fs_in.tangentFragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
 		vec3 specular = light.specular * pow(max(0.0, dot(fragNormal, halfwayDir)), 32) * lightColor;
 
@@ -186,7 +194,7 @@ vec3 CalcSpot() {
 	for(int i = 0; i < sceneData.spotLightsCount; i++) {
 		SpotLight light = sceneData.spotLights[i];
 		vec3 lightColor = light.color.xyz * light.color.w;
-		vec3 lightDir = normalize(light.position - fs_in.fragPos);
+		vec3 lightDir = normalize(fs_in.tangentSpotLightPos[i] - fs_in.tangentFragPos);
 		float phi = cos(radians(light.cutOffInner));
 		float gamma = cos(radians(light.cutOffOuter));
 		float theta = dot(lightDir, normalize(-light.direction));
@@ -197,7 +205,7 @@ vec3 CalcSpot() {
 		float lightAngle = clamp(dot(fragNormal, lightDir), 0.0, 1.0);
 		vec3 diffuse = light.diffuse * lightAngle * lightColor;
 
-		vec3 viewDir = normalize(sceneData.cameraData.pos - fs_in.fragPos);
+		vec3 viewDir = normalize(fs_in.tangentViewPos - fs_in.tangentFragPos);
 		vec3 halfwayDir = normalize(lightDir + viewDir);
 		vec3 specular = light.specular * pow(max(0.0, dot(fragNormal, halfwayDir)), 32) * lightColor;
 
@@ -210,8 +218,7 @@ void main() {
 	vec3 tex_color = texture(tex, fs_in.textureCoords).xyz;
 
 	vec3 normal = texture(normalMap, fs_in.textureCoords).xyz;
-	normal = (normal * 2.0 - 1.0);
-	fragNormal = normalize(fs_in.TBN * normal);
+	fragNormal = (normal * 2.0 - 1.0);
 
 	vec3 directional = CalcDirectional();
 	vec3 point = CalcPoint();

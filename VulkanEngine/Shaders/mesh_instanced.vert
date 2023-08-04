@@ -6,7 +6,6 @@ layout(location = 0) out VS_OUT {
 	vec3 fragPos;
 	vec2 textureCoords;
 	vec4 worldCoords;
-	mat3 TBN;
 } vs_out;
 
 layout(location = 0) in vec3 pos;
@@ -53,10 +52,4 @@ void main() {
 	vs_out.textureCoords = textureCoords;
 
 	vs_out.worldCoords = modelMatrix * vec4(pos, 1.f);
-
-	vec3 T = normalize(normalMat * tangent.xyz);
-	vec3 N = vs_out.normal;
-	T = normalize(T - dot(T, N) * N);
-	vec3 B = normalize(cross(N, T) * tangent.w);
-	vs_out.TBN = mat3(T, B, N);
 }

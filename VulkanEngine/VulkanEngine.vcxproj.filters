@@ -307,5 +307,6 @@
     <None Include="Shaders\textured_lit_emissive.frag" />
     <None Include="Shaders\blur.comp" />
     <None Include="Shaders\textured_lit_normals.frag" />
+    <None Include="Shaders\mesh_instanced_tangent.vert" />
   </ItemGroup>
 </Project>

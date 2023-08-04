@@ -81,7 +81,7 @@ void MaterialSystem::BuildDefaultTemplates() {
   ShaderEffect* textured_lit_emissive = BuildEffect(
       {"mesh_instanced.vert.spv"}, {"textured_lit_emissive.frag.spv"});
   ShaderEffect* textured_lit_normals = BuildEffect(
-      {"mesh_instanced.vert.spv"}, {"textured_lit_normals.frag.spv"});
+      {"mesh_instanced_tangent.vert.spv"}, {"textured_lit_normals.frag.spv"});
   ShaderEffect* opaque_shadowcast =
       BuildEffect({"shadowcast.vert.spv"}, {}, {"shadowcast.geom.spv"});
   ShaderEffect* opaque_shadowcast_point =
